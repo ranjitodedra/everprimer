@@ -18,6 +18,7 @@ import {
   type ObjectiveEvidence,
   type ObjectiveMasteryState,
 } from "@eco/mastery";
+import { enqueueMemoryJob } from "@/lib/memory";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /**
@@ -199,6 +200,14 @@ async function recomputeTopic(
     { onConflict: "child_id,topic_id" },
   );
   if (pErr) throw pErr;
+
+  if (upserts.length) {
+    try {
+      await enqueueMemoryJob(childId, topicId);
+    } catch (err) {
+      console.error("[memory] enqueue failed", err instanceof Error ? err.message : err);
+    }
+  }
 }
 
 export type { ArtifactRow };

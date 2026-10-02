@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { getUser } from "@/lib/auth";
+import { getAccount, homeFor } from "@/lib/auth";
 
 export default async function Home() {
-  const user = await getUser();
-  redirect(user ? "/parent" : "/login");
+  const account = await getAccount();
+  redirect(account ? homeFor(account) : "/login");
 }

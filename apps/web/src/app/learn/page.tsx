@@ -1,12 +1,18 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ChildRow } from "@eco/db";
 import { enterChildMode } from "@/app/actions";
 import { Avatar } from "@/components/ui";
+import { homeFor, requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+/** Shared-device picker. Child logins and individuals go straight to their own home. */
 export default async function LearnHome() {
+  const account = await requireAccount();
+  if (account.kind !== "parent") redirect(homeFor(account));
+
   const supabase = await createClient();
-  const { data } = await supabase.from("children").select("*").order("created_at");
+  const { data } = await supabase.from("children").select("*").eq("kind", "child").eq("shared_device", true).order("created_at");
   const children = (data ?? []) as ChildRow[];
 
   return (
@@ -15,7 +21,7 @@ export default async function LearnHome() {
       <h1 className="mb-10 text-center text-4xl font-black tracking-tight sm:text-5xl">Who is learning today?</h1>
       {children.length === 0 ? (
         <p className="text-center text-ink-soft">
-          No children yet.{" "}
+          No children on this device yet.{" "}
           <Link href="/parent" className="link">
             Add one in the grown-up area.
           </Link>

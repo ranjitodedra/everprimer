@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Sprout design tokens.
+ * Everprimer design tokens.
  * Warm paper background, leaf-green brand, amber "sun" accent. Semantic
  * colours (sky / sun / berry) are for status, never for decoration.
  */
@@ -89,12 +89,31 @@
     background: var(--color-paper);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Kills double-tap-to-zoom while keeping normal taps snappy. */
+    touch-action: manipulation;
   }
   body {
     min-height: 100dvh;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  @supports (height: 100svh) {
+    body {
+      min-height: 100svh;
+    }
   }
   h1,
   h2,
@@ -266,6 +285,61 @@
     color: var(--color-brand-deep);
   }
 
+  /* ---------- Kid path ---------- */
+
+  .path-node {
+    --node-edge: var(--color-line-strong);
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 9999px;
+    box-shadow: 0 6px 0 var(--node-edge);
+    transition:
+      transform 120ms ease,
+      box-shadow 120ms ease;
+  }
+  a:hover > * > .path-node {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 0 var(--node-edge);
+  }
+  a:active > * > .path-node {
+    transform: translateY(4px);
+    box-shadow: 0 2px 0 var(--node-edge);
+  }
+  .path-node-lg {
+    width: 5.25rem;
+    height: 5.25rem;
+  }
+  .path-node-done {
+    --node-edge: var(--color-brand-deep);
+    background: var(--color-brand);
+    color: #fff;
+  }
+  .path-node-current {
+    --node-edge: var(--color-brand-deep);
+    background: var(--color-brand);
+    color: #fff;
+  }
+  .path-node-review {
+    --node-edge: var(--color-sun-deep);
+    background: var(--color-sun);
+    color: #3b2200;
+  }
+  .path-node-new {
+    --node-edge: var(--color-line-strong);
+    background: var(--color-paper-deep);
+    color: var(--color-ink-soft);
+  }
+  .path-ring::before {
+    content: "";
+    position: absolute;
+    inset: -0.6rem -0.6rem -0.95rem;
+    border-radius: 9999px;
+    border: 5px solid color-mix(in srgb, var(--color-brand) 30%, transparent);
+    pointer-events: none;
+  }
+
   /* ---------- Forms ---------- */
 
   .input {
@@ -275,8 +349,12 @@
     border: 1.5px solid var(--color-line-strong);
     background: var(--color-card);
     padding-inline: 0.9rem;
+    /* 16px minimum on mobile prevents iOS Safari zoom-on-focus. */
     font-size: 1rem;
     color: var(--color-ink);
+    /* Leaves room above/below when the browser scrolls a focused field into view
+     * (e.g. under a sticky header or above the on-screen keyboard). */
+    scroll-margin-block: 6rem;
     transition:
       border-color 140ms ease,
       box-shadow 140ms ease;

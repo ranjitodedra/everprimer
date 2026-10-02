@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "sync": "cap sync",
+    "sync": "cp ../../logo.svg www/logo.svg && cap sync",
     "open:ios": "cap open ios",
     "open:android": "cap open android",
     "apk": "JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk@21}\" ./android/gradlew -p android assembleDebug",

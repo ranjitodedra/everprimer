@@ -18,8 +18,8 @@ if (!serverUrl) {
 }
 
 const config: CapacitorConfig = {
-  appId: "app.sprout.learn",
-  appName: "Sprout",
+  appId: "app.everprimer.learn",
+  appName: "Everprimer",
   webDir: "www",
   server: {
     ...(serverUrl
