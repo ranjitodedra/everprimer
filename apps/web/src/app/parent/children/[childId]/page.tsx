@@ -1,26 +1,36 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ChildRow, CurriculumRow, PersonalizationRow, TopicProgressRow, TopicRow } from "@eco/db";
-import { addContext, createCurriculum, enterChildMode, removeContext } from "@/app/actions";
+import { ageFromBirth } from "@eco/contracts";
+import type { ChildRow, CurriculumRow, MemoryRow, PersonalizationRow, TopicProgressRow, TopicRow } from "@eco/db";
+import { addContext, createCurriculum, enterChildMode, removeContext, removeMemory, setLearnerBirth } from "@/app/actions";
+import { BirthFields } from "@/components/birth-fields";
 import { Book, Chart, ChevronRight, Heart, Play, Sparkles, X } from "@/components/icons";
+import { BillingNotice, billingCode } from "@/components/billing-notice";
 import { Avatar, EmptyState, PageHeader, ProgressRing, SectionTitle, StatusBadge } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { requireGrownup } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { ChildAccess } from "./child-access";
 
 export default async function ChildPage(props: PageProps<"/parent/children/[childId]">) {
-  await requireUser();
+  await requireGrownup();
   const { childId } = await props.params;
+  const sp = await props.searchParams;
   const supabase = await createClient();
 
-  const [{ data: child }, { data: ctx }, { data: curricula }, { data: progress }] = await Promise.all([
+  const [{ data: child }, { data: ctx }, { data: memories }, { data: curricula }, { data: progress }, { data: login }] = await Promise.all([
     supabase.from("children").select("*").eq("id", childId).maybeSingle(),
     supabase.from("personalization_context").select("*").eq("child_id", childId).eq("active", true).order("created_at"),
+    supabase.from("learner_memories").select("*").eq("child_id", childId).eq("active", true).eq("source", "inferred").order("last_seen_at", { ascending: false }),
     supabase.from("curricula").select("*").eq("child_id", childId).order("created_at", { ascending: false }),
     supabase.from("topic_progress").select("*").eq("child_id", childId),
+    supabase.from("child_logins").select("username").eq("child_id", childId).maybeSingle(),
   ]);
   if (!child) notFound();
   const c = child as ChildRow;
+  const isSelf = c.kind === "self";
   const context = (ctx ?? []) as PersonalizationRow[];
+  const remembered = (memories ?? []) as MemoryRow[];
+  const age = c.birth_year != null && c.birth_month != null ? ageFromBirth(c.birth_year, c.birth_month) : c.age;
   const curriculumRows = (curricula ?? []) as CurriculumRow[];
   const progressRows = (progress ?? []) as TopicProgressRow[];
 
@@ -33,16 +43,25 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
 
   const completed = progressRows.filter((p) => p.status === "completed").length;
   const needsReview = progressRows.filter((p) => p.status === "needs_review").length;
-  const meta = [c.age ? `Age ${c.age}` : "Age not set", c.reading_level ? `${c.reading_level.replace("_", " ")} reader` : null].filter(Boolean).join(" · ");
+  const meta = [age ? `Age ${age}` : "Age not set", c.reading_level ? `${c.reading_level.replace("_", " ")} reader` : null].filter(Boolean).join(" · ");
 
   const enter = enterChildMode.bind(null, c.id);
   const addCtx = addContext.bind(null, c.id);
+  const saveBirth = setLearnerBirth.bind(null, c.id);
   const newCurriculum = createCurriculum.bind(null, c.id);
+  const memoryLabel: Record<MemoryRow["kind"], string> = {
+    interest: "Interest",
+    preference: "Preference",
+    strength: "Strength",
+    misconception: "Misconception",
+    analogy_that_worked: "Analogy",
+  };
 
   return (
     <>
+      <BillingNotice code={billingCode(sp.billing)} audience="grownup" />
       <PageHeader
-        eyebrow="Child"
+        eyebrow={isSelf ? "Your learning" : "Child"}
         leading={<Avatar emoji={c.avatar} size="lg" className="mt-1" />}
         title={c.display_name}
         description={`${meta} · ${completed} topic${completed === 1 ? "" : "s"} completed${needsReview ? ` · ${needsReview} to review` : ""}`}
@@ -52,18 +71,24 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
               <Chart size={16} />
               Daily summary
             </Link>
-            <form action={enter}>
-              <button type="submit" className="btn-primary">
+            {isSelf ? (
+              <Link href={`/learn/${c.id}`} className="btn-primary">
                 <Play size={14} />
-                Open kid mode
-              </button>
-            </form>
+                Start learning
+              </Link>
+            ) : c.shared_device ? (
+              <form action={enter}>
+                <button type="submit" className="btn-primary">
+                  <Play size={14} />
+                  Open kid mode
+                </button>
+              </form>
+            ) : null}
           </>
         }
       />
 
-      <div className="grid gap-8 lg:grid-cols-[1.6fr_1fr]">
-        <div className="space-y-8">
+      <div className="flex w-full flex-col gap-6">
           <section>
             <SectionTitle hint="Every goal becomes an ordered set of lessons.">Curricula</SectionTitle>
             {curriculumRows.length === 0 ? (
@@ -107,7 +132,15 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
                 </div>
               </div>
               <form action={newCurriculum} className="space-y-3">
-                <textarea name="goal" required minLength={5} maxLength={600} rows={3} className="input" placeholder="I want my child to learn about the solar system and all the planets." />
+                <textarea
+                  name="goal"
+                  required
+                  minLength={5}
+                  maxLength={600}
+                  rows={3}
+                  className="input"
+                  placeholder={isSelf ? "I want to understand how compound interest works." : "I want my child to learn about the solar system and all the planets."}
+                />
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-xs text-ink-faint">5 to 14 lessons, from familiar to new.</p>
                   <button type="submit" className="btn-primary">Create curriculum</button>
@@ -115,9 +148,18 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
               </form>
             </div>
           </section>
-        </div>
 
-        <aside className="space-y-6">
+          {isSelf ? null : <ChildAccess childId={c.id} sharedDevice={c.shared_device} username={(login?.username as string | undefined) ?? null} />}
+          <section className="card">
+            <h2 className="font-extrabold">Birthday</h2>
+            <p className="mb-4 text-sm text-ink-soft">Age in lessons is calculated from this. It updates as the year goes on.</p>
+            <form action={saveBirth} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <BirthFields required defaultMonth={c.birth_month} defaultYear={c.birth_year} monthId="learner_birth_month" yearId="learner_birth_year" />
+              </div>
+              <button type="submit" className="btn-secondary">Save birthday</button>
+            </form>
+          </section>
           <section className="card">
             <div className="mb-1 flex items-center gap-2">
               <Heart size={16} className="text-berry" />
@@ -149,7 +191,32 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
               <button type="submit" className="btn-secondary shrink-0">Add</button>
             </form>
           </section>
-        </aside>
+          <section className="card">
+            <div className="mb-1 flex items-center gap-2">
+              <Sparkles size={16} className="text-brand" />
+              <h2 className="font-extrabold">Remembered from lessons</h2>
+            </div>
+            <p className="mb-4 text-sm text-ink-soft">Plus and Max can keep a few notes after a lesson. They shape the next lesson, not ones already published. Learners never see this list.</p>
+            <ul className="mb-1 space-y-2">
+              {remembered.length === 0 ? <li className="text-sm text-ink-faint">Nothing yet.</li> : null}
+              {remembered.map((item) => {
+                const remove = removeMemory.bind(null, c.id, item.id);
+                return (
+                  <li key={item.id} className="flex items-start gap-2 rounded-xl bg-paper-deep px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold tracking-wide text-ink-faint uppercase">{memoryLabel[item.kind]}</p>
+                      <p className="text-sm font-semibold">{item.value}</p>
+                    </div>
+                    <form action={remove}>
+                      <button type="submit" aria-label={`Remove ${item.value}`} className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-black/10">
+                        <X size={14} />
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
       </div>
     </>
   );

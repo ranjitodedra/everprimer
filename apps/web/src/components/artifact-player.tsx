@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LEARNKIT_PROTOCOL_VERSION, LearnKitMessage, type HostInitMessage, type LearningEvent } from "@eco/contracts";
+import { newId } from "@/lib/uuid";
 
 interface Props {
   html: string;
@@ -85,7 +86,7 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
 
   useEffect(() => {
     // The host records the open; the artifact records everything after.
-    const opened: LearningEvent = { clientEventId: crypto.randomUUID(), type: "topic_opened", occurredAt: new Date().toISOString(), payload: { artifactId } };
+    const opened: LearningEvent = { clientEventId: newId(), type: "topic_opened", occurredAt: new Date().toISOString(), payload: { artifactId } };
     queueRef.current.set(opened.clientEventId, opened);
     const initialFlush = setTimeout(() => void flush(), 0);
 
@@ -146,7 +147,7 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
         </span>
         {completed ? (
           <Link href={backHref} className="btn-primary animate-pop">
-            Back to my topics
+            Back to path
           </Link>
         ) : null}
       </div>

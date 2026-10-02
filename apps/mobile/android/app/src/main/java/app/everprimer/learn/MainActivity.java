@@ -1,4 +1,4 @@
-package app.sprout.learn;
+package app.everprimer.learn;
 
 import com.getcapacitor.BridgeActivity;
 

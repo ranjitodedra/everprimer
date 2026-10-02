@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Sprout</string>
-    <string name="title_activity_main">Sprout</string>
-    <string name="package_name">app.sprout.learn</string>
-    <string name="custom_url_scheme">app.sprout.learn</string>
+    <string name="app_name">Everprimer</string>
+    <string name="title_activity_main">Everprimer</string>
+    <string name="package_name">app.everprimer.learn</string>
+    <string name="custom_url_scheme">app.everprimer.learn</string>
 </resources>

@@ -3,12 +3,13 @@ import { z } from "zod";
 import {
   ArtifactBlueprint,
   GeneratedCurriculum,
+  MemoryUpdate,
   lintBlueprint,
   type LearnerContext,
 } from "@eco/contracts";
 import { normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml, type HtmlValidationResult } from "@eco/learnkit";
 import { mockBlueprint, mockCurriculum, mockFactcheck, mockReport } from "./mock";
-import { PROMPT_VERSION, blueprintPrompt, codegenPrompt, curriculumPrompt, factcheckPrompt, reportPrompt } from "./prompts";
+import { PROMPT_VERSION, blueprintPrompt, codegenPrompt, curriculumPrompt, factcheckPrompt, memoryPrompt, reportPrompt } from "./prompts";
 import { resolveModel, type AiTask, type Tier, type UsageRecord } from "./provider";
 import { modelSchema, schemaProblems } from "./schema";
 
@@ -259,6 +260,41 @@ export async function generateArtifactHtml(input: { blueprint: ArtifactBlueprint
 /* ------------------------------------------------------------------ */
 /* Parent report                                                        */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* Learner memory compaction                                            */
+/* ------------------------------------------------------------------ */
+
+export async function compactLearnerMemory(input: {
+  summary: string;
+  cards: { kind: string; value: string; confidence: number }[];
+  tier: Tier;
+}): Promise<{ update: MemoryUpdate; meta: PipelineMeta }> {
+  const empty = MemoryUpdate.parse({ upserts: [], deactivate: [] });
+  const r = resolveModel("memory", input.tier);
+  if (r.provider === "mock") return { update: empty, meta: meta("mock", "mock", []) };
+
+  const usage: UsageRecord[] = [];
+  const schema = modelSchema(MemoryUpdate);
+  let problems: string[] = [];
+  let update: MemoryUpdate | null = null;
+
+  for (let attempt = 0; attempt < 2 && !update; attempt++) {
+    const { system, prompt } = memoryPrompt(input);
+    const repair = problems.length ? `\n\nYOUR PREVIOUS ATTEMPT WAS INVALID. Fix all of these and return the update again:\n${problems.map((p) => `- ${p}`).join("\n")}` : "";
+    const res = await timed(
+      "memory",
+      r,
+      () => generateText({ model: r.model, system, prompt: prompt + repair, output: Output.object({ schema }), temperature: 0.2 }),
+      usage,
+    );
+    const parsed = MemoryUpdate.safeParse(res.output);
+    if (parsed.success) update = parsed.data;
+    else problems = schemaProblems(parsed.error);
+  }
+  if (!update) throw new Error(`memory update did not match the schema: ${problems.join("; ")}`);
+  return { update, meta: meta(r.provider, r.modelId, usage) };
+}
 
 export async function generateReportText(input: { childName: string; stats: Record<string, unknown>; tier: Tier }): Promise<{ text: string; meta: PipelineMeta }> {
   const r = resolveModel("report", input.tier);

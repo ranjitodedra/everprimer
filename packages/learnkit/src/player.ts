@@ -517,7 +517,9 @@ export const PLAYER_CSS = String.raw`
 :root { --lk-primary: #15803d; --lk-accent: #f59e0b; --lk-bg: #f8f5ee; --lk-ink: #1f2a24; --lk-muted: #5f6b64; --lk-card: #ffffff; --lk-line: #e5dfd2; --lk-ok: #15803d; --lk-warn: #b45309; --lk-radius: 22px; --lk-shade: color-mix(in srgb, var(--lk-primary) 72%, black); }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-body { font-family: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--lk-bg); color: var(--lk-ink); line-height: 1.55; font-size: 18px; -webkit-font-smoothing: antialiased; }
+body { font-family: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: var(--lk-bg); color: var(--lk-ink); line-height: 1.55; font-size: 18px; -webkit-font-smoothing: antialiased; touch-action: manipulation; }
+html { touch-action: manipulation; }
+button, a, input, select, textarea, label, summary, [role="button"] { touch-action: manipulation; }
 #app { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
 .lk-header { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 16px; }
 .lk-brand { display: flex; align-items: center; gap: 12px; }
@@ -625,6 +627,7 @@ body { font-family: "Nunito", ui-rounded, system-ui, -apple-system, "Segoe UI", 
 .lk-done-emoji { font-size: 64px; display: inline-block; animation: lk-pop 500ms cubic-bezier(.2,.9,.3,1.3) both; }
 @keyframes lk-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 :focus-visible { outline: 3px solid var(--lk-accent); outline-offset: 3px; }
+@media (max-width: 420px) { #app { padding: 12px 12px 32px; } .lk-main { padding: 18px 14px; border-radius: 18px; } .lk-section h2 { font-size: 22px; margin: 6px 0 10px; } .lk-lead { font-size: 18px; } .lk-prompt { font-size: 19px; margin-bottom: 12px !important; } .lk-btn { min-height: 46px; padding: 8px 16px; font-size: 16px; } .lk-btn.big { min-height: 56px; font-size: 18px; } .lk-nav { gap: 8px; padding-top: 14px; } .lk-option { min-height: 54px; padding: 10px 12px; font-size: 16px; } .lk-input { min-height: 52px; font-size: 18px; padding: 10px 14px; } .lk-callout { padding: 12px 14px; border-radius: 14px; } .lk-emoji { width: 40px; height: 40px; font-size: 24px; } .lk-title { font-size: 20px; } }
 @media (min-width: 640px) { body { font-size: 19px; } #app { padding: 28px 24px 60px; } .lk-main { padding: 30px 32px; } .lk-section h2 { font-size: 30px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } .lk-bar-fill { transition: none; } }
 .lk-reduced-motion *, .lk-reduced-motion *::before, .lk-reduced-motion *::after { transition: none !important; animation: none !important; }

@@ -4,7 +4,7 @@ import type { ChildRow, DailyReportRow } from "@eco/db";
 import { generateReportNow } from "@/app/actions";
 import { ArrowLeft, ArrowRight, Book, Check, Clock, Sparkles, Target } from "@/components/icons";
 import { Avatar, BackLink, PageHeader, Stat } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { requireGrownup } from "@/lib/auth";
 import { computeDailyStats, todayIso, type DailyStats } from "@/lib/report";
 import { createClient } from "@/lib/supabase/server";
 
@@ -13,7 +13,7 @@ function prettyDate(iso: string) {
 }
 
 export default async function ReportPage(props: PageProps<"/parent/children/[childId]/report">) {
-  await requireUser();
+  await requireGrownup();
   const { childId } = await props.params;
   const sp = await props.searchParams;
   const date = typeof sp.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayIso();
@@ -56,14 +56,14 @@ export default async function ReportPage(props: PageProps<"/parent/children/[chi
         }
       />
 
-      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Topics opened" value={stats.topicsOpened.length} icon={<Book size={18} />} tone="sky" />
         <Stat label="Completed" value={stats.topicsCompleted.length} icon={<Check size={18} />} tone="brand" />
         <Stat label="Questions" value={`${stats.questionsCorrect}/${stats.questionsAnswered}`} hint={stats.questionsAnswered ? `${stats.firstAttemptCorrect} right first time` : undefined} icon={<Target size={18} />} tone="violet" />
         <Stat label="Active" value={`${stats.minutesActive} min`} hint="Context, not proof of learning" icon={<Clock size={18} />} tone="sun" />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
         <section className="card h-fit">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-extrabold">Written summary</h2>

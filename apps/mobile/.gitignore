@@ -24,3 +24,6 @@ android/captures
 android/.cxx
 android/app/src/main/assets/public
 android/capacitor-cordova-android-plugins
+
+# Copied from the repo-root logo.svg by `pnpm sync`
+www/logo.svg

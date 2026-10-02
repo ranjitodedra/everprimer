@@ -42,8 +42,8 @@ export function authoredScripts(html: string): string[] {
   const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(authored))) {
-    if (/\bsrc\s*=/i.test(m[1])) continue;
-    const body = m[2].trim();
+    if (/\bsrc\s*=/i.test(m[1] ?? "")) continue;
+    const body = (m[2] ?? "").trim();
     if (body) out.push(body);
   }
   return out;
@@ -61,15 +61,33 @@ function scriptSyntaxError(source: string): string | null {
   }
 }
 
+const VIEWPORT_META = `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">`;
+const TOUCH_GUARD_STYLE = `<style data-lk-touch>html,body,a,button,input,select,textarea,label,[role="button"]{touch-action:manipulation}</style>`;
+
+/**
+ * Stop double-tap and pinch zoom inside the lesson iframe. The host page's
+ * viewport and touch-action do not reach into the srcdoc document.
+ */
+export function withTouchGuards(html: string): string {
+  let out = html.replace(/<meta[^>]+name=["']viewport["'][^>]*>\s*/gi, "");
+  if (!/<head[\s>]/i.test(out)) return out;
+  const tags = out.includes("data-lk-touch") ? VIEWPORT_META : `${VIEWPORT_META}\n${TOUCH_GUARD_STYLE}`;
+  const csp = out.match(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/i);
+  const head = out.match(/<head[^>]*>/i)!;
+  const anchor = csp && csp.index! > head.index! ? csp : head;
+  const at = anchor.index! + anchor[0].length;
+  out = `${out.slice(0, at)}\n${tags}${out.slice(at)}`;
+  return out;
+}
+
 /** Deterministic, complete lesson document driven purely by the blueprint. */
 export function renderBlueprintHtml(bp: ArtifactBlueprint): string {
   const surface = themeSurface(bp);
   const themeVars = `:root{--lk-primary:${bp.theme.primary};--lk-accent:${bp.theme.accent};--lk-bg:${bp.theme.background};--lk-ink:${surface.ink};--lk-muted:${surface.muted};--lk-card:${surface.card};--lk-line:${surface.line};}`;
-  return `<!doctype html>
+  return withTouchGuards(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}">
 <title>${escapeHtml(bp.title)}</title>
 <style>${PLAYER_CSS}${themeVars}</style>
@@ -80,7 +98,7 @@ export function renderBlueprintHtml(bp: ArtifactBlueprint): string {
 <script>window.__BLUEPRINT__=${jsonForScript(bp)};</script>
 <script>${PLAYER_SOURCE}</script>
 </body>
-</html>`;
+</html>`);
 }
 
 /**
@@ -97,9 +115,7 @@ export function normalizeGeneratedHtml(html: string): string {
   // Strip any CSP the model wrote and inject ours.
   out = out.replace(/<meta[^>]+http-equiv=["']Content-Security-Policy["'][^>]*>/gi, "");
   out = out.replace(/<head([^>]*)>/i, `<head$1>\n<meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}">`);
-  if (!/<meta[^>]+name=["']viewport["']/i.test(out)) {
-    out = out.replace(/<head([^>]*)>/i, `<head$1>\n<meta name="viewport" content="width=device-width, initial-scale=1">`);
-  }
+  out = withTouchGuards(out);
 
   // Remove any runtime the model tried to include (script src pointing at learnkit, or an inline copy).
   out = out.replace(/<script[^>]+src=["'][^"']*learnkit[^"']*["'][^>]*>\s*<\/script>/gi, "");

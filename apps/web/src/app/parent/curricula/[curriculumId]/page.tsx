@@ -3,14 +3,18 @@ import { notFound } from "next/navigation";
 import type { ArtifactRow, ChildRow, CurriculumRow, ObjectiveMasteryRow, ObjectiveRow, TopicProgressRow, TopicRow } from "@eco/db";
 import { regenerateArtifact, retryCurriculum } from "@/app/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { BillingNotice, billingCode } from "@/components/billing-notice";
 import { Check, ChevronDown, Play, Refresh } from "@/components/icons";
 import { BackLink, MasteryBar, Notice, PageHeader, ProgressRing, StatusBadge } from "@/components/ui";
-import { requireUser } from "@/lib/auth";
+import { requireGrownup } from "@/lib/auth";
+import { planFor } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function CurriculumPage(props: PageProps<"/parent/curricula/[curriculumId]">) {
-  await requireUser();
+  const account = await requireGrownup();
   const { curriculumId } = await props.params;
+  const sp = await props.searchParams;
+  const canRegenerate = planFor(account.parent.tier).regenerate;
   const supabase = await createClient();
 
   const { data: cur } = await supabase.from("curricula").select("*").eq("id", curriculumId).maybeSingle();
@@ -46,6 +50,7 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
   return (
     <>
       {generating ? <AutoRefresh intervalMs={4000} /> : null}
+      <BillingNotice code={billingCode(sp.billing)} audience="grownup" />
       <BackLink href={`/parent/children/${c.id}`}>{c.display_name}</BackLink>
       <PageHeader
         eyebrow="Curriculum"
@@ -100,7 +105,7 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
                 {status === "completed" ? <Check size={20} /> : t.position}
               </span>
               <div className="card min-w-0 flex-1">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-extrabold">{t.title}</h2>
@@ -140,17 +145,19 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
                     </p>
                     {art?.status === "failed" ? <p className="mt-1 text-xs font-bold text-berry">Last generation failed: {art.error}</p> : null}
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="flex shrink-0 flex-wrap gap-2">
                     <Link href={`/learn/${c.id}/topics/${t.id}`} className="btn-secondary btn-sm">
                       <Play size={13} />
                       Preview
                     </Link>
-                    <form action={regen}>
-                      <button type="submit" className="btn-ghost btn-sm" disabled={art?.status === "generating"}>
-                        <Refresh size={14} className={art?.status === "generating" ? "animate-spin" : ""} />
-                        {art ? "Regenerate" : "Generate"}
-                      </button>
-                    </form>
+                    {art?.status === "published" && !canRegenerate ? null : (
+                      <form action={regen}>
+                        <button type="submit" className="btn-ghost btn-sm" disabled={art?.status === "generating"}>
+                          <Refresh size={14} className={art?.status === "generating" ? "animate-spin" : ""} />
+                          {art?.status === "published" ? "Regenerate" : art ? "Try again" : "Generate"}
+                        </button>
+                      </form>
+                    )}
                   </div>
                 </div>
               </div>

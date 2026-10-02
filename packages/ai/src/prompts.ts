@@ -5,7 +5,7 @@ import type { ArtifactBlueprint, GeneratedCurriculum, LearnerContext } from "@ec
  * per rules.md section 20. Bump PROMPT_VERSION whenever wording changes so
  * artifacts stay traceable to the prompt that produced them.
  */
-export const PROMPT_VERSION = "2026-09-19.3";
+export const PROMPT_VERSION = "2026-09-27.1";
 
 const SAFETY = `SAFETY AND TONE (non-negotiable):
 - Content is for a child. No sexual content, graphic violence, dangerous instructions, or risky real-world behaviour.
@@ -16,11 +16,17 @@ const SAFETY = `SAFETY AND TONE (non-negotiable):
 - Every factual claim must be true and age-appropriate. If unsure, leave it out.`;
 
 export function learnerBlock(learner: LearnerContext): string {
+  const strengths = learner.strengths ?? [];
+  const misconceptions = learner.misconceptions ?? [];
+  const analogies = learner.analogies ?? [];
   return [
     `- Child age: ${learner.age ?? "unknown"}`,
     `- Reading level: ${learner.readingLevel ?? "unknown"}`,
-    `- Interests (teaching bridges only): ${learner.interests.length ? learner.interests.join(", ") : "none provided"}`,
+    `- Interests (framing only — analogies, themes, and scenarios; do not change what is taught): ${learner.interests.length ? learner.interests.join(", ") : "none provided"}`,
+    `- Analogies that worked (framing only): ${analogies.length ? analogies.join(" | ") : "none"}`,
     `- Parent notes: ${learner.notes.length ? learner.notes.join(" | ") : "none"}`,
+    `- Strengths (already shown; do not reteach at length): ${strengths.length ? strengths.join(" | ") : "none"}`,
+    `- Misconceptions (change the examples and give these ideas more practice): ${misconceptions.length ? misconceptions.join(" | ") : "none"}`,
   ].join("\n");
 }
 
@@ -210,6 +216,44 @@ RULES:
 - Plain language, 80-160 words, no emojis, no headings. Refer to the child by name.
 - If there was no activity, say so briefly and suggest one small next step.`,
     prompt: `Child: ${input.childName}\nStatistics (JSON):\n${JSON.stringify(input.stats)}\n\nWrite the summary.`,
+  };
+}
+
+export function memoryPrompt(input: {
+  summary: string;
+  cards: { kind: string; value: string; confidence: number }[];
+}): { system: string; prompt: string } {
+  const existing = input.cards.length
+    ? input.cards.map((card) => `- ${card.kind} (${card.confidence.toFixed(2)}): ${card.value}`).join("\n")
+    : "none";
+  return {
+    system: `ROLE: You maintain a small set of learning-memory cards for one learner.
+
+TASK: From this lesson's mastery summary, propose cards to add or retire. You are not given the child's typed answers, and you must not invent them.
+
+ALLOWED KINDS:
+- interest — a subject the learner keeps reaching for. Framing only.
+- preference — how they like a lesson to be shaped (shorter steps, more pictures).
+- strength — a skill this lesson showed they can already do.
+- misconception — a specific wrong idea to practice against. Not a personality trait.
+- analogy_that_worked — a comparison that made the idea click. Framing only.
+
+RULES:
+- Interests and analogies change framing only. They do not change the facts.
+- Misconceptions should change examples and which objectives get more practice next time.
+- NEVER infer or store health, family, home address, school, religion, friends, or emotions.
+- NEVER quote what the child typed. NEVER mention or update age.
+- Do not invent biographical facts. If the summary does not support a card, leave it out.
+- Each value is at most 200 characters and is about the subject being learned.
+- Deactivate a card only when this lesson shows it is no longer true.
+- Return empty arrays when nothing should change.`,
+    prompt: `LESSON MASTERY (no answer text):
+${input.summary}
+
+ACTIVE INFERRED CARDS:
+${existing}
+
+Return the update.`,
   };
 }
 

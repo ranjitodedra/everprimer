@@ -1,11 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { KID_MODE_COOKIE } from "@/lib/kid-mode";
 
-const PROTECTED_PREFIXES = ["/parent", "/learn"];
+const PROTECTED_PREFIXES = ["/parent", "/learn", "/unlock"];
+
+function under(path: string, prefix: string) {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
 
 /**
- * Refreshes the Supabase session cookie on every request and gates the
- * parent and child surfaces behind sign-in.
+ * Refreshes the Supabase session cookie on every request, gates the parent
+ * and child surfaces behind sign-in, keeps child logins inside their own
+ * learn pages, and puts the grown-up area behind the PIN while a shared
+ * device is in kid mode.
  */
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -32,19 +39,29 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isProtected = PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+  const redirectTo = (pathname: string, search = "") => {
+    const target = request.nextUrl.clone();
+    target.pathname = pathname;
+    target.search = search;
+    const res = NextResponse.redirect(target);
+    response.cookies.getAll().forEach((c) => res.cookies.set(c));
+    return res;
+  };
 
-  if (!user && isProtected) {
-    const login = request.nextUrl.clone();
-    login.pathname = "/login";
-    login.searchParams.set("next", path);
-    return NextResponse.redirect(login);
+  if (!user) {
+    if (PROTECTED_PREFIXES.some((p) => under(path, p))) return redirectTo("/login", `?next=${encodeURIComponent(path)}`);
+    return response;
   }
-  if (user && path === "/login") {
-    const home = request.nextUrl.clone();
-    home.pathname = "/parent";
-    home.search = "";
-    return NextResponse.redirect(home);
+
+  const meta = user.app_metadata as { account?: string; child_id?: string } | undefined;
+  if (meta?.account === "child") {
+    const home = `/learn/${meta.child_id}`;
+    return meta.child_id && under(path, home) ? response : redirectTo(home);
+  }
+
+  if (path === "/login") return redirectTo("/");
+  if (request.cookies.has(KID_MODE_COOKIE) && under(path, "/parent")) {
+    return redirectTo("/unlock", `?next=${encodeURIComponent(path)}`);
   }
   return response;
 }

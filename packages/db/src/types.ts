@@ -3,23 +3,49 @@
  * MVP; replace with `supabase gen types` output once a project is linked.
  */
 
-export type Tier = "free" | "paid";
+export type Tier = "free" | "paid" | "max";
 
+export type AccountKind = "individual" | "parent";
+
+/** Columns readable by the signed-in user; PIN columns are service-role only. */
 export interface ParentRow {
   id: string;
   email: string | null;
   tier: Tier;
   timezone: string;
+  kind: AccountKind;
+  /** Service-role writes only. Readable so the settings page can show it. */
+  tutor_enabled: boolean;
+  /** Lesson credits still available to reserve. Readable; not client-writable. */
+  credit_balance: number;
   created_at: string;
 }
+
+export type ProfileKind = "child" | "self";
 
 export interface ChildRow {
   id: string;
   parent_id: string;
   display_name: string;
+  /** Cached completed years. Recomputed from birth month and year when those are set. */
   age: number | null;
+  birth_year: number | null;
+  birth_month: number | null;
   reading_level: "pre_reader" | "early" | "developing" | "fluent" | "advanced" | null;
   avatar: string;
+  kind: ProfileKind;
+  shared_device: boolean;
+  created_at: string;
+}
+
+export interface ChildLoginRow {
+  user_id: string;
+  child_id: string;
+  parent_id: string;
+  username: string;
+  auth_email: string;
+  failed_attempts: number;
+  locked_until: string | null;
   created_at: string;
 }
 
@@ -28,6 +54,20 @@ export interface PersonalizationRow {
   child_id: string;
   kind: "interest" | "preference" | "note";
   value: string;
+  active: boolean;
+  created_at: string;
+}
+
+export type MemoryKind = "interest" | "preference" | "strength" | "misconception" | "analogy_that_worked";
+
+export interface MemoryRow {
+  id: string;
+  child_id: string;
+  kind: MemoryKind;
+  value: string;
+  source: "parent" | "inferred";
+  confidence: number;
+  last_seen_at: string;
   active: boolean;
   created_at: string;
 }
@@ -148,7 +188,7 @@ export interface TopicProgressRow {
   completed_at: string | null;
 }
 
-export type JobKind = "curriculum" | "artifact" | "daily_report";
+export type JobKind = "curriculum" | "artifact" | "daily_report" | "memory";
 
 export interface GenerationJobRow {
   id: string;
@@ -159,6 +199,8 @@ export interface GenerationJobRow {
   max_attempts: number;
   error: string | null;
   usage: unknown | null;
+  /** Paying account. Null on jobs created before billing. */
+  parent_id: string | null;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

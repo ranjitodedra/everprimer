@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactBlueprint } from "@eco/contracts";
 import { ArtifactBlueprint as BlueprintSchema, lintBlueprint, parseBlueprint } from "@eco/contracts";
-import { normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml } from "./html";
+import { normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml, withTouchGuards } from "./html";
 
 const bp: ArtifactBlueprint = {
   schemaVersion: 1,
@@ -100,5 +100,24 @@ describe("normalizeGeneratedHtml", () => {
     expect(html).toContain("Content-Security-Policy");
     expect(html.indexOf("window.LearnKit = {")).toBeLessThan(html.indexOf("LearnKit.emit('question_answered'"));
     expect(validateArtifactHtml(html).ok).toBe(true);
+  });
+});
+
+describe("withTouchGuards", () => {
+  const count = (s: string, needle: string) => s.split(needle).length - 1;
+
+  it("replaces a zoomable viewport and adds touch-action once", () => {
+    const html = withTouchGuards(`<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>`);
+    expect(count(html, `name="viewport"`)).toBe(1);
+    expect(html).toContain("user-scalable=no");
+    expect(count(html, "data-lk-touch")).toBe(1);
+  });
+
+  it("is idempotent and keeps CSP first in <head>", () => {
+    const once = normalizeGeneratedHtml(`<html><head></head><body><script>LearnKit.emit('question_answered',{});LearnKit.emit('topic_completed',{})</script></body></html>`);
+    const twice = withTouchGuards(once);
+    expect(count(twice, `name="viewport"`)).toBe(1);
+    expect(count(twice, "data-lk-touch")).toBe(1);
+    expect(twice.indexOf("Content-Security-Policy")).toBeLessThan(twice.indexOf("data-lk-touch"));
   });
 });

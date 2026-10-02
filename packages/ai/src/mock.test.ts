@@ -5,7 +5,16 @@ import { mockBlueprint, mockCurriculum } from "./mock";
 import { SOLAR_SYSTEM_BLUEPRINTS, SOLAR_SYSTEM_CURRICULUM } from "./mock/solarSystem";
 import { generateArtifactHtml, generateBlueprint, generateCurriculum } from "./pipelines";
 
-const learner: LearnerContext = { displayName: "Ava", age: 8, readingLevel: "developing", interests: ["dinosaurs"], notes: [] };
+const learner: LearnerContext = {
+  displayName: "Ava",
+  age: 8,
+  readingLevel: "developing",
+  interests: ["dinosaurs"],
+  notes: [],
+  strengths: [],
+  misconceptions: [],
+  analogies: [],
+};
 
 describe("seed content", () => {
   it("solar system curriculum is valid", () => {

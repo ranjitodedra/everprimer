@@ -107,6 +107,11 @@ export const Users = (p: IconProps) => (
     <path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2" />
   </svg>
 );
+export const Home = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H5.5A1.5 1.5 0 0 1 4 19Z" />
+  </svg>
+);
 export const Lock = (p: IconProps) => (
   <svg {...base(p)}>
     <rect x="5" y="11" width="14" height="10" rx="2.5" />

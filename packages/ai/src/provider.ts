@@ -8,14 +8,16 @@ import type { LanguageModel } from "ai";
  *
  * - `mock`  : deterministic local generator, no network, no keys.
  * - `google`: Gemini, used for the free tier and for cheap tasks everywhere.
- * - `anthropic`: Claude, used for paid-tier blueprint and code generation.
+ * - `anthropic`: Claude, used for Plus and Max blueprint and code generation.
  *
- * Set AI_PROVIDER=mock to force the mock. Otherwise a task falls back to the
- * mock when its provider key is missing, so local development always works.
+ * Free never calls Anthropic, including when `AI_MODEL_FREE_*` asks for it
+ * or when the Gemini key is missing. Plus (`paid`) and Max share a routing
+ * table. Set AI_PROVIDER=mock to force the mock. A paid task falls back to
+ * the other real provider when its key is missing, then to mock.
  */
 
-export type AiTask = "curriculum" | "blueprint" | "codegen" | "factcheck" | "report";
-export type Tier = "free" | "paid";
+export type AiTask = "curriculum" | "blueprint" | "codegen" | "factcheck" | "report" | "memory";
+export type Tier = "free" | "paid" | "max";
 export type ProviderId = "mock" | "google" | "anthropic";
 
 export interface ModelSpec {
@@ -23,22 +25,32 @@ export interface ModelSpec {
   modelId: string;
 }
 
+const GEMINI: ModelSpec = { provider: "google", modelId: "gemini-3.8-flash" };
+const CLAUDE: ModelSpec = { provider: "anthropic", modelId: "claude-sonnet-4-5" };
+
+function plusModels(): Record<AiTask, ModelSpec> {
+  return {
+    curriculum: GEMINI,
+    blueprint: CLAUDE,
+    codegen: CLAUDE,
+    // Cross-provider check: Gemini reviews what Claude wrote.
+    factcheck: GEMINI,
+    report: GEMINI,
+    memory: GEMINI,
+  };
+}
+
 const DEFAULTS: Record<Tier, Record<AiTask, ModelSpec>> = {
   free: {
-    curriculum: { provider: "google", modelId: "gemini-3.8-flash" },
-    blueprint: { provider: "google", modelId: "gemini-3.8-flash" },
-    codegen: { provider: "google", modelId: "gemini-3.8-flash" },
-    factcheck: { provider: "google", modelId: "gemini-3.8-flash" },
-    report: { provider: "google", modelId: "gemini-3.8-flash" },
+    curriculum: GEMINI,
+    blueprint: GEMINI,
+    codegen: GEMINI,
+    factcheck: GEMINI,
+    report: GEMINI,
+    memory: GEMINI,
   },
-  paid: {
-    curriculum: { provider: "google", modelId: "gemini-3.8-flash" },
-    blueprint: { provider: "anthropic", modelId: "claude-sonnet-4-5" },
-    codegen: { provider: "anthropic", modelId: "claude-sonnet-4-5" },
-    // Cross-provider check: Gemini reviews what Claude wrote.
-    factcheck: { provider: "google", modelId: "gemini-3.8-flash" },
-    report: { provider: "google", modelId: "gemini-3.8-flash" },
-  },
+  paid: plusModels(),
+  max: plusModels(),
 };
 
 function envOverride(task: AiTask, tier: Tier): ModelSpec | undefined {
@@ -62,15 +74,26 @@ function hasKey(provider: ProviderId): boolean {
 
 export function resolveModelSpec(task: AiTask, tier: Tier): ModelSpec {
   if (process.env.AI_PROVIDER === "mock") return { provider: "mock", modelId: "mock" };
-  const spec = envOverride(task, tier) ?? DEFAULTS[tier][task];
+
+  // Compaction is Gemini for every paid tier. Never fall back to Claude, and
+  // never invent cards with the mock provider when the Gemini key is missing.
+  if (task === "memory") {
+    const override = envOverride(task, tier);
+    const spec = override?.provider === "google" ? override : GEMINI;
+    if (spec.provider === "google" && hasKey("google")) return spec;
+    return { provider: "mock", modelId: "mock" };
+  }
+
+  const fallback = DEFAULTS[tier][task];
+  let spec = envOverride(task, tier) ?? fallback;
+  // An override must not smuggle Claude onto the free tier.
+  if (tier === "free" && spec.provider === "anthropic") spec = fallback;
+
   if (hasKey(spec.provider)) return spec;
-  // Degrade gracefully: try the other real provider, then mock.
-  const alt: ModelSpec | undefined =
-    spec.provider === "anthropic"
-      ? DEFAULTS.free[task]
-      : spec.provider === "google"
-        ? DEFAULTS.paid.codegen
-        : undefined;
+
+  if (tier === "free") return { provider: "mock", modelId: "mock" };
+
+  const alt: ModelSpec | undefined = spec.provider === "anthropic" ? DEFAULTS.free[task] : spec.provider === "google" ? DEFAULTS.paid.codegen : undefined;
   if (alt && hasKey(alt.provider)) return alt;
   return { provider: "mock", modelId: "mock" };
 }

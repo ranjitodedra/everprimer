@@ -6,5 +6,6 @@ export {
   renderBlueprintHtml,
   normalizeGeneratedHtml,
   validateArtifactHtml,
+  withTouchGuards,
   type HtmlValidationResult,
 } from "./html";

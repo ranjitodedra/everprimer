@@ -13,7 +13,17 @@ const MESSAGES = [
 ];
 
 /** Friendly wait screen that polls until the lesson is published. */
-export function GeneratingState({ topicId, emoji = "✨", failed }: { topicId: string; emoji?: string; failed?: string | null }) {
+export function GeneratingState({
+  topicId,
+  emoji = "✨",
+  failed,
+  retry,
+}: {
+  topicId: string;
+  emoji?: string;
+  failed?: string | null;
+  retry?: () => Promise<void>;
+}) {
   const router = useRouter();
   const [i, setI] = useState(0);
 
@@ -45,10 +55,19 @@ export function GeneratingState({ topicId, emoji = "✨", failed }: { topicId: s
           <h2 className="text-2xl font-black">This lesson needs a little more time</h2>
           <p className="mx-auto mt-1 max-w-md text-ink-soft">We could not finish building it just now. You can try again, or pick another topic and come back later.</p>
         </div>
-        <button type="button" className="btn-primary btn-lg" onClick={() => router.refresh()}>
-          <Refresh size={16} />
-          Try again
-        </button>
+        {retry ? (
+          <form action={retry}>
+            <button type="submit" className="btn-primary btn-lg">
+              <Refresh size={16} />
+              Try again
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="btn-primary btn-lg" onClick={() => router.refresh()}>
+            <Refresh size={16} />
+            Try again
+          </button>
+        )}
       </div>
     );
   }
