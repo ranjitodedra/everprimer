@@ -89,6 +89,7 @@
     background: var(--color-paper);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    -webkit-tap-highlight-color: transparent;
     /* Kills double-tap-to-zoom while keeping normal taps snappy. */
     touch-action: manipulation;
   }
@@ -154,6 +155,9 @@
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     transform 120ms ease,
     background-color 160ms ease,
@@ -174,10 +178,12 @@
     color: #fff;
     box-shadow: 0 3px 0 var(--color-brand-deep);
   }
-  .btn-primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-brand) 92%, white);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 0 var(--color-brand-deep);
+  @media (hover: hover) and (pointer: fine) {
+    .btn-primary:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--color-brand) 92%, white);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 0 var(--color-brand-deep);
+    }
   }
   .btn-primary:active:not(:disabled) {
     transform: translateY(2px);
@@ -190,9 +196,11 @@
     color: #3b2200;
     box-shadow: 0 3px 0 var(--color-sun-deep);
   }
-  .btn-sun:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 0 var(--color-sun-deep);
+  @media (hover: hover) and (pointer: fine) {
+    .btn-sun:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 0 var(--color-sun-deep);
+    }
   }
   .btn-sun:active:not(:disabled) {
     transform: translateY(2px);
@@ -206,10 +214,12 @@
     border: 1.5px solid var(--color-line-strong);
     box-shadow: 0 2px 0 var(--color-line);
   }
-  .btn-secondary:hover:not(:disabled) {
-    border-color: var(--color-brand);
-    color: var(--color-brand-deep);
-    transform: translateY(-1px);
+  @media (hover: hover) and (pointer: fine) {
+    .btn-secondary:hover:not(:disabled) {
+      border-color: var(--color-brand);
+      color: var(--color-brand-deep);
+      transform: translateY(-1px);
+    }
   }
   .btn-secondary:active:not(:disabled) {
     transform: translateY(1px);
@@ -221,18 +231,22 @@
     background: var(--color-brand-soft);
     color: var(--color-brand-deep);
   }
-  .btn-soft:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--color-brand-soft) 70%, var(--color-brand) 30%);
-    color: #fff;
+  @media (hover: hover) and (pointer: fine) {
+    .btn-soft:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--color-brand-soft) 70%, var(--color-brand) 30%);
+      color: #fff;
+    }
   }
 
   .btn-ghost {
     @apply btn;
     color: var(--color-ink-soft);
   }
-  .btn-ghost:hover:not(:disabled) {
-    background: var(--color-paper-deep);
-    color: var(--color-ink);
+  @media (hover: hover) and (pointer: fine) {
+    .btn-ghost:hover:not(:disabled) {
+      background: var(--color-paper-deep);
+      color: var(--color-ink);
+    }
   }
 
   .btn-lg {
@@ -265,10 +279,12 @@
       box-shadow 180ms ease,
       border-color 180ms ease;
   }
-  .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lift);
-    border-color: var(--color-line-strong);
+  @media (hover: hover) and (pointer: fine) {
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lift);
+      border-color: var(--color-line-strong);
+    }
   }
   .card-muted {
     background: var(--color-paper-deep);

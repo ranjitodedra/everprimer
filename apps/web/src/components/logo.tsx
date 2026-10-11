@@ -10,5 +10,9 @@ export function EverprimerMark({ className = "h-9 w-9" }: { className?: string }
 }
 
 export function Wordmark({ className = "" }: { className?: string }) {
-  return <span className={`font-black tracking-tight ${className}`}>Everprimer</span>;
+  return (
+    <span translate="no" className={`font-black tracking-tight ${className}`}>
+      Everprimer
+    </span>
+  );
 }

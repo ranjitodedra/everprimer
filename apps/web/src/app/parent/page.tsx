@@ -59,32 +59,32 @@ export default async function ParentHome(props: PageProps<"/parent">) {
                 const n = curriculaByChild.get(c.id) ?? 0;
                 const done = completedByChild.get(c.id) ?? 0;
                 return (
-                  <li key={c.id} className="card card-hover animate-rise flex flex-wrap items-center gap-4" style={{ animationDelay: `${i * 40}ms` }}>
-                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                  <li key={c.id} className="card card-hover animate-rise grid grid-cols-1 items-center gap-4 md:grid-cols-[minmax(0,1fr)_auto]" style={{ animationDelay: `${i * 40}ms` }}>
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                       <Avatar emoji={c.avatar} size="lg" />
                       <div className="min-w-0">
-                        <h3 className="text-lg font-extrabold">{c.display_name}</h3>
-                        <p className="text-sm text-ink-soft">{meta}</p>
-                        <p className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-ink-soft">
+                        <h3 className="text-lg font-black break-words">{c.display_name}</h3>
+                        <p className="text-sm leading-snug text-ink-soft">{meta}</p>
+                        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-ink-soft">
                           <span className="inline-flex items-center gap-1.5"><Book size={14} className="text-brand" />{n} {n === 1 ? "curriculum" : "curricula"}</span>
-                          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand" />{done} {done === 1 ? "topic" : "topics"} completed</span>
+                          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand" aria-hidden />{done} {done === 1 ? "topic" : "topics"} completed</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <Link href={`/parent/children/${c.id}`} className="btn-secondary">
+                    <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
+                      <Link href={`/parent/children/${c.id}`} className="btn-secondary w-full sm:flex-1 md:w-auto md:flex-none">
                         Manage
                         <ChevronRight size={16} />
                       </Link>
                       {c.shared_device ? (
-                        <form action={enter}>
-                          <button type="submit" className="btn-primary">
+                        <form action={enter} className="w-full sm:flex-1 md:w-auto md:flex-none">
+                          <button type="submit" className="btn-primary w-full">
                             <Play size={14} />
                             Start learning
                           </button>
                         </form>
                       ) : (
-                        <span className="badge bg-paper-deep text-ink-soft">Uses their own login</span>
+                        <span className="badge justify-center bg-paper-deep px-3 py-2 text-ink-soft">Uses their own login</span>
                       )}
                     </div>
                   </li>
