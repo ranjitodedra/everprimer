@@ -2,6 +2,7 @@ import "server-only";
 import {
   QuestionAnsweredPayload,
   collectQuestions,
+  isGameBlueprint,
   parseBlueprint,
   type EventBatch,
   type LearningEvent,
@@ -11,10 +12,12 @@ import type { ArtifactRow, ObjectiveMasteryRow, ObjectiveRow, SessionRow, TopicP
 import {
   EMPTY_MASTERY,
   applyEvidence,
+  buildLessonFeedback,
   gradeAnswer,
   summarizeTopic,
   topicStatus,
   type ActivityType,
+  type LessonFeedback,
   type ObjectiveEvidence,
   type ObjectiveMasteryState,
 } from "@eco/mastery";
@@ -59,13 +62,32 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
 
   // 2. Turn educationally meaningful events into graded responses and evidence.
   const questions = blueprint ? new Map(collectQuestions(blueprint).map((q) => [q.question.id, q])) : new Map<string, { sectionId: string; question: Question }>();
-  const sectionType = new Map((blueprint?.sections ?? []).map((s) => [s.id, s.type]));
+  const sectionType = new Map(
+    blueprint
+      ? isGameBlueprint(blueprint)
+        ? [
+            ...blueprint.sessions.flatMap((s) => s.bites.map((b) => [b.id, b.type] as const)),
+            ["final_test", "quiz"] as const,
+          ]
+        : blueprint.sections.map((s) => [s.id, s.type] as const)
+      : [],
+  );
+  const finalQuestionIds = blueprint && isGameBlueprint(blueprint) ? blueprint.finalTest.questions.map((q) => q.id) : [];
   const evidenceByCode = new Map<string, ObjectiveEvidence[]>();
+  // Recall questions revisit an earlier lesson's objective, keyed by objective id.
+  const recallEvidence = new Map<string, ObjectiveEvidence[]>();
   const responses: Array<Record<string, unknown>> = [];
   let reachedEnd = false;
+  let sessionsCompletedHint: number | null = null;
 
-  const push = (codes: string[], ev: ObjectiveEvidence) => {
-    for (const code of codes) {
+  const push = (question: Question, ev: ObjectiveEvidence) => {
+    if (question.recallObjectiveId) {
+      const list = recallEvidence.get(question.recallObjectiveId) ?? [];
+      list.push(ev);
+      recallEvidence.set(question.recallObjectiveId, list);
+      return;
+    }
+    for (const code of question.objectiveCodes) {
       const list = evidenceByCode.get(code) ?? [];
       list.push(ev);
       evidenceByCode.set(code, list);
@@ -73,7 +95,11 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
   };
 
   for (const e of fresh) {
-    if (e.type === "topic_completed") reachedEnd = true;
+    if (e.type === "topic_completed" || e.type === "final_test_completed") reachedEnd = true;
+    if (e.type === "session_completed") {
+      const index = typeof e.payload.index === "number" ? e.payload.index : Number(e.payload.index);
+      if (Number.isFinite(index) && index >= 0) sessionsCompletedHint = Math.max(sessionsCompletedHint ?? 0, Math.floor(index) + 1);
+    }
 
     if (e.type === "question_answered") {
       const parsed = QuestionAnsweredPayload.safeParse(e.payload);
@@ -83,6 +109,7 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
       if (!found) continue;
       const { correct } = gradeAnswer(found.question, p.answer);
       const activityType: ActivityType = sectionType.get(found.sectionId) === "apply" ? "apply" : "quiz";
+      const onFinal = found.sectionId === "final_test" || finalQuestionIds.includes(p.questionId);
       responses.push({
         session_id: session.id,
         child_id: session.child_id,
@@ -100,12 +127,13 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
         hints_used: p.hintsUsed,
         occurred_at: e.occurredAt,
       });
-      push(found.question.objectiveCodes, {
+      push(found.question, {
         correct,
         difficulty: found.question.difficulty as 1 | 2 | 3,
         attempt: p.attempt,
         hintsUsed: p.hintsUsed,
         activityType,
+        finalTest: onFinal,
       });
     }
 
@@ -113,7 +141,7 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
       const qid = typeof e.payload.questionId === "string" ? e.payload.questionId : null;
       const found = qid ? questions.get(qid) : undefined;
       if (found) {
-        push(found.question.objectiveCodes, { correct: false, difficulty: found.question.difficulty as 1 | 2 | 3, attempt: 3, hintsUsed: 0, revealed: true, activityType: "quiz" });
+        push(found.question, { correct: false, difficulty: found.question.difficulty as 1 | 2 | 3, attempt: 3, hintsUsed: 0, revealed: true, activityType: "quiz" });
       }
     }
 
@@ -124,9 +152,32 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
     if (rErr) throw rErr;
   }
 
-  // 3. Update per-objective mastery and topic progress.
-  await recomputeTopic(session.child_id, session.topic_id, evidenceByCode, reachedEnd, fresh);
+  // 3. Update per-objective mastery and topic progress. Recall evidence first,
+  // so the memory job queued last points at the lesson being played.
+  if (recallEvidence.size) await applyRecallEvidence(session.child_id, recallEvidence, fresh);
+  await recomputeTopic(session.child_id, session.topic_id, evidenceByCode, reachedEnd, fresh, {
+    sessionsCompletedHint,
+    finalQuestionIds,
+  });
   return { inserted: fresh.length };
+}
+
+/** Credit recall answers to the earlier objective they revisit, only on this child's own curricula. */
+async function applyRecallEvidence(childId: string, recall: Map<string, ObjectiveEvidence[]>, events: LearningEvent[]) {
+  const db = createServiceClient();
+  const { data, error } = await db
+    .from("learning_objectives")
+    .select("id, code, topic_id, topics!inner(curricula!inner(child_id))")
+    .in("id", [...recall.keys()])
+    .eq("topics.curricula.child_id", childId);
+  if (error) throw error;
+  const byTopic = new Map<string, Map<string, ObjectiveEvidence[]>>();
+  for (const row of (data ?? []) as Array<{ id: string; code: string; topic_id: string }>) {
+    const codes = byTopic.get(row.topic_id) ?? new Map<string, ObjectiveEvidence[]>();
+    codes.set(row.code, recall.get(row.id) ?? []);
+    byTopic.set(row.topic_id, codes);
+  }
+  for (const [topicId, codes] of byTopic) await recomputeTopic(childId, topicId, codes, false, events, { enqueueMemory: false });
 }
 
 async function recomputeTopic(
@@ -135,9 +186,10 @@ async function recomputeTopic(
   evidenceByCode: Map<string, ObjectiveEvidence[]>,
   reachedEndNow: boolean,
   events: LearningEvent[],
+  opts: { enqueueMemory?: boolean; sessionsCompletedHint?: number | null; finalQuestionIds?: string[] } = {},
 ) {
   const db = createServiceClient();
-  const { data: objRows } = await db.from("learning_objectives").select("*").eq("topic_id", topicId);
+  const { data: objRows } = await db.from("learning_objectives").select("*").eq("topic_id", topicId).order("position");
   const objectives = (objRows ?? []) as ObjectiveRow[];
   if (objectives.length === 0) return;
 
@@ -182,8 +234,24 @@ async function recomputeTopic(
   const prev = progressRow as TopicProgressRow | null;
   const summary = summarizeTopic(states);
   const reachedEnd = Boolean(prev?.reached_end) || reachedEndNow;
-  const status = topicStatus(summary, reachedEnd, true);
+  const sessionsCompleted = Math.max(prev?.sessions_completed ?? 0, opts.sessionsCompletedHint ?? 0);
+  let finalScore = prev?.final_score != null ? Number(prev.final_score) : null;
+  if (opts.finalQuestionIds?.length) {
+    const computed = await firstAttemptFinalScore(childId, topicId, opts.finalQuestionIds);
+    if (computed != null) finalScore = computed;
+  }
+  const status = topicStatus(summary, reachedEnd, true, finalScore);
   const earliest = events.reduce((min, e) => (e.occurredAt < min ? e.occurredAt : min), events[0]!.occurredAt);
+
+  let feedback: LessonFeedback | null = prev?.feedback ?? null;
+  if (reachedEnd) {
+    const { data: topic } = await db.from("topics").select("title").eq("id", topicId).maybeSingle();
+    const textByCode = new Map(objectives.map((o) => [o.code, o.text]));
+    feedback = buildLessonFeedback(
+      (topic as { title: string } | null)?.title ?? "this lesson",
+      states.map((s) => ({ code: s.code, text: textByCode.get(s.code) ?? s.code, state: s.state })),
+    );
+  }
 
   const { error: pErr } = await db.from("topic_progress").upsert(
     {
@@ -196,18 +264,48 @@ async function recomputeTopic(
       first_activity_at: prev?.first_activity_at ?? earliest,
       last_activity_at: now,
       completed_at: status === "completed" ? (prev?.completed_at ?? now) : prev?.completed_at ?? null,
+      feedback,
+      sessions_completed: sessionsCompleted,
+      final_score: finalScore,
     },
     { onConflict: "child_id,topic_id" },
   );
   if (pErr) throw pErr;
 
-  if (upserts.length) {
+  // Memory updates after every lesson, and after a burst of answers.
+  if (opts.enqueueMemory !== false && (upserts.length || reachedEndNow)) {
     try {
       await enqueueMemoryJob(childId, topicId);
     } catch (err) {
       console.error("[memory] enqueue failed", err instanceof Error ? err.message : err);
     }
   }
+}
+
+/** First-attempt mark on the final-test questions, or null until every item has a first attempt. */
+async function firstAttemptFinalScore(childId: string, topicId: string, questionIds: string[]): Promise<number | null> {
+  if (questionIds.length === 0) return null;
+  const db = createServiceClient();
+  const { data, error } = await db
+    .from("responses")
+    .select("question_id, correct, attempt")
+    .eq("child_id", childId)
+    .eq("topic_id", topicId)
+    .in("question_id", questionIds)
+    .eq("attempt", 1);
+  if (error) {
+    console.error("[progress] final score:", error.message);
+    return null;
+  }
+  const first = new Map<string, boolean>();
+  for (const row of data ?? []) {
+    const id = row.question_id as string;
+    if (!first.has(id)) first.set(id, Boolean(row.correct));
+  }
+  if (first.size < questionIds.length) return null;
+  let correct = 0;
+  for (const ok of first.values()) if (ok) correct += 1;
+  return correct / questionIds.length;
 }
 
 export type { ArtifactRow };

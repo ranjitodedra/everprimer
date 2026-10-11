@@ -27,7 +27,7 @@ export default async function SettingsPage(props: PageProps<"/parent/settings">)
 
   return (
     <>
-      <PageHeader eyebrow="Account" title="Settings" />
+      <PageHeader title="Settings" />
 
       {sp.checkout === "success" ? <Notice tone="success">Payment received. Credits show up as soon as Stripe confirms the invoice.</Notice> : null}
       {sp.checkout === "cancel" ? <Notice>Checkout closed. Your plan is unchanged.</Notice> : null}

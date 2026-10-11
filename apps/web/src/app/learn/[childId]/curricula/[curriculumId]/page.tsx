@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LESSON_LIMITS, ageBandFor } from "@eco/contracts";
 import type { ChildRow, CurriculumRow, TopicProgressRow, TopicRow } from "@eco/db";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { Check, Play, Refresh, Sparkles } from "@/components/icons";
+import { GenerationProgress } from "@/components/generation-progress";
+import { Check, Play, Refresh, Sparkles, Wrench } from "@/components/icons";
 import { BackLink, ProgressRing } from "@/components/ui";
 import { requireLearner } from "@/lib/auth";
+import { lessonFinished } from "@/lib/lesson-progress";
 import { createClient } from "@/lib/supabase/server";
 
 type Status = TopicProgressRow["status"];
@@ -32,7 +35,9 @@ export default async function SubtopicPath(props: PageProps<"/learn/[childId]/cu
   if (!child || !curriculum) notFound();
   const c = child as ChildRow;
   const cur = curriculum as CurriculumRow;
-  const list = (topics ?? []) as TopicRow[];
+  const all = (topics ?? []) as TopicRow[];
+  const list = all.filter((t) => t.kind === "lesson");
+  const lessonNumber = new Map(list.map((t, i) => [t.id, i + 1]));
 
   const { data: progress } = list.length
     ? await supabase.from("topic_progress").select("*").eq("child_id", c.id).in("topic_id", list.map((t) => t.id))
@@ -40,16 +45,14 @@ export default async function SubtopicPath(props: PageProps<"/learn/[childId]/cu
   const progressByTopic = new Map(((progress ?? []) as TopicProgressRow[]).map((p) => [p.topic_id, p]));
   const statusOf = (t: TopicRow): Status => progressByTopic.get(t.id)?.status ?? "not_started";
 
-  const done = list.filter((t) => statusOf(t) === "completed").length;
+  const sessionTotal = LESSON_LIMITS[ageBandFor(c.age)].sessions;
+  const done = list.filter((t) => lessonFinished(progressByTopic.get(t.id))).length;
   const current =
-    list.find((t) => {
-      const s = statusOf(t);
-      return s === "in_progress" || s === "needs_review";
-    }) ?? list.find((t) => statusOf(t) === "not_started");
+    list.find((t) => statusOf(t) === "in_progress") ?? list.find((t) => statusOf(t) === "not_started");
 
   return (
     <div className="py-2">
-      {cur.status === "generating" ? <AutoRefresh intervalMs={5000} /> : null}
+      {cur.status === "generating" ? <AutoRefresh intervalMs={3000} /> : null}
       <BackLink href={`/learn/${c.id}`}>My topics</BackLink>
       <div className="mb-10 flex items-center gap-4">
         {list.length ? (
@@ -63,16 +66,37 @@ export default async function SubtopicPath(props: PageProps<"/learn/[childId]/cu
         </div>
       </div>
 
-      {list.length === 0 ? (
+      {list.length === 0 && cur.status === "failed" ? (
         <div className="card flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-soft text-violet">
-            <Sparkles size={18} className="animate-pulse" />
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sun-soft text-sun-deep" aria-hidden>
+            <Wrench size={18} />
           </span>
-          <p>Your lessons are being prepared. They will appear here in a moment.</p>
+          <p>We could not set up these lessons. A grown-up can try again.</p>
+        </div>
+      ) : list.length === 0 ? (
+        <div className="card flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-soft text-violet">
+              <Sparkles size={18} className="animate-pulse" />
+            </span>
+            <p>Your lessons are being prepared. They will appear here in a moment.</p>
+          </div>
+          {cur.status === "generating" ? <GenerationProgress kind="curriculum" stage={cur.stage} stageAt={cur.stage_at} retrying={!!cur.error} /> : null}
         </div>
       ) : (
         <ol className="flex flex-col items-center gap-8 pb-8">
-          {list.map((t, i) => {
+          {all.map((t, i) => {
+            if (t.kind === "unit") {
+              return (
+                <li key={t.id} className="animate-rise w-full max-w-sm" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+                  <div className="rounded-2xl border-2 border-dashed border-line-strong bg-card px-4 py-3 text-center">
+                    <p className="text-xs font-black tracking-widest text-ink-faint uppercase">Big topic</p>
+                    <p className="text-lg leading-tight font-extrabold">{t.title}</p>
+                    <p className="text-sm text-ink-soft">Explore it one part at a time.</p>
+                  </div>
+                </li>
+              );
+            }
             const status = statusOf(t);
             const isCurrent = current?.id === t.id;
             const nodeClass = isCurrent && status !== "needs_review" ? "path-node-current" : NODE_CLASS[status];
@@ -101,11 +125,17 @@ export default async function SubtopicPath(props: PageProps<"/learn/[childId]/cu
                       ) : isCurrent ? (
                         <Play size={32} />
                       ) : (
-                        <span className="text-xl font-black tabular-nums">{t.position}</span>
+                        <span className="text-xl font-black tabular-nums">{lessonNumber.get(t.id)}</span>
                       )}
                     </span>
                   </span>
                   <span className="max-w-[9rem] text-center text-sm leading-tight font-extrabold">{t.title}</span>
+                  {progressByTopic.get(t.id)?.sessions_completed ? (
+                    <span className="text-xs font-bold text-ink-soft">
+                      Session {progressByTopic.get(t.id)!.sessions_completed} of {sessionTotal}
+                      {progressByTopic.get(t.id)?.final_score != null ? ` · ${Math.round(Number(progressByTopic.get(t.id)!.final_score) * 100)}%` : ""}
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             );

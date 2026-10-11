@@ -14,8 +14,8 @@ export const PLAYER_SOURCE = String.raw`
   var root = document.getElementById("app");
   if (!BP || !LK || !root) return;
 
-  var sections = BP.sections.filter(function (s) { return s.type !== "flashcards"; });
-  var state = { i: 0, started: false, act: {}, reachedEnd: false, totals: { correct: 0, answered: 0 } };
+  var sections = BP.schemaVersion === 3 ? [] : BP.sections.filter(function (s) { return s.type !== "flashcards"; });
+  var state = { i: 0, started: false, act: {}, qres: {}, reachedEnd: false, totals: { correct: 0, answered: 0 }, screen: "map", si: 0, bi: 0, stars: 0, streak: 0, sessionStars: 0, doneSessions: {}, startSession: 0, finalQi: 0, finalResults: {}, celebrated: false };
 
   function el(tag, props) {
     var node = document.createElement(tag);
@@ -56,15 +56,31 @@ export const PLAYER_SOURCE = String.raw`
     if (q.kind === "true_false") return answer === q.answer;
     if (q.kind === "short_answer") { var n = LK.normalize(answer); if (!n) return false; for (var i = 0; i < q.acceptedAnswers.length; i++) if (LK.normalize(q.acceptedAnswers[i]) === n) return true; return false; }
     if (q.kind === "ordering") { if (!Array.isArray(answer) || answer.length !== q.correctOrder.length) return false; for (var k = 0; k < answer.length; k++) if (answer[k] !== q.correctOrder[k]) return false; return true; }
+    if (q.kind === "fill_blank") { if (!Array.isArray(answer) || answer.length !== q.blanks.length) return false; for (var b = 0; b < answer.length; b++) if (answer[b] !== q.blanks[b]) return false; return true; }
+    if (q.kind === "matching") {
+      if (!Array.isArray(answer) || answer.length !== q.pairs.length) return false;
+      var want = {}; q.pairs.forEach(function (p) { want[p.left] = p.right; });
+      var seen = {};
+      for (var mi = 0; mi < answer.length; mi++) {
+        var parts = String(answer[mi]).split(":");
+        if (parts.length !== 2 || seen[parts[0]] || want[parts[0]] !== parts[1]) return false;
+        seen[parts[0]] = true;
+      }
+      return true;
+    }
     return false;
   }
+  function optionText(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].text; return id; }
   function correctAnswerText(q) {
-    if (q.kind === "mcq") { for (var i = 0; i < q.options.length; i++) if (q.options[i].id === q.correctOptionId) return q.options[i].text; }
+    if (q.kind === "mcq") return optionText(q.options, q.correctOptionId);
     if (q.kind === "true_false") return q.answer ? "True" : "False";
     if (q.kind === "short_answer") return q.acceptedAnswers[0];
-    if (q.kind === "ordering") { var m = {}; q.items.forEach(function (it) { m[it.id] = it.text; }); return q.correctOrder.map(function (id) { return m[id]; }).join(" → "); }
+    if (q.kind === "ordering") return q.correctOrder.map(function (id) { return optionText(q.items, id); }).join(" → ");
+    if (q.kind === "fill_blank") return q.blanks.map(function (id) { return optionText(q.options, id); }).join(", ");
+    if (q.kind === "matching") return q.pairs.map(function (p) { return optionText(q.left, p.left) + " → " + optionText(q.right, p.right); }).join("; ");
     return "";
   }
+  function assetUri(id) { var A = window.__ASSETS__ || {}; return id && typeof A[id] === "string" ? A[id] : null; }
 
   /* ---------- shell ---------- */
 
@@ -108,7 +124,8 @@ export const PLAYER_SOURCE = String.raw`
     var view = renderSection(s);
     main.appendChild(view.node);
     root.appendChild(main);
-    root.appendChild(nav(view.canContinue, view.label));
+    var isLast = state.i === sections.length - 1;
+    root.appendChild(nav(view.canContinue, isLast ? "See how I did" : view.label));
     LK.emit("section_viewed", { index: state.i, type: s.type, stage: s.stage }, { sectionId: s.id });
     var heading = main.querySelector("h2");
     if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
@@ -121,10 +138,64 @@ export const PLAYER_SOURCE = String.raw`
     if (s.type === "explain") return renderExplain(s);
     if (s.type === "quiz" || s.type === "apply") return renderQuiz(s);
     if (s.type === "review") return renderReview(s);
+    if (s.type === "key_points") return renderKeyPoints(s);
+    if (s.type === "image") return renderImage(s);
+    if (s.type === "mnemonic") return renderMnemonic(s);
+    if (s.type === "analogy") return renderAnalogy(s);
+    if (s.type === "simple_explain") return renderSimpleExplain(s);
     return { node: el("section", {}, el("h2", { text: s.title })), canContinue: true };
   }
 
-  function stageTag(s) { return el("span", { class: "lk-stage", text: s.stage }); }
+  /* ---------- teaching blocks ---------- */
+  function renderKeyPoints(s) {
+    var node = el("section", { class: "lk-section lk-points" }, stageTag(s), el("h2", { text: s.title }));
+    if (s.lead) node.appendChild(el("p", { class: "lk-lead", text: s.lead }));
+    var ol = el("ol", { class: "lk-point-list" });
+    s.points.forEach(function (p, idx) { ol.appendChild(el("li", {}, el("span", { class: "lk-step-n", "aria-hidden": "true", text: String(idx + 1) }), el("span", { text: p }))); });
+    node.appendChild(ol);
+    return { node: node, canContinue: true };
+  }
+
+  function renderImage(s) {
+    var node = el("section", { class: "lk-section lk-image" }, stageTag(s), el("h2", { text: s.title }));
+    var uri = assetUri(s.assetId);
+    var fig = el("figure", { class: "lk-figure" });
+    if (uri) fig.appendChild(el("img", { src: uri, alt: s.alt, loading: "eager", decoding: "async" }));
+    else fig.appendChild(el("div", { class: "lk-image-missing", role: "img", "aria-label": s.alt }, el("span", { class: "lk-part-emoji", "aria-hidden": "true", text: "🖼️" }), el("p", { text: s.alt })));
+    if (s.caption) fig.appendChild(el("figcaption", { text: s.caption }));
+    node.appendChild(fig);
+    return { node: node, canContinue: true };
+  }
+
+  function renderMnemonic(s) {
+    var node = el("section", { class: "lk-section lk-mnemonic" }, stageTag(s), el("h2", { text: s.title }));
+    node.appendChild(el("p", { class: "lk-mnemonic-phrase", text: s.phrase }));
+    var ul = el("ul", { class: "lk-mnemonic-lines" });
+    s.lines.forEach(function (l) { ul.appendChild(el("li", {}, el("span", { class: "lk-cue", text: l.cue }), el("span", { text: l.text }))); });
+    node.appendChild(ul);
+    if (s.tip) node.appendChild(el("div", { class: "lk-callout" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "🧠" }), el("p", { text: s.tip })));
+    return { node: node, canContinue: true };
+  }
+
+  function renderAnalogy(s) {
+    var node = el("section", { class: "lk-section lk-analogy" }, stageTag(s), el("h2", { text: s.title }));
+    node.appendChild(el("div", { class: "lk-callout analogy" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "💡" }), el("div", {}, el("strong", { text: "You know this from " + s.interest }), el("p", { text: s.familiar }))));
+    node.appendChild(el("p", { class: "lk-lead", text: s.bridge }));
+    if (s.limit) node.appendChild(el("div", { class: "lk-callout limit" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "✋" }), el("div", {}, el("strong", { text: "Where the comparison stops" }), el("p", { text: s.limit }))));
+    return { node: node, canContinue: true };
+  }
+
+  function renderSimpleExplain(s) {
+    var node = el("section", { class: "lk-section lk-simple" }, stageTag(s), el("h2", { text: s.title }));
+    node.appendChild(el("p", { class: "lk-lead", text: s.simple }));
+    node.appendChild(el("div", { class: "lk-term-card" }, el("span", { class: "lk-term-label", text: "The real word" }), el("strong", { class: "lk-term", text: s.term }), el("p", { text: s.definition })));
+    return { node: node, canContinue: true };
+  }
+
+  function stageTag(s) {
+    if (BP.schemaVersion === 3) return el("span", { class: "lk-sr", text: "" });
+    return el("span", { class: "lk-stage", text: s.stage });
+  }
 
   /* ---------- intro ---------- */
   function renderIntro(s) {
@@ -391,35 +462,47 @@ export const PLAYER_SOURCE = String.raw`
         a.attempts[q.id] = attempt;
         LK.emit("question_answered", { activityId: s.id, questionId: q.id, answer: answer, attempt: attempt, hintsUsed: a.hints[q.id] || 0, clientCorrect: ok }, { sectionId: s.id, activityId: s.id });
         if (ok) {
-          a.results[q.id] = attempt === 1 && !(a.hints[q.id] > 0) ? true : true;
+          a.results[q.id] = true;
+          state.qres[q.id] = { ok: true, first: attempt === 1 };
           state.totals.correct++; state.totals.answered++;
+          if (BP.schemaVersion === 3 && attempt === 1) { state.stars++; state.sessionStars++; state.streak++; }
           live.textContent = "Correct. " + q.explanation;
-          feedback(el("div", { class: "lk-feedback ok" }, el("strong", { text: "Yes! That's right." }), el("p", { text: q.explanation }), nextBtn()));
+          feedback(el("div", { class: "lk-feedback ok" }, el("strong", { text: BP.schemaVersion === 3 ? "Nice!" : "Yes! That's right." }), el("p", { text: q.explanation }), nextBtn()));
           disableInputs();
         } else if (attempt < 2) {
+          if (BP.schemaVersion === 3) state.streak = 0;
           live.textContent = "Not quite. Try again.";
-          feedback(el("div", { class: "lk-feedback retry" }, el("strong", { text: "Not quite." }), el("p", { text: q.hint ? "Have another go. Hint: " + q.hint : "Have another look and try again." }), el("button", { class: "lk-btn soft", type: "button", onClick: function () { draw(); } }, "Try again")));
+          feedback(el("div", { class: "lk-feedback retry" }, el("strong", { text: "Not quite." }), el("p", { text: q.hint ? q.hint : "Have another look and try again." }), el("button", { class: "lk-btn soft", type: "button", onClick: function () { draw(); } }, "Try again")));
           disableInputs();
         } else {
           a.results[q.id] = false;
+          state.qres[q.id] = { ok: false, first: false };
           state.totals.answered++;
+          if (BP.schemaVersion === 3) state.streak = 0;
           LK.emit("answer_revealed", { activityId: s.id, questionId: q.id }, { sectionId: s.id, activityId: s.id });
           live.textContent = "The answer is " + correctAnswerText(q) + ". " + q.explanation;
           feedback(el("div", { class: "lk-feedback reveal" }, el("strong", { text: "Here's the answer: " + correctAnswerText(q) }), el("p", { text: q.explanation }), nextBtn()));
           disableInputs();
         }
       }
-      function disableInputs() { var ctrls = answerBox.querySelectorAll("button, input"); for (var i = 0; i < ctrls.length; i++) ctrls[i].disabled = true; var acts = actions.querySelectorAll("button"); for (var j = 0; j < acts.length; j++) acts[j].disabled = true; }
+      function disableInputs() { var ctrls = answerBox.querySelectorAll("button, input, select"); for (var i = 0; i < ctrls.length; i++) ctrls[i].disabled = true; var acts = actions.querySelectorAll("button"); for (var j = 0; j < acts.length; j++) acts[j].disabled = true; }
+      function finishQuiz() {
+        a.done = true;
+        var total = s.questions.length, correct = 0; for (var id in a.results) if (a.results[id]) correct++;
+        LK.emit("quiz_completed", { activityId: s.id, correct: correct, total: total, kind: s.type }, { sectionId: s.id, activityId: s.id });
+        enableContinue();
+      }
       function nextBtn() {
+        var last = a.qi + 1 >= s.questions.length;
+        if (last && BP.schemaVersion === 3) {
+          finishQuiz();
+          return el("span", {});
+        }
         return el("button", { class: "lk-btn primary", type: "button", onClick: function () {
-          if (a.qi + 1 >= s.questions.length) {
-            a.done = true;
-            var total = s.questions.length, correct = 0; for (var id in a.results) if (a.results[id]) correct++;
-            LK.emit("quiz_completed", { activityId: s.id, correct: correct, total: total, kind: s.type }, { sectionId: s.id, activityId: s.id });
-            enableContinue();
-          } else a.qi++;
+          if (last) finishQuiz();
+          else a.qi++;
           draw();
-        } }, a.qi + 1 >= s.questions.length ? "See results" : "Next question");
+        } }, last ? "See results" : "Next question");
       }
     }
     draw();
@@ -477,6 +560,42 @@ export const PLAYER_SOURCE = String.raw`
       box.appendChild(list2);
       return function () { return order.slice(); };
     }
+    if (q.kind === "fill_blank") {
+      var pieces = q.text.split("___");
+      var selects = [];
+      var sentence = el("p", { class: "lk-blank-text" });
+      pieces.forEach(function (piece, idx) {
+        if (piece) sentence.appendChild(document.createTextNode(piece));
+        if (idx < pieces.length - 1 && selects.length < q.blanks.length) {
+          var sel = el("select", { class: "lk-select", "aria-label": "Blank " + (selects.length + 1) });
+          sel.appendChild(el("option", { value: "", text: "choose…" }));
+          q.options.forEach(function (o) { sel.appendChild(el("option", { value: o.id, text: o.text })); });
+          selects.push(sel);
+          sentence.appendChild(sel);
+        }
+      });
+      box.appendChild(sentence);
+      return function () {
+        var out = selects.map(function (sel) { return sel.value; });
+        return out.length && out.every(function (v) { return v; }) ? out : null;
+      };
+    }
+    if (q.kind === "matching") {
+      var rows = el("div", { class: "lk-match", role: "group", "aria-label": "Match each item" });
+      var pickers = [];
+      q.left.forEach(function (l) {
+        var sel = el("select", { class: "lk-select", "aria-label": "Match for " + l.text });
+        sel.appendChild(el("option", { value: "", text: "choose…" }));
+        shuffled(q.right, q.id + l.id).forEach(function (r) { sel.appendChild(el("option", { value: r.id, text: r.text })); });
+        pickers.push({ left: l.id, sel: sel });
+        rows.appendChild(el("label", { class: "lk-match-row" }, el("strong", { text: l.text }), el("span", { class: "lk-match-arrow", "aria-hidden": "true", text: "→" }), sel));
+      });
+      box.appendChild(rows);
+      return function () {
+        var out = pickers.map(function (p) { return p.sel.value ? p.left + ":" + p.sel.value : ""; });
+        return out.every(function (v) { return v; }) ? out : null;
+      };
+    }
     return function () { return null; };
   }
 
@@ -502,14 +621,250 @@ export const PLAYER_SOURCE = String.raw`
     }
     root.innerHTML = "";
     root.appendChild(header());
-    root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section lk-done" },
+    var done = el("section", { class: "lk-section lk-done" },
       el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: BP.theme.emoji || "🎉" }),
       el("h2", { text: "Lesson complete" }),
-      el("p", { class: "lk-lead", text: "You explored " + BP.title + ". You can come back any time to practise again." }),
-      el("button", { class: "lk-btn ghost", type: "button", onClick: function () { state.i = 0; render(); } }, "Start over"))));
+      el("p", { class: "lk-lead", text: "Here is how you did in " + BP.title + "." }));
+    var fb = feedbackRows();
+    if (fb.rows.length) {
+      var list = el("ul", { class: "lk-feedback-list" });
+      fb.rows.forEach(function (r) {
+        list.appendChild(el("li", { class: "lk-fb-row " + r.status },
+          el("span", { class: "lk-fb-icon", "aria-hidden": "true", text: r.status === "strong" ? "🌟" : r.status === "growing" ? "🌱" : "🔁" }),
+          el("div", {}, el("strong", { text: r.text }), el("p", { text: r.label }))));
+      });
+      done.appendChild(list);
+    }
+    if (fb.recall) done.appendChild(el("p", { class: "lk-muted", text: "You also revisited " + fb.recall + " idea" + (fb.recall === 1 ? "" : "s") + " from earlier lessons." }));
+    done.appendChild(el("p", { class: "lk-muted", text: fb.practise ? "Anything marked to practise will come back in a later lesson. Your grown-up can see this summary too." : "Your grown-up can see this summary too." }));
+    done.appendChild(el("button", { class: "lk-btn ghost", type: "button", onClick: function () { state.i = 0; render(); } }, "Start over"));
+    root.appendChild(el("main", { class: "lk-main" }, done));
   }
 
-  render();
+  /* Per-objective summary from this session's answers. The server keeps the authoritative record. */
+  function feedbackRows() {
+    var byCode = {}, recall = 0;
+    sections.forEach(function (s) {
+      if (s.type !== "quiz" && s.type !== "apply") return;
+      s.questions.forEach(function (q) {
+        if (q.recallObjectiveId) { if (state.qres[q.id]) recall++; return; }
+        (q.objectiveCodes || []).forEach(function (c) { (byCode[c] = byCode[c] || []).push(state.qres[q.id]); });
+      });
+    });
+    var practise = 0;
+    var rows = BP.learningObjectives.map(function (o) {
+      var res = (byCode[o.code] || []).filter(function (r) { return r; });
+      if (!res.length) return null;
+      var first = res.filter(function (r) { return r.ok && r.first; }).length;
+      var ok = res.filter(function (r) { return r.ok; }).length;
+      var status = first === res.length ? "strong" : ok * 2 >= res.length ? "growing" : "practise";
+      if (status === "practise") practise++;
+      var label = status === "strong" ? "You've got this." : status === "growing" ? "Nearly there. A little more practice will lock it in." : "Let's practise this again soon.";
+      return { text: o.text, status: status, label: label };
+    }).filter(function (r) { return r; });
+    return { rows: rows, recall: recall, practise: practise };
+  }
+
+  /* ---------- game lesson (schema v3) ---------- */
+  function applyStartSession(n) {
+    state.startSession = Math.max(0, Math.floor(n));
+    state.doneSessions = {};
+    for (var i = 0; i < Math.min(state.startSession, BP.sessions.length); i++) state.doneSessions[i] = true;
+  }
+  function currentSessionIndex() {
+    for (var i = 0; i < BP.sessions.length; i++) if (!state.doneSessions[i]) return i;
+    return BP.sessions.length;
+  }
+  function gameHud(sess) {
+    var strip = el("div", { class: "lk-strip", "aria-label": "Progress" });
+    if (sess) {
+      sess.bites.forEach(function (_b, idx) {
+        strip.appendChild(el("span", { class: "lk-pip" + (idx < state.bi ? " done" : idx === state.bi ? " current" : "") }));
+      });
+    }
+    return el("header", { class: "lk-header lk-game-hud" },
+      el("div", { class: "lk-brand" },
+        el("span", { class: "lk-emoji", "aria-hidden": "true", text: (sess && sess.emoji) || BP.theme.emoji || "✨" }),
+        el("h1", { class: "lk-title", text: sess ? sess.title : BP.title })
+      ),
+      el("div", { class: "lk-hud-stats" },
+        el("span", { class: "lk-star", "aria-label": state.stars + " stars", text: "★ " + state.stars }),
+        el("span", { class: "lk-streak", "aria-label": "streak " + state.streak, text: state.streak > 1 ? "🔥 " + state.streak : "" })
+      ),
+      strip
+    );
+  }
+  function gameNav(can, label, onNext) {
+    var next = el("button", { class: "lk-btn primary", type: "button", id: "lk-next", disabled: !can, onClick: onNext }, label || "Next");
+    return el("nav", { class: "lk-nav", "aria-label": "Next" }, el("span", {}), next);
+  }
+  function openSession(i) {
+    state.si = i;
+    state.bi = 0;
+    state.sessionStars = 0;
+    state.screen = "bite";
+    drawGame();
+  }
+  function nextBite() {
+    var sess = BP.sessions[state.si];
+    if (state.bi + 1 >= sess.bites.length) {
+      state.screen = "session_done";
+    } else {
+      state.bi++;
+    }
+    drawGame();
+  }
+  function drawMap() {
+    var cur = currentSessionIndex();
+    var nodeList = el("ol", { class: "lk-map", "aria-label": "Rounds" });
+    BP.sessions.forEach(function (sess, idx) {
+      var done = !!state.doneSessions[idx];
+      var current = idx === cur;
+      var btn = el("button", {
+        class: "lk-node" + (done ? " done" : "") + (current ? " current" : ""),
+        type: "button",
+        "data-id": sess.id,
+        "aria-label": done ? sess.title + " replay" : current ? "Start" : sess.title,
+        disabled: !done && !current,
+        onClick: function () { openSession(idx); }
+      },
+        el("span", { class: "lk-node-emoji", "aria-hidden": "true", text: done ? "✓" : sess.emoji }),
+        el("strong", { text: sess.title }),
+        done ? el("span", { class: "lk-node-go", text: "Replay" }) : current ? el("span", { class: "lk-node-go", text: "Start" }) : null
+      );
+      nodeList.appendChild(el("li", {}, btn));
+    });
+    var finalReady = cur >= BP.sessions.length;
+    var finalBtn = el("button", {
+      class: "lk-node lk-node-final" + (finalReady ? " current" : ""),
+      type: "button",
+      "data-id": "final_test",
+      "aria-label": finalReady ? "Start" : "Big challenge",
+      disabled: !finalReady,
+      onClick: function () { state.screen = "final"; state.finalQi = 0; state.finalResults = {}; drawGame(); }
+    },
+      el("span", { class: "lk-node-emoji", "aria-hidden": "true", text: "🏆" }),
+      el("strong", { text: "Big challenge" }),
+      finalReady ? el("span", { class: "lk-node-go", text: "Start" }) : null
+    );
+    nodeList.appendChild(el("li", {}, finalBtn));
+    root.appendChild(gameHud(null));
+    root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section" },
+      el("h2", { text: BP.title }),
+      nodeList
+    )));
+  }
+  function drawBite() {
+    var sess = BP.sessions[state.si];
+    var bite = sess.bites[state.bi];
+    if (state.bi === 0 && !state.celebrated) {
+      /* opener once per session start */
+    }
+    root.appendChild(gameHud(sess));
+    var main = el("main", { class: "lk-main", id: "lk-main" });
+    if (state.bi === 0) main.appendChild(el("p", { class: "lk-lead", text: sess.opener }));
+    var view = renderSection(bite);
+    main.appendChild(view.node);
+    root.appendChild(main);
+    root.appendChild(gameNav(view.canContinue, "Next", nextBite));
+    LK.emit("section_viewed", { index: state.bi, type: bite.type, stage: bite.stage, sessionId: sess.id }, { sectionId: bite.id });
+  }
+  function drawSessionDone() {
+    var sess = BP.sessions[state.si];
+    if (!state.doneSessions[state.si]) {
+      state.doneSessions[state.si] = true;
+      LK.emit("session_completed", { sessionId: sess.id, index: state.si }, { sectionId: sess.id });
+    }
+    root.appendChild(gameHud(sess));
+    root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section lk-done" },
+      el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: sess.emoji || "🌟" }),
+      el("h2", { text: "Nice work" }),
+      el("p", { class: "lk-lead", text: "★ " + state.sessionStars })
+    )));
+    root.appendChild(gameNav(true, "Next", function () { state.screen = "map"; drawGame(); }));
+  }
+  function drawFinal() {
+    var qs = BP.finalTest.questions;
+    var q = qs[state.finalQi];
+    root.appendChild(gameHud(null));
+    var main = el("main", { class: "lk-main" });
+    var node = el("section", { class: "lk-section lk-quiz", "data-id": "final_test" });
+    if (state.finalQi === 0) node.appendChild(el("p", { class: "lk-lead", text: BP.finalTest.intro }));
+    node.appendChild(el("p", { class: "lk-counter", text: (state.finalQi + 1) + " / " + qs.length }));
+    node.appendChild(el("p", { class: "lk-prompt", text: q.prompt }));
+    var answerBox = el("div", { class: "lk-answer" });
+    node.appendChild(answerBox);
+    var locked = false;
+    function submit(answer) {
+      if (locked) return;
+      if (answer === null || answer === undefined || answer === "") return;
+      locked = true;
+      var ok = grade(q, answer);
+      state.finalResults[q.id] = ok;
+      LK.emit("question_answered", { activityId: "final_test", questionId: q.id, answer: answer, attempt: 1, hintsUsed: 0, clientCorrect: ok }, { sectionId: "final_test", activityId: "final_test" });
+      if (state.finalQi + 1 >= qs.length) {
+        state.screen = "score";
+      } else {
+        state.finalQi++;
+      }
+      drawGame();
+    }
+    var getAnswer = renderInput(q, answerBox, submit);
+    if (q.kind !== "true_false") {
+      node.appendChild(el("div", { class: "lk-row" }, el("button", { class: "lk-btn primary", type: "button", onClick: function () { submit(getAnswer()); } }, "Check")));
+    }
+    main.appendChild(node);
+    root.appendChild(main);
+    LK.emit("section_viewed", { index: state.finalQi, type: "final_test" }, { sectionId: "final_test" });
+  }
+  function drawScore() {
+    var qs = BP.finalTest.questions;
+    var correct = 0;
+    qs.forEach(function (q) { if (state.finalResults[q.id]) correct++; });
+    var pass = qs.length > 0 && correct / qs.length >= 0.7;
+    if (!state.reachedEnd) {
+      state.reachedEnd = true;
+      LK.emit("final_test_completed", { correct: correct, total: qs.length }, { sectionId: "final_test" });
+      if (pass) LK.emit("topic_completed", { answered: qs.length, correct: correct });
+    }
+    root.appendChild(gameHud(null));
+    var again = el("button", { class: "lk-btn primary", type: "button", onClick: function () {
+      state.reachedEnd = false;
+      state.finalQi = 0;
+      state.finalResults = {};
+      state.screen = "final";
+      drawGame();
+    } }, "Try again");
+    root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section lk-done" },
+      el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: pass ? "🎉" : "💪" }),
+      el("h2", { text: pass ? "You did it" : "Almost" }),
+      el("p", { class: "lk-lead", text: correct + " / " + qs.length }),
+      pass ? null : again
+    )));
+  }
+  function drawGame() {
+    root.innerHTML = "";
+    if (!state.started) { state.started = true; LK.emit("lesson_started", { sessions: BP.sessions.length, stages: BP.stages }); }
+    if (state.screen === "bite") drawBite();
+    else if (state.screen === "session_done") drawSessionDone();
+    else if (state.screen === "final") drawFinal();
+    else if (state.screen === "score") drawScore();
+    else drawMap();
+    window.scrollTo(0, 0);
+  }
+  function playGame() {
+    applyStartSession(LK.context && LK.context.startSession ? LK.context.startSession : 0);
+    window.addEventListener("message", function (e) {
+      var d = e.data;
+      if (!d || d.source !== "learnkit-host" || d.kind !== "init") return;
+      if (typeof d.startSession === "number") applyStartSession(d.startSession);
+      if (state.screen === "map") drawGame();
+    });
+    drawGame();
+  }
+
+  if (BP.schemaVersion === 3) playGame();
+  else render();
 })();
 `;
 
@@ -624,6 +979,36 @@ button, a, input, select, textarea, label, summary, [role="button"] { touch-acti
 .lk-bullets li { display: flex; gap: 10px; align-items: flex-start; font-size: 18px; }
 .lk-check { color: var(--lk-ok); font-weight: 900; }
 .lk-done { text-align: center; padding: 30px 0; }
+.lk-feedback-list { list-style: none; padding: 0; margin: 8px 0 16px; display: grid; gap: 10px; text-align: left; }
+.lk-fb-row { display: flex; gap: 12px; align-items: flex-start; border-radius: 16px; padding: 12px 14px; border: 2px solid var(--lk-line); background: var(--lk-card); }
+.lk-fb-row p { margin: 2px 0 0; font-size: 15px; color: var(--lk-muted); }
+.lk-fb-row.strong { border-color: #86efac; }
+.lk-fb-row.growing { border-color: #fcd34d; }
+.lk-fb-row.practise { border-color: #93c5fd; }
+.lk-fb-icon { font-size: 22px; line-height: 1.2; }
+.lk-point-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 10px; }
+.lk-point-list li { display: flex; gap: 12px; align-items: flex-start; }
+.lk-figure { margin: 8px 0; }
+.lk-figure img { display: block; width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--lk-line); }
+.lk-figure figcaption { font-size: 14px; color: var(--lk-muted); text-align: center; margin-top: 8px; }
+.lk-image-missing { border-radius: 16px; border: 2px dashed var(--lk-line); padding: 20px; text-align: center; color: var(--lk-muted); }
+.lk-mnemonic-phrase { font-size: 30px; font-weight: 900; letter-spacing: 0.04em; text-align: center; color: var(--lk-primary); margin: 8px 0 16px !important; }
+.lk-mnemonic-lines { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.lk-mnemonic-lines li { display: flex; gap: 12px; align-items: center; }
+.lk-cue { flex: none; min-width: 44px; padding: 6px 10px; border-radius: 12px; text-align: center; font-weight: 900; background: color-mix(in srgb, var(--lk-accent) 22%, white); }
+.lk-callout.limit { background: color-mix(in srgb, var(--lk-ink) 5%, white); border-left-color: var(--lk-muted); }
+.lk-callout strong { display: block; margin-bottom: 2px; }
+.lk-term-card { border-radius: 16px; padding: 14px 16px; background: color-mix(in srgb, var(--lk-primary) 8%, var(--lk-card)); border: 2px solid color-mix(in srgb, var(--lk-primary) 28%, transparent); }
+.lk-term-card p { margin: 6px 0 0; }
+.lk-term-label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 900; color: var(--lk-primary); }
+.lk-term { font-size: 22px; }
+.lk-blank-text { font-size: 20px; line-height: 2.2; }
+.lk-select { min-height: 48px; font-size: 17px; font-family: inherit; padding: 6px 10px; margin: 0 4px; border-radius: 12px; border: 2px solid var(--lk-line); background: var(--lk-card); color: inherit; }
+.lk-select:focus { border-color: var(--lk-primary); outline: none; }
+.lk-match { display: grid; gap: 10px; }
+.lk-match-row { display: grid; grid-template-columns: 1fr auto 1.4fr; gap: 10px; align-items: center; }
+.lk-match-arrow { color: var(--lk-muted); }
+@media (max-width: 420px) { .lk-match-row { grid-template-columns: 1fr; gap: 4px; } .lk-match-arrow { display: none; } }
 .lk-done-emoji { font-size: 64px; display: inline-block; animation: lk-pop 500ms cubic-bezier(.2,.9,.3,1.3) both; }
 @keyframes lk-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 :focus-visible { outline: 3px solid var(--lk-accent); outline-offset: 3px; }
@@ -631,7 +1016,7 @@ button, a, input, select, textarea, label, summary, [role="button"] { touch-acti
 @media (min-width: 640px) { body { font-size: 19px; } #app { padding: 28px 24px 60px; } .lk-main { padding: 30px 32px; } .lk-section h2 { font-size: 30px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } .lk-bar-fill { transition: none; } }
 .lk-reduced-motion *, .lk-reduced-motion *::before, .lk-reduced-motion *::after { transition: none !important; animation: none !important; }
-.lk-dark .lk-main, .lk-dark .lk-option, .lk-dark .lk-input, .lk-dark .lk-order-item, .lk-dark .lk-card-part, .lk-dark .lk-card-part.tap, .lk-dark .lk-reveal-card, .lk-dark .lk-sim-step { background: var(--lk-card); border-color: var(--lk-line); color: var(--lk-ink); }
+.lk-dark .lk-main, .lk-dark .lk-option, .lk-dark .lk-input, .lk-dark .lk-order-item, .lk-dark .lk-card-part, .lk-dark .lk-card-part.tap, .lk-dark .lk-reveal-card, .lk-dark .lk-sim-step, .lk-dark .lk-fb-row, .lk-dark .lk-term-card, .lk-dark .lk-select { background: var(--lk-card); border-color: var(--lk-line); color: var(--lk-ink); }
 .lk-dark .lk-btn { background: color-mix(in srgb, var(--lk-card) 80%, white); color: var(--lk-ink); }
 .lk-dark .lk-btn.ghost { border-color: var(--lk-line); }
 .lk-dark .lk-btn.soft { background: color-mix(in srgb, var(--lk-primary) 22%, var(--lk-card)); }
@@ -642,4 +1027,23 @@ button, a, input, select, textarea, label, summary, [role="button"] { touch-acti
 .lk-dark .lk-feedback.ok { background: #14532d; border-color: #166534; color: #bbf7d0; }
 .lk-dark .lk-feedback.retry { background: #713f12; border-color: #a16207; color: #fde68a; }
 .lk-dark .lk-feedback.reveal { background: #1e3a5f; border-color: #1d4ed8; color: #bfdbfe; }
+.lk-game-hud { gap: 10px; }
+.lk-hud-stats { display: flex; gap: 12px; font-weight: 900; }
+.lk-star { color: #d97706; }
+.lk-streak { color: #ea580c; }
+.lk-strip { display: flex; gap: 4px; }
+.lk-pip { flex: 1; height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--lk-ink) 10%, transparent); }
+.lk-pip.done { background: var(--lk-primary); opacity: 0.5; }
+.lk-pip.current { background: var(--lk-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lk-primary) 18%, transparent); }
+.lk-map { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
+.lk-node { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; min-height: 64px; padding: 12px 14px; border-radius: 18px; border: 2px solid var(--lk-line); background: var(--lk-card); color: inherit; font: inherit; cursor: pointer; box-shadow: 0 2px 0 var(--lk-line); }
+.lk-node:disabled { opacity: 0.45; cursor: not-allowed; }
+.lk-node.done { border-color: #86efac; }
+.lk-node.current { border-color: var(--lk-primary); box-shadow: 0 0 0 4px color-mix(in srgb, var(--lk-primary) 18%, transparent); animation: lk-pulse 1.4s ease-in-out infinite; }
+.lk-node-emoji { font-size: 24px; width: 36px; text-align: center; }
+.lk-node-go { margin-left: auto; font-weight: 900; color: var(--lk-primary); }
+.lk-node-final { background: color-mix(in srgb, var(--lk-accent) 12%, var(--lk-card)); }
+@keyframes lk-pulse { 50% { transform: scale(1.015); } }
+.lk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: reduce) { .lk-node.current { animation: none; } }
 `;

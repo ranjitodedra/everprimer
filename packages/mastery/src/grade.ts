@@ -44,5 +44,22 @@ export function gradeAnswer(question: Question, answer: SubmittedAnswer): GradeR
         order.length === question.correctOrder.length && order.every((id, i) => id === question.correctOrder[i]);
       return { correct, normalized: order };
     }
+    case "fill_blank": {
+      const chosen = Array.isArray(answer) ? answer : [];
+      const correct = chosen.length === question.blanks.length && chosen.every((id, i) => id === question.blanks[i]);
+      return { correct, normalized: chosen };
+    }
+    case "matching": {
+      // Each entry is "leftId:rightId"; order does not matter, every left item must be paired once.
+      const submitted = Array.isArray(answer) ? answer : [];
+      const byLeft = new Map<string, string>();
+      for (const entry of submitted) {
+        const [left, right] = entry.split(":");
+        if (!left || !right || byLeft.has(left)) return { correct: false, normalized: submitted };
+        byLeft.set(left, right);
+      }
+      const correct = byLeft.size === question.pairs.length && question.pairs.every((p) => byLeft.get(p.left) === p.right);
+      return { correct, normalized: [...submitted].sort() };
+    }
   }
 }

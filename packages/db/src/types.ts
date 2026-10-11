@@ -78,8 +78,14 @@ export interface CurriculumRow {
   goal_text: string;
   title: string;
   description: string;
+  scope: "overview" | "hobby" | "exam" | "mastery";
+  scope_note: string | null;
+  interest: string | null;
   status: "generating" | "ready" | "failed";
   error: string | null;
+  /** Step the generation job is on; null until a worker picks it up. */
+  stage: "outlining" | "saving" | null;
+  stage_at: string;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +99,9 @@ export interface TopicRow {
   position: number;
   difficulty: number;
   prerequisites: string[];
+  /** A unit has child topics instead of a lesson of its own. */
+  kind: "lesson" | "unit";
+  parent_topic_id: string | null;
   created_at: string;
 }
 
@@ -108,8 +117,9 @@ export interface ArtifactRow {
   id: string;
   topic_id: string;
   version: number;
-  status: "generating" | "published" | "failed";
+  status: "generating" | "published" | "failed" | "split";
   blueprint: unknown | null;
+  lesson_plan: unknown | null;
   html: string | null;
   used_fallback: boolean;
   provider: string | null;
@@ -117,8 +127,19 @@ export interface ArtifactRow {
   prompt_version: string | null;
   validation_report: unknown | null;
   error: string | null;
+  /** Step the generation job is on; null until a worker picks it up. */
+  stage: "planning" | "writing" | "checking" | "building" | null;
+  stage_at: string;
   created_at: string;
   published_at: string | null;
+}
+
+export interface ArtifactAssetRow {
+  artifact_id: string;
+  key: string;
+  mime: "image/png" | "image/jpeg" | "image/webp";
+  data_base64: string;
+  created_at: string;
 }
 
 export interface SessionRow {
@@ -186,6 +207,19 @@ export interface TopicProgressRow {
   first_activity_at: string | null;
   last_activity_at: string | null;
   completed_at: string | null;
+  feedback: LessonFeedbackRow | null;
+  sessions_completed: number;
+  final_score: number | null;
+}
+
+/** End-of-lesson summary, written when the learner reaches the end. */
+export interface LessonFeedbackRow {
+  mastery: number;
+  objectives: Array<{ code: string; text: string; status: ObjectiveMasteryRow["status"]; score: number }>;
+  strong: string[];
+  practice: string[];
+  kid: string;
+  parent: string;
 }
 
 export type JobKind = "curriculum" | "artifact" | "daily_report" | "memory";

@@ -4,7 +4,7 @@ import { useActionState, useState, type FocusEvent } from "react";
 import { BirthFields } from "@/components/birth-fields";
 import { Lock } from "@/components/icons";
 import { signIn, signInChild, signUp, type AuthState } from "./actions";
-import { type Who } from "./who";
+import { type AuthMode, type Who } from "./who";
 
 function keepInView(e: FocusEvent<HTMLElement>) {
   // Safety net for Android WebView and iOS Safari, where the on-screen keyboard
@@ -20,7 +20,6 @@ function keepInView(e: FocusEvent<HTMLElement>) {
   }, 250);
 }
 
-type AuthMode = "signin" | "signup";
 type AdultWho = Exclude<Who, "child">;
 
 const PEOPLE: { who: Who; emoji: string; title: string; body: string }[] = [
@@ -53,29 +52,6 @@ function ChooseAgain({ onBack }: { onBack: () => void }) {
     <button type="button" onClick={onBack} className="mb-4 text-sm font-extrabold text-ink-soft hover:text-ink">
       ← Choose someone else
     </button>
-  );
-}
-
-function ModeSwitch({ mode, onChange }: { mode: AuthMode; onChange: (mode: AuthMode) => void }) {
-  const tabs: { mode: AuthMode; label: string }[] = [
-    { mode: "signin", label: "Sign in" },
-    { mode: "signup", label: "Create account" },
-  ];
-  return (
-    <div className="mb-6 grid grid-cols-2 rounded-full bg-paper-deep p-1 text-sm font-extrabold" role="tablist">
-      {tabs.map((t) => (
-        <button
-          key={t.mode}
-          type="button"
-          role="tab"
-          onClick={() => onChange(t.mode)}
-          className={`rounded-full py-2.5 transition ${mode === t.mode ? "bg-card shadow-soft" : "text-ink-soft hover:text-ink"}`}
-          aria-selected={mode === t.mode}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -199,8 +175,24 @@ function ChildForm() {
   );
 }
 
-function PersonaForm({ who, next, onBack }: { who: Who; next: string; onBack: () => void }) {
-  const [mode, setMode] = useState<AuthMode>("signin");
+const MODES: { mode: AuthMode; emoji: string; title: string; body: string }[] = [
+  { mode: "signup", emoji: "✨", title: "Create account", body: "Start with a free plan." },
+  { mode: "signin", emoji: "🔑", title: "Sign in", body: "I already have an account." },
+];
+
+function PersonaForm({
+  who,
+  mode,
+  next,
+  onBack,
+  onModeChange,
+}: {
+  who: Who;
+  mode: AuthMode;
+  next: string;
+  onBack: () => void;
+  onModeChange: (mode: AuthMode) => void;
+}) {
   return (
     <>
       <ChooseAgain onBack={onBack} />
@@ -208,39 +200,86 @@ function PersonaForm({ who, next, onBack }: { who: Who; next: string; onBack: ()
         <ChildForm />
       ) : (
         <>
-          <ModeSwitch mode={mode} onChange={setMode} />
           <CredentialForm key={mode} who={who} mode={mode} next={next} />
+          <button
+            type="button"
+            onClick={() => onModeChange(mode === "signin" ? "signup" : "signin")}
+            className="mt-4 w-full text-center text-sm font-extrabold text-ink-soft hover:text-ink"
+          >
+            {mode === "signin" ? "Need an account? Create one" : "Already have an account? Sign in"}
+          </button>
         </>
       )}
     </>
   );
 }
 
-export function LoginForm({ next, who }: { next: string; who: Who | null }) {
+function Tile({
+  emoji,
+  title,
+  body,
+  onClick,
+}: {
+  emoji: string;
+  title: string;
+  body: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="card flex h-full w-full items-center gap-4 p-5 text-left transition hover:border-brand/40 lg:h-auto lg:gap-3 lg:p-3"
+    >
+      <span className="text-5xl lg:text-2xl" aria-hidden>{emoji}</span>
+      <span className="min-w-0">
+        <span className="block text-xl font-black lg:text-sm">{title}</span>
+        <span className="block text-base text-ink-soft lg:text-xs">{body}</span>
+      </span>
+    </button>
+  );
+}
+
+export function LoginForm({ next, who, initialMode }: { next: string; who: Who | null; initialMode?: AuthMode | null }) {
+  const [mode, setMode] = useState<AuthMode | null>(initialMode ?? (who ? "signin" : null));
   const [selected, setSelected] = useState<Who | null>(who);
+  const people = mode === "signup" ? PEOPLE.filter((p) => p.who !== "child") : PEOPLE;
 
   return (
     <div className="card p-5 shadow-lift sm:p-7">
-      {selected ? (
-        <PersonaForm key={selected} who={selected} next={next} onBack={() => setSelected(null)} />
-      ) : (
+      {selected && mode ? (
+        <PersonaForm
+          key={`${selected}-${mode}`}
+          who={selected}
+          mode={mode}
+          next={next}
+          onBack={() => setSelected(null)}
+          onModeChange={setMode}
+        />
+      ) : mode ? (
         <>
+          <button type="button" onClick={() => setMode(null)} className="mb-4 text-sm font-extrabold text-ink-soft hover:text-ink">
+            ← Back
+          </button>
           <h2 className="text-xl font-black">Who are you?</h2>
           <p className="mb-4 text-sm text-ink-soft">Pick the login that matches you.</p>
-          <div className="grid h-[75dvh] grid-cols-1 grid-rows-4 gap-3 lg:h-auto lg:grid-rows-none lg:gap-2" role="group" aria-label="Who are you?">
-            {PEOPLE.map((person) => (
-              <button
-                key={person.who}
-                type="button"
-                onClick={() => setSelected(person.who)}
-                className="card flex h-full w-full items-center gap-4 p-5 text-left transition hover:border-brand/40 lg:h-auto lg:gap-3 lg:p-3"
-              >
-                <span className="text-5xl lg:text-2xl" aria-hidden>{person.emoji}</span>
-                <span className="min-w-0">
-                  <span className="block text-xl font-black lg:text-sm">{person.title}</span>
-                  <span className="block text-base text-ink-soft lg:text-xs">{person.body}</span>
-                </span>
-              </button>
+          <div
+            className={`grid grid-cols-1 gap-3 lg:h-auto lg:grid-rows-none lg:gap-2 ${people.length === 3 ? "h-[60dvh] grid-rows-3" : "h-[75dvh] grid-rows-4"}`}
+            role="group"
+            aria-label="Who are you?"
+          >
+            {people.map((person) => (
+              <Tile key={person.who} emoji={person.emoji} title={person.title} body={person.body} onClick={() => setSelected(person.who)} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <h2 className="text-xl font-black">Get started</h2>
+          <p className="mb-4 text-sm text-ink-soft">Create a free account or sign in.</p>
+          <div className="grid h-[40dvh] grid-cols-1 grid-rows-2 gap-3 lg:h-auto lg:grid-rows-none" role="group" aria-label="Create account or sign in">
+            {MODES.map((option) => (
+              <Tile key={option.mode} emoji={option.emoji} title={option.title} body={option.body} onClick={() => setMode(option.mode)} />
             ))}
           </div>
         </>

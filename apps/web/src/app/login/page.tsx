@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { EverprimerMark, Wordmark } from "@/components/logo";
 import { LoginForm } from "./login-form";
-import { parseWho } from "./who";
+import { parseMode, parseWho } from "./who";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -15,6 +15,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const sp = await props.searchParams;
   const next = typeof sp.next === "string" ? sp.next : "/";
   const who = parseWho(sp.who);
+  const mode = parseMode(sp.mode);
   return (
     <main className="kid-sky flex flex-1 flex-col justify-start px-4 pt-[max(1.25rem,env(safe-area-inset-top,0px))] pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] lg:items-center lg:justify-center lg:py-10">
       <div className="grid w-full max-w-5xl items-center gap-4 lg:grid-cols-[1.1fr_1fr] lg:gap-10">
@@ -29,7 +30,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
 
         {/* Sign-in card first in DOM so it sits above the fold on mobile. */}
         <section className="animate-rise w-full max-w-md justify-self-center lg:order-last lg:justify-self-end" style={{ animationDelay: "80ms" }}>
-          <LoginForm next={next} who={who} />
+          <LoginForm next={next} who={who} initialMode={mode} />
         </section>
 
         {/* Marketing panel: hidden on mobile/tablet, shown on lg on the left. */}

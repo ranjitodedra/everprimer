@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { PersonalizationKind, ReadingLevel } from "@eco/contracts";
+import { GoalInput, ReadingLevel } from "@eco/contracts";
 import { parseBirth } from "@/lib/birth";
 import { hasGrownupPin, isKidMode, requireAccount, requireGrownup } from "@/lib/auth";
 import { childPassword, hashPin, isLocked, lockedUntil, newChildAuthUser, Pin, Username, verifyPin } from "@/lib/child-login";
@@ -35,7 +35,7 @@ export async function createChild(formData: FormData) {
   const supabase = await createClient();
   const { count } = await supabase.from("children").select("id", { count: "exact", head: true }).eq("parent_id", account.user.id).eq("kind", "child");
   if ((count ?? 0) >= planFor(account.parent.tier).childCap) redirect("/parent?billing=children");
-  const birth = parseBirth(formData, { required: false, minAge: 3, maxAge: 18 });
+  const birth = parseBirth(formData, { required: false, minAge: 4, maxAge: 18 });
   if (!birth.ok) throw new Error(birth.error);
   const input = ChildInput.parse({
     display_name: formData.get("display_name"),
@@ -83,16 +83,6 @@ export async function createSelfProfile(formData: FormData) {
   redirect(`/learn/${data.id}`);
 }
 
-export async function addContext(childId: string, formData: FormData) {
-  await requireGrownup();
-  const kind = PersonalizationKind.parse(formData.get("kind") ?? "interest");
-  const value = z.string().trim().min(1).max(200).parse(formData.get("value"));
-  const supabase = await createClient();
-  const { error } = await supabase.from("personalization_context").insert({ child_id: childId, kind, value });
-  if (error) throw new Error(error.message);
-  revalidatePath(`/parent/children/${childId}`);
-}
-
 export async function removeContext(childId: string, id: string) {
   await requireGrownup();
   const supabase = await createClient();
@@ -107,7 +97,7 @@ export async function setLearnerBirth(childId: string, formData: FormData) {
   if (readError) throw new Error(readError.message);
   if (!child) throw new Error("Learner not found");
   const self = (child as { kind: string }).kind === "self";
-  const birth = parseBirth(formData, { required: true, minAge: self ? 13 : 3, maxAge: self ? 120 : 18 });
+  const birth = parseBirth(formData, { required: true, minAge: self ? 13 : 4, maxAge: self ? 120 : 18 });
   if (!birth.ok || !birth.birth) throw new Error(birth.ok ? "Enter a birth month and year." : birth.error);
   const { error } = await supabase.from("children").update(birth.birth).eq("id", childId);
   if (error) throw new Error(error.message);
@@ -211,15 +201,30 @@ export async function removeChildLogin(childId: string) {
 
 export async function createCurriculum(childId: string, formData: FormData) {
   await requireGrownup();
-  const goal = z.string().trim().min(5).max(600).parse(formData.get("goal"));
+  const optional = (key: string) => {
+    const v = formData.get(key);
+    return typeof v === "string" && v.trim() ? v : undefined;
+  };
+  const input = GoalInput.parse({
+    goal: formData.get("goal"),
+    scope: formData.get("scope") || "hobby",
+    scopeNote: optional("scopeNote"),
+    interest: optional("interest"),
+  });
   const supabase = await createClient();
   const { data: child } = await supabase.from("children").select("id").eq("id", childId).maybeSingle();
   if (!child) throw new Error("child not found");
 
-  const started = await startCurriculumJob(childId, goal);
+  const started = await startCurriculumJob(childId, input.goal);
   const back = formData.get("from") === "learn" ? `/learn/${childId}` : `/parent/children/${childId}`;
   if (!started.ok) redirect(`${back}?billing=${started.error}`);
   if (!started.jobId || !started.curriculumId) throw new Error("curriculum was not enqueued");
+  // Saved before the job is kicked, so generation sees the scope and interest.
+  const { error } = await createServiceClient()
+    .from("curricula")
+    .update({ scope: input.scope, scope_note: input.scopeNote ?? null, interest: input.interest ?? null })
+    .eq("id", started.curriculumId);
+  if (error) throw new Error(error.message);
   kickJob(started.jobId);
   redirect(formData.get("from") === "learn" ? `/learn/${childId}/curricula/${started.curriculumId}` : `/parent/curricula/${started.curriculumId}`);
 }

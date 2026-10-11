@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { EventBatch } from "@eco/contracts";
 import type { SessionRow } from "@eco/db";
@@ -26,7 +27,18 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: "unknown session" }, { status: 404 });
 
   try {
-    const result = await ingestEventBatch(session as SessionRow, batch);
+    const row = session as SessionRow;
+    const result = await ingestEventBatch(row, batch);
+    if (result.inserted > 0) {
+      revalidatePath(`/learn/${row.child_id}`);
+      revalidatePath(`/parent/children/${row.child_id}`);
+      const { data: topic } = await supabase.from("topics").select("curriculum_id").eq("id", row.topic_id).maybeSingle();
+      const curriculumId = (topic as { curriculum_id: string } | null)?.curriculum_id;
+      if (curriculumId) {
+        revalidatePath(`/learn/${row.child_id}/curricula/${curriculumId}`);
+        revalidatePath(`/parent/curricula/${curriculumId}`);
+      }
+    }
     return NextResponse.json(result);
   } catch (err) {
     console.error("[events] ingest failed", err);

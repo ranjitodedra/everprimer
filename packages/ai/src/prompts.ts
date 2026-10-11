@@ -1,36 +1,60 @@
-import type { ArtifactBlueprint, GeneratedCurriculum, LearnerContext } from "@eco/contracts";
+import {
+  LESSON_LIMITS,
+  SCOPE_GUIDANCE,
+  ageBandFor,
+  clampLearnerAge,
+  type ArtifactBlueprint,
+  type GeneratedCurriculum,
+  type LearnerContext,
+  type LearningScope,
+  type LessonPlan,
+} from "@eco/contracts";
 
 /**
  * Prompt templates. Structured (role / task / context / requirements / output)
  * per rules.md section 20. Bump PROMPT_VERSION whenever wording changes so
  * artifacts stay traceable to the prompt that produced them.
  */
-export const PROMPT_VERSION = "2026-09-27.1";
+export const PROMPT_VERSION = "2026-10-11.3";
 
-const SAFETY = `SAFETY AND TONE (non-negotiable):
-- Content is for a child. No sexual content, graphic violence, dangerous instructions, or risky real-world behaviour.
-- Never ask the child for personal information.
-- Feedback teaches; it never shames. Never say just "wrong".
-- Do not present yourself as the child's friend, parent, or confidant. You are a lesson, not a companion.
-- Use parent-provided interests only as a teaching bridge (analogies, themes, scenarios). Do not reproduce copyrighted characters, dialogue, or logos; a generic themed equivalent is always preferred ("a ninja-style mission", not a named character).
-- Every factual claim must be true and age-appropriate. If unsure, leave it out.`;
+const SAFETY = `SAFETY AND VOICE (non-negotiable):
+- Content is for a learner aged 4 to 18. Keep it easy for their age. No sexual content, graphic violence, dangerous instructions, or risky real-world behaviour.
+- Never ask for personal information.
+- You are a friendly game guide. Talk straight to the learner in second person ("you"). Warm and playful.
+- Every line is something you would say to them. No instructions, no headings like Objective, no "in this lesson", no "the learner", no "this section", no "students".
+- Feedback celebrates or gently nudges. Never say just "wrong".
+- Use parent-provided interests only as a teaching bridge. Interests never change the facts or the correct answers. No copyrighted characters.
+- Every factual claim must be true and age-appropriate. If unsure, leave it out.
+- Keep difficulty low. Explain any new word in the same bite.`;
 
 export function learnerBlock(learner: LearnerContext): string {
   const strengths = learner.strengths ?? [];
   const misconceptions = learner.misconceptions ?? [];
   const analogies = learner.analogies ?? [];
   return [
-    `- Child age: ${learner.age ?? "unknown"}`,
+    `- Child age: ${clampLearnerAge(learner.age)} (content ages 4-18)`,
     `- Reading level: ${learner.readingLevel ?? "unknown"}`,
     `- Interests (framing only — analogies, themes, and scenarios; do not change what is taught): ${learner.interests.length ? learner.interests.join(", ") : "none provided"}`,
     `- Analogies that worked (framing only): ${analogies.length ? analogies.join(" | ") : "none"}`,
-    `- Parent notes: ${learner.notes.length ? learner.notes.join(" | ") : "none"}`,
+    `- Parent notes (planning context, never a source of facts): ${learner.notes.length ? learner.notes.join(" | ") : "none"}`,
     `- Strengths (already shown; do not reteach at length): ${strengths.length ? strengths.join(" | ") : "none"}`,
-    `- Misconceptions (change the examples and give these ideas more practice): ${misconceptions.length ? misconceptions.join(" | ") : "none"}`,
+    `- Misconceptions (change the examples and give these ideas more practice): ${misconceptions.length ? misconceptions.map((m, i) => `m${i + 1}: ${m}`).join(" | ") : "none"}`,
   ].join("\n");
 }
 
-export function curriculumPrompt(goal: string, learner: LearnerContext): { system: string; prompt: string } {
+function scopeBlock(scope: LearningScope, scopeNote?: string | null): string {
+  return `- Scope: ${scope} — ${SCOPE_GUIDANCE[scope]}${scopeNote ? `\n- What the grown-up wants by the end (planning context, not a source of facts): """${scopeNote}"""` : ""}`;
+}
+
+export interface CurriculumPromptInput {
+  goal: string;
+  scope: LearningScope;
+  scopeNote?: string | null;
+  interest?: string | null;
+  learner: LearnerContext;
+}
+
+export function curriculumPrompt(input: CurriculumPromptInput): { system: string; prompt: string } {
   return {
     system: `ROLE: You are an expert curriculum designer for children.
 
@@ -39,87 +63,225 @@ TASK: Turn a parent's learning goal into an ordered curriculum, like the table o
 ${SAFETY}
 
 CURRICULUM REQUIREMENTS:
-- 5 to 14 topics, each a coherent 10-20 minute lesson.
-- Start with an orienting "what is this?" topic; end with a review/synthesis topic.
+- Learners are 4 to 18. Keep topic difficulty 1 or 2. Content stays easy; do not write adult or college-level material.
+- A flat, ordered list of topics. Each topic becomes a short game of about 10-15 minutes across a few sessions. Do not nest topics; a later step splits a topic only if it is too big for one lesson.
+- Scope decides breadth and depth. There is no fixed topic count:
+  - overview: few topics that cover the whole subject at a shallow depth.
+  - hobby: the most interesting, useful parts; room to explore.
+  - exam: every required idea, with topics that leave room for practice.
+  - mastery: break the subject into its real concepts, still at an easy level.
+- Never add topics just to make the list longer. 3 to 20 topics.
+- Start with an orienting "what is this?" topic when it helps; end with a review/synthesis topic when the curriculum has more than four topics.
 - Order builds from concrete and familiar to abstract and new. Use prerequisites only where genuinely needed.
-- Each topic has 2-5 learning objectives that start with an observable verb (Identify, Describe, Explain, Compare, Predict, Order...). Objectives must be assessable.
+- Each topic has 2-5 learning objectives that start with an observable verb (Identify, Describe, Explain, Compare, Predict, Order...). Objectives must be assessable and match the scope's depth.
 - Slugs are stable kebab-case identifiers unique in the curriculum.
-- Difficulty 1-5 relative to this child's age.
-- Descriptions are written for the parent: one or two plain sentences.`,
+- Descriptions are written for the parent: one or two plain sentences.
+- The interest is a theme for later lessons. It never adds topics or changes objectives.`,
     prompt: `PARENT'S GOAL:
-"""${goal}"""
+"""${input.goal}"""
+
+SCOPE:
+${scopeBlock(input.scope, input.scopeNote)}
+
+CURRENT INTEREST (framing only): ${input.interest || "none given"}
 
 LEARNER:
-${learnerBlock(learner)}
+${learnerBlock(input.learner)}
 
 Return the curriculum.`,
   };
 }
 
-export function blueprintPrompt(input: {
-  topic: { slug: string; title: string; description: string; objectives: string[]; difficulty: number };
-  curriculum: { title: string; description: string; topicTitles: string[] };
-  learner: LearnerContext;
-  priorPerformance?: string;
-  repairProblems?: string[];
-}): { system: string; prompt: string } {
-  const { topic, curriculum, learner } = input;
-  return {
-    system: `ROLE: You are an expert educational experience designer for children.
+/** The registered lesson building blocks. The planner chooses among these and nothing else. */
+export const TOOLBOX_DOC = `TOOLBOX (the only bites that exist):
+TEACH (one small idea per bite)
+- explore — an interactive visual the learner taps. Needs visualKind.
+- explain — one short paragraph, optional analogy, optional visual.
+- key_points — 2-7 short points.
+- mnemonic — an acronym or memory phrase with one line per letter or word.
+- analogy — a bridge from something they know to the idea, and where it stops working.
+- simple_explain — say it simply, then the real term and definition.
+TASK (at least 40% of bites)
+- quiz — 1 or 2 graded questions. Never role final_check (that is a separate finalTest).
+- apply — a fresh scenario plus 1 or 2 graded questions.
+QUESTION KINDS
+- mcq, true_false, fill_blank, short_answer (1-3 words), matching, ordering.`;
 
-TASK: Design the blueprint for ONE interactive lesson. The child learns by playing with a visual artifact (animation, tap-to-discover model, comparison), then takes a quiz. This blueprint is structured data; a later step turns it into a web page. Everything the lesson teaches, asks and grades must be in this blueprint.
+const VISUAL_RULES = `VISUAL SELECTION (choose by the concept, never because it looks engaging):
+- orbit — orbital or cyclical relationships and celestial motion. First item is the centre.
+- comparison — magnitudes, attributes, side-by-side differences. Every item has a numeric value.
+- simulation — changing variables, cause and effect, dynamic systems. Items are the states or steps.
+- parts — a whole and its components.
+- sequence — an ordered process.
+- timeline — historical or temporal progression.
+Every visual declares its instructional purpose, e.g. "show_that_earth_rotation_changes_which_side_faces_the_sun".`;
+
+const INTENT_RULES = `PLANNING RULES BY OBJECTIVE INTENT:
+- identify/name: prefer explore or key_points, then assess. Review optional. Do not require apply unless it adds real value.
+- explain / explain_process: REQUIRED a representation (explore or explain) AND an explanation bite (explain or simple_explain) AND a practice task. A quiz alone can never satisfy it.
+- compare: prefer explore with a comparison visual, then assess. Explain and apply optional.
+- sequence: prefer explore with a sequence or timeline visual, then an ordering question. Explain, mnemonic, review optional.
+- predict: prefer explore with a simulation (or orbit/sequence), then a quiz or apply.
+- apply (use in a new situation): REQUIRED teaching AND an apply block AND assessment. Recognition-only questions are not enough.
+- Any objective planned at depth "transfer" needs an apply block.
+- Strengths: do not reteach them at length. Misconceptions: give them an example or extra practice and list their ids on that block.`;
+
+export interface RecallCandidate {
+  objectiveId: string;
+  text: string;
+  topicTitle: string;
+  status: string;
+}
+
+export interface LessonPlanPromptInput {
+  topic: { slug: string; title: string; description: string; objectives: string[]; difficulty: number };
+  curriculum: { title: string; description: string; topicTitles: string[]; scope: LearningScope; scopeNote?: string | null };
+  learner: LearnerContext;
+  framingInterest: string | null;
+  priorPerformance?: string;
+  recallCandidates: RecallCandidate[];
+  /** false for topics that are already part of a unit */
+  allowSplit?: boolean;
+  repairProblems?: string[];
+}
+
+export function lessonPlanPrompt(input: LessonPlanPromptInput): { system: string; prompt: string } {
+  const band = ageBandFor(input.learner.age);
+  const limits = LESSON_LIMITS[band];
+  return {
+    system: `ROLE: You are an expert learning designer for children. You plan the STRUCTURE of one game-like lesson. You do not write the lesson.
+
+TASK: Split this topic into short sessions of tiny bites, then a final test. Keep it structural.
 
 ${SAFETY}
 
-LESSON SHAPE (required, in this order):
-1. intro — two short sentences max plus a curiosity hook. No lecture.
-2. explore — THE LESSON. An interactive visual the child taps, plays, or watches. This is how they learn. Not optional.
-3. explain — optional, only if one extra visual is needed. At most TWO short paragraphs. Prefer skipping it.
-4. review — 3 to 5 tiny recap bullets of what they just discovered. No new facts.
-5. quiz — LAST section. This is how the lesson ends. 4 to 8 questions covering every learning objective.
+${TOOLBOX_DOC}
 
-NEVER include flashcards, vocabulary drills, or walls of text. Recognition happens by tapping the artifact, not by flipping cards.
+${INTENT_RULES}
 
-EXPLORE VISUAL (pick the kind that teaches the idea):
-- orbit: a centre body plus things that move around it (solar system, atoms, seasons). First item is the centre. Give every item a distinct hex colour.
-- comparison: magnitudes the child can see (size, distance, time). Every item MUST have a numeric value so bars or scaled shapes can be drawn.
-- simulation: a process that plays (water cycle, rotation → day/night, a growing fraction). Items are the steps.
-- parts: a labelled diagram the child taps (parts of a plant, layers of Earth).
-- sequence / timeline: ordered steps or history.
+${VISUAL_RULES}
 
-Each visual item has a short label and a one-sentence description shown when the child taps it. Put the teaching in those descriptions — not in paragraphs.
+HOW TO PLAN:
+1. Classify every objective: intent and depth. Use exactly the given codes.
+2. Group objectives into concept clusters (c1, c2, ...).
+${
+  input.allowSplit === false
+    ? `3. This topic is already part of a unit and cannot be split again. Always return mode "single" with at most ${limits.maxConceptClusters} clusters.`
+    : `3. If the clusters exceed ${limits.maxConceptClusters} for ages ${band}, return mode "sub_index" with splitReason and one proposedChildTopic per cluster. Leave sessions empty. Do NOT split just because there are many objectives.`
+}
+4. For mode "single", outline exactly ${limits.sessions} sessions. Each session has a title, emoji, purpose, objectiveCodes, biteKinds (5-8) and taskCount (how many of those kinds are quiz or apply). At least 40% of all bites must be tasks. Total bites at least ${limits.minBites}.
+5. Each session teaches one small idea, then has the learner use it right away.
+6. Add finalTest with questionCount ${limits.finalTestQuestions}, every objective code, and the question kinds you will use.
+7. Scope: overview = broad and shallow. hobby = curiosity. exam = practice before the final test. mastery = at least one transfer-depth objective with an apply bite. Keep content easy.
+8. Recall: up to 2 offered candidates, each one extra question somewhere in a quiz bite or the final test.
+9. learnerConstraints: ageBand "${band}", readingLevel as given, textBudget at most ${limits.wordsPerBite}, misconceptionIds, framingInterest.
 
-QUIZ:
-- Questions test the learning objectives, vary in difficulty, and cannot be guessed from wording. Every objective is assessed at least once.
-- Every question has an explanation that teaches WHY, and most have a hint.
-- Short-answer acceptedAnswers include common spellings and phrasings.
-- Ordering questions list items in an arbitrary order; correctOrder holds the right sequence of item ids.
-- For children 8+, include one application-style question in the quiz (a fresh scenario). Do not add a separate apply section unless truly needed; if you do, it must sit before the review.
+HARD LIMITS:
+- Session ids start with sess_. Bite kinds only from the toolbox. No image bites.
+- finalTest.questionCount must be ${limits.finalTestQuestions}.
+- Every objective is taught and practised before the final test.
+- scope must equal "${input.curriculum.scope}".
+
+OUTPUT: only the LessonPlan JSON with planVersion 2.`,
+    prompt: `CURRICULUM: ${input.curriculum.title} — ${input.curriculum.description}
+Topics in order: ${input.curriculum.topicTitles.join(" → ")}
+
+SCOPE:
+${scopeBlock(input.curriculum.scope, input.curriculum.scopeNote)}
+
+THIS TOPIC: ${input.topic.title} (slug: ${input.topic.slug}, difficulty ${input.topic.difficulty}/5)
+${input.topic.description}
+
+LEARNING OBJECTIVES:
+${input.topic.objectives.map((o, i) => `lo${i + 1}: ${o}`).join("\n")}
+
+LEARNER:
+${learnerBlock(input.learner)}
+- Framing interest for this goal: ${input.framingInterest ?? "none"}
+${input.priorPerformance ? `\nPREVIOUS PERFORMANCE:\n${input.priorPerformance}` : ""}
+
+RECALL CANDIDATES (earlier objectives not yet secure):
+${input.recallCandidates.length ? input.recallCandidates.map((c) => `- ${c.objectiveId}: "${c.text}" from ${c.topicTitle} (${c.status})`).join("\n") : "none"}
+${repairBlock(input.repairProblems)}
+Return the lesson plan.`,
+  };
+}
+
+function repairBlock(problems?: string[]): string {
+  return problems?.length ? `\nYOUR PREVIOUS ATTEMPT HAD THESE PROBLEMS. Fix all of them:\n${problems.map((p) => `- ${p}`).join("\n")}\n` : "";
+}
+
+export interface BlueprintPromptInput {
+  plan: LessonPlan;
+  topic: { slug: string; title: string; description: string; objectives: string[]; difficulty: number };
+  curriculum: { title: string; topicTitles: string[] };
+  audience: { age: number | null; readingLevel: LearnerContext["readingLevel"] };
+  misconceptions: Array<{ id: string; text: string }>;
+  analogies: string[];
+  recall: Array<{ objectiveId: string; text: string; topicTitle: string }>;
+  repairProblems?: string[];
+}
+
+export function blueprintPrompt(input: BlueprintPromptInput): { system: string; prompt: string } {
+  const { plan, topic } = input;
+  const limits = LESSON_LIMITS[plan.learnerConstraints.ageBand];
+  return {
+    system: `ROLE: You are a children's game-guide writer. You turn a validated session plan into a lesson blueprint the built-in player renders and the server grades.
+
+TASK: Implement this exact plan.
+- Same sessions, same order, same ids, same bite kinds.
+- Each bite is one tiny step: one idea or one task.
+- Talk to the learner. Questions sound like a friend asking ("Which planet do you think is the hottest?").
+- Do not invent facts outside the facts list. Do not invent ungradeable questions.
+
+${SAFETY}
+
+${TOOLBOX_DOC}
+
+FACTS ARE THE SOURCE OF TRUTH:
+- First write "facts": short, checkable, true statements (f1, f2, ...).
+- Every teach bite and every question cites factIds.
+- The interest frames examples only.
+
+STRUCTURE:
+- schemaVersion 3. Session ids from the plan (sess_*). Bite ids start with s_. Question ids start with q_.
+- Each session has title, emoji, opener (one spoken line), objectiveCodes, and bites matching biteKinds.
+- Quiz and apply bites hold 1 or 2 questions. Never set role final_check on a bite.
+- finalTest.intro sets up a "big challenge" in the same voice. finalTest.questions: exactly ${limits.finalTestQuestions}, covering every objective.
+- Recall: one question with recallObjectiveId, objectiveCodes [].
+- Questions have an explanation that teaches WHY. Practice bites may have a hint. Final-test questions have no hint.
+- short_answer: 1-3 words. fill_blank uses ___.
+
+READING LOAD:
+- At most ${limits.wordsPerBite} words in any single text.
+- Vocabulary matches age ${input.audience.age ?? "unknown"} (band ${plan.learnerConstraints.ageBand}).
 
 CRAFT:
-- Vocabulary, sentence length and interaction match the age and reading level.
-- Personalization: weave interests into the theme mood and one analogy, without changing what is taught. Say how in "personalization".
-- Theme colours must give this topic its own identity and stay high-contrast against the background. Space topics should feel dark and cosmic; nature topics warm and green; etc.
-- Every fact must be correct. This is the most important requirement.`,
-    prompt: `CURRICULUM: ${curriculum.title} — ${curriculum.description}
-Topics in order: ${curriculum.topicTitles.join(" → ")}
+- personalization: one sentence on how the framing interest was used.
+- Theme colours stay high-contrast.
+- Every fact must be correct.`,
+    prompt: `CURRICULUM: ${input.curriculum.title}
+Topics in order: ${input.curriculum.topicTitles.join(" → ")}
 
 THIS TOPIC: ${topic.title} (slug: ${topic.slug}, difficulty ${topic.difficulty}/5)
 ${topic.description}
 
-LEARNING OBJECTIVES (use codes lo1, lo2, ... in this order):
+LEARNING OBJECTIVES (use these codes):
 ${topic.objectives.map((o, i) => `lo${i + 1}: ${o}`).join("\n")}
 
-LEARNER:
-${learnerBlock(learner)}
-${input.priorPerformance ? `\nPREVIOUS PERFORMANCE:\n${input.priorPerformance}` : ""}
-${
-  input.repairProblems?.length
-    ? `\nYOUR PREVIOUS ATTEMPT HAD THESE PROBLEMS. Fix all of them:\n${input.repairProblems.map((p) => `- ${p}`).join("\n")}`
-    : ""
-}
+LESSON PLAN (validated; implement exactly):
+${JSON.stringify({ scope: plan.scope, objectives: plan.objectives, sessions: plan.sessions, finalTest: plan.finalTest, recall: plan.recall })}
 
-Return the blueprint with schemaVersion 1 and topicSlug "${topic.slug}".`,
+LEARNER CONSTRAINTS:
+- Age: ${input.audience.age ?? "unknown"} (band ${plan.learnerConstraints.ageBand}); reading level: ${input.audience.readingLevel ?? "unknown"}
+- Framing interest: ${plan.learnerConstraints.framingInterest ?? "none"}
+- Analogies that worked before (framing only): ${input.analogies.length ? input.analogies.join(" | ") : "none"}
+- Misconceptions to address: ${input.misconceptions.length ? input.misconceptions.map((m) => `${m.id}: ${m.text}`).join(" | ") : "none"}
+
+RECALL ITEMS:
+${input.recall.length ? input.recall.map((r) => `- ${r.objectiveId}: "${r.text}" (from ${r.topicTitle})`).join("\n") : "none"}
+${repairBlock(input.repairProblems)}
+Return the blueprint with schemaVersion 3, topicSlug "${topic.slug}", audience age ${input.audience.age ?? "null"}.`,
   };
 }
 
@@ -127,82 +289,26 @@ export function factcheckPrompt(bp: ArtifactBlueprint): { system: string; prompt
   return {
     system: `ROLE: You are a meticulous subject-matter reviewer for children's educational content.
 
-TASK: Review a lesson blueprint for factual accuracy, correct answer keys, correct explanations, internal consistency and age appropriateness. Be precise. Do not nitpick style. Do not flag things that are merely simplified for a child.
+TASK: Review a lesson blueprint. Be precise. Do not nitpick style. Do not flag things that are merely simplified for a child. Check:
+- facts: every entry in the facts list is true and age-appropriate.
+- definitions and relationships stated in any block.
+- answer keys: the marked correct answer is right and no other option is also right.
+- question correctness: explanations agree with the answer; hints do not mislead.
+- question/objective alignment: each question actually assesses the objectives it claims.
+- unsupported claims: any block or question that states something not in the facts list.
+- safety.
 
-Report each problem with EXACTLY ONE of these severities. Use the higher bar; "critical" is not the default.
+Report each problem with EXACTLY ONE severity. Use the higher bar; "critical" is not the default.
+- "safety": unsafe, age-inappropriate, harmfully scary, dangerous, sexualised, discriminatory, medical/legal/self-harm advice, or revealing or requesting personal information. Safety problems block publishing.
+- "critical": a clearly false fact, a wrong answer key, an explanation that contradicts the answer, or an unsupported claim. Only when you are certain.
+- "minor": imprecise wording, a slight oversimplification, a debatable example, a missing nuance.
 
-- "safety": content that is unsafe, age-inappropriate, scary in a harmful way, dangerous, sexualised, discriminatory, medical/legal/self-harm advice, or that reveals or requests personal information. Safety problems block publishing.
-- "critical": a clearly false fact, a wrong answer key, or an explanation that directly contradicts the correct answer. Only use this when you are certain the content is wrong. Critical problems trigger one automatic repair attempt but do NOT block publishing on their own — a small factual slip should not delete the whole lesson.
-- "minor": imprecise wording, a slight oversimplification, a debatable choice of emoji or example, or a missing nuance. Do not flag correct child-level simplifications as minor.
+Give each problem a level:
+- "content": the wording, a fact, an answer key or a question is wrong and can be fixed in place.
+- "plan": the lesson structure itself cannot teach the objective correctly (for example the chosen visual misrepresents the idea). Use this rarely. Never redesign the lesson yourself.
 
 If the lesson is fine, return an empty issues array with ok: true. Silence is a valid answer.`,
     prompt: `BLUEPRINT (JSON):\n${JSON.stringify(bp)}\n\nReview it.`,
-  };
-}
-
-export const LEARNKIT_API_DOC = `LEARNKIT RUNTIME (already injected before your code as window.LearnKit — do NOT include it yourself):
-  LearnKit.emit(type, payload, { sectionId, activityId })  -> records a learning event
-  LearnKit.normalize(text)                                 -> lower-case, punctuation/article-stripped text for answer matching
-  LearnKit.reducedMotion                                   -> boolean; when true, disable non-essential animation
-
-REQUIRED EVENTS (exact type strings):
-  "lesson_started"      once, at start
-  "section_viewed"      { index, type } each time a section becomes visible, meta.sectionId = blueprint section id
-  "animation_started"   { visual } when the explore animation/simulation begins
-  "animation_completed" { visual } when it finishes a cycle or the child pauses it
-  "item_explored"       { activityId, itemId } each time the child taps/selects an explore item
-  "activity_started"    { kind: "explore" } once when they first interact with the artifact
-  "activity_completed"  { kind: "explore" } once they have explored enough items to continue
-  "quiz_started"        { activityId } once per quiz/apply section
-  "question_answered"   { activityId, questionId, answer, attempt, hintsUsed, clientCorrect } on EVERY submission.
-                        answer is: option id (mcq) | boolean (true_false) | string (short_answer) | array of item ids (ordering)
-  "hint_requested"      { activityId, questionId }
-  "answer_revealed"     { activityId, questionId } when you show the answer after failed attempts
-  "quiz_completed"      { activityId, correct, total }
-  "review_completed"    when the review section is finished
-  "topic_completed"     once, when the child finishes the lesson
-Use the blueprint's section ids as activityId for quiz/apply/explore sections and the exact question/item ids.
-Do NOT emit flashcard events. There are no flashcards.`;
-
-export function codegenPrompt(bp: ArtifactBlueprint): { system: string; prompt: string } {
-  return {
-    system: `ROLE: You are an expert educational experience designer and senior front-end engineer.
-
-TASK: Turn the lesson blueprint into ONE self-contained interactive HTML document. The child should feel they are playing with a living model of the idea — not reading a worksheet. Think "mini orrery / science toy / tap-to-discover exhibit" that ends in a quiz.
-
-${SAFETY}
-
-HARD TECHNICAL CONSTRAINTS (the document is rejected automatically if violated):
-- A single complete <!doctype html> document. Everything inline. No external scripts, stylesheets, fonts, images, iframes, or network calls of any kind (no fetch/XHR/WebSocket, no CDNs, no Three.js, no Tailwind). Use inline SVG, CSS, the Canvas 2D API, and emoji.
-- No localStorage/sessionStorage/cookies (unavailable in the sandbox).
-- Never touch window.parent.document or window.top.
-- JavaScript must parse. Never interpolate CSS functions like var(--x) inside a JS template literal. Write stroke="#4A4A8A", not stroke="\${var(--border-color)}".
-- Boot immediately if document.readyState !== "loading"; do not rely only on DOMContentLoaded (it may already have fired).
-- Wrap your top-level boot in try/catch and, on error, write the error message into the page so a blank screen is impossible.
-- The host sizes the iframe to your content, so never use vh/vw/svh/dvh units or position:fixed for layout. Size things with px, %, rem, and aspect-ratio instead.
-- Mobile-first, responsive, touch-friendly (controls at least 44px). Readable typography (16px+ body), sufficient contrast.
-- Accessible: semantic HTML, buttons for actions, visible focus states, aria-live region for feedback, keyboard operable, never rely on colour alone.
-- Respect reduced motion: check prefers-reduced-motion and LearnKit.reducedMotion, and pause/disable non-essential animation when set.
-- Emit every required LearnKit event exactly as documented below.
-
-${LEARNKIT_API_DOC}
-
-VISUAL-FIRST (this is the product):
-- The explore section is the star. It must be a real interactive artifact that fills most of the viewport: orbiting bodies, a playable simulation, scaled comparison shapes, or a tap-to-open diagram. Motion should teach the concept (planets actually travel around a sun; a cycle actually loops; bars actually grow).
-- Tapping an item reveals ONE short fact in a compact card. Do not dump all descriptions on screen at once.
-- Almost no paragraphs. Intro is a headline + one line. Review is a tight recap list. The quiz is clean and uncluttered.
-- NEVER build flashcards, flip-cards with "I knew it", vocabulary decks, or a page of text cards pretending to be a lesson.
-- Use the theme colours and mood as a full-page identity (dark cosmic for space, etc.). Spacious. Child-friendly. Not a blog post.
-
-LEARNING REQUIREMENTS:
-- Implement EVERY section of the blueprint in order, with the exact ids, question text, options, answer keys, explanations, hints, and visual item copy. Do not invent new facts or questions.
-- One section visible at a time with clear Back/Continue navigation and a slim progress indicator. Explore must be interacted with (tap at least half the items, or play the simulation) before Continue unlocks. Quiz questions must be answered before Continue unlocks.
-- Grade answers locally for instant feedback; show the blueprint explanation after each answer; allow a second attempt after a wrong answer; reveal the correct answer after two wrong attempts.
-- Ordering: use up/down buttons (not drag-only) so it works with touch and keyboard.
-- End on the quiz, then a calm completion screen. No streaks, points, timers or pressure.
-
-OUTPUT: Return ONLY the HTML document inside a single \`\`\`html fenced block. No commentary.`,
-    prompt: `BLUEPRINT (JSON):\n${JSON.stringify(bp)}`,
   };
 }
 

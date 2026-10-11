@@ -13,6 +13,7 @@ interface Props {
   artifactId: string;
   title: string;
   backHref: string;
+  startSession?: number;
 }
 
 const FLUSH_MS = 2000;
@@ -27,20 +28,34 @@ const FLUSH_AT = 25;
  * cannot make same-origin requests. We accept messages only from this exact
  * iframe window and only when they carry the per-session nonce.
  */
-export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, title, backHref }: Props) {
+export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, title, backHref, startSession = 0 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const queueRef = useRef<Map<string, LearningEvent>>(new Map());
   const inFlightRef = useRef(false);
+  const followRef = useRef(false);
+  const followKeepaliveRef = useRef(false);
   const [height, setHeight] = useState(720);
   const [completed, setCompleted] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
 
   const flush = useCallback(
+    // Recursive self-call after a follow-up batch; the compiler cannot memoize it.
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- flush re-enters itself
     async (opts: { keepalive?: boolean } = {}) => {
-      if (inFlightRef.current || queueRef.current.size === 0) return;
+      if (queueRef.current.size === 0) return;
+      // A leave or a completion can arrive while a batch is already on the wire.
+      // Remember it and send the remainder when this request finishes. Event ids
+      // are deduped, so the follow-up cannot double-count.
+      if (inFlightRef.current) {
+        followRef.current = true;
+        if (opts.keepalive) followKeepaliveRef.current = true;
+        return;
+      }
       const events = [...queueRef.current.values()].slice(0, 200);
       inFlightRef.current = true;
+      followRef.current = false;
       setSaveState("saving");
+      let ok = false;
       try {
         const res = await fetch("/api/events", {
           method: "POST",
@@ -50,11 +65,17 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
         });
         if (!res.ok) throw new Error(`events ${res.status}`);
         for (const e of events) queueRef.current.delete(e.clientEventId);
+        ok = true;
         setSaveState("idle");
       } catch {
-        setSaveState("error"); // kept in queue; retried on the next tick
+        setSaveState("error"); // kept in queue; retried on the next tick or the follow-up
       } finally {
         inFlightRef.current = false;
+        const keepalive = followKeepaliveRef.current;
+        const again = queueRef.current.size > 0 && (followRef.current || ok);
+        followRef.current = false;
+        followKeepaliveRef.current = false;
+        if (again) void flush({ keepalive });
       }
     },
     [sessionId],
@@ -63,7 +84,11 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
   const enqueue = useCallback(
     (event: LearningEvent) => {
       queueRef.current.set(event.clientEventId, event);
-      if (event.type === "topic_completed") setCompleted(true);
+      if (event.type === "topic_completed") {
+        setCompleted(true);
+        void flush();
+        return;
+      }
       if (queueRef.current.size >= FLUSH_AT) void flush();
     },
     [flush],
@@ -80,9 +105,10 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
       topicId,
       artifactId,
       reducedMotion: typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      startSession,
     };
     win.postMessage(msg, "*");
-  }, [nonce, topicId, artifactId]);
+  }, [nonce, topicId, artifactId, startSession]);
 
   useEffect(() => {
     // The host records the open; the artifact records everything after.

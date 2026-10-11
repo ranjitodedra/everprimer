@@ -35,6 +35,32 @@ export const GeneratedCurriculum = z.object({
 });
 export type GeneratedCurriculum = z.infer<typeof GeneratedCurriculum>;
 
+/**
+ * Why the learner is studying this. Scope shapes both how broad the curriculum
+ * is and how deep each lesson goes. It never maps to a fixed lesson count.
+ */
+export const LearningScope = z.enum(["overview", "hobby", "exam", "mastery"]);
+export type LearningScope = z.infer<typeof LearningScope>;
+
+export const SCOPE_GUIDANCE: Record<LearningScope, string> = {
+  overview: "broad coverage, shallow depth: recognise and name the big ideas",
+  hobby: "useful breadth plus interesting exploration: curiosity first, fewer drills",
+  exam: "required coverage plus enough practice to demonstrate every objective",
+  mastery: "deeper concept decomposition: explanation, practice and transfer to new situations",
+};
+
+/** What a grown-up types when adding a learning goal. */
+export const GoalInput = z.object({
+  goal: z.string().trim().min(5).max(600),
+  scope: LearningScope,
+  scopeNote: z.string().trim().max(300).optional(),
+  interest: z.string().trim().max(120).optional(),
+});
+export type GoalInput = z.infer<typeof GoalInput>;
+
+export const TopicKind = z.enum(["lesson", "unit"]);
+export type TopicKind = z.infer<typeof TopicKind>;
+
 export const TopicStatus = z.enum(["locked", "not_started", "in_progress", "needs_review", "completed"]);
 export type TopicStatus = z.infer<typeof TopicStatus>;
 

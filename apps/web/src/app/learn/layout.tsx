@@ -2,7 +2,7 @@ import Link from "next/link";
 import { exitChildMode, signOut } from "@/app/actions";
 import { isKidMode, requireAccount } from "@/lib/auth";
 import { KidBottomNav, type LearnExit } from "@/components/bottom-nav";
-import { Lock, LogOut, Wrench } from "@/components/icons";
+import { Book, Lock, LogOut, Settings } from "@/components/icons";
 import { EverprimerMark, Wordmark } from "@/components/logo";
 
 /** Learner shell. Billing stays on the grown-up settings page; child logins and kid mode never see it. */
@@ -44,11 +44,12 @@ export default async function LearnLayout({ children }: LayoutProps<"/learn">) {
               <span className="flex items-center gap-1">
                 {settingsHref ? (
                   <Link href={settingsHref} className="btn-ghost btn-sm text-ink-soft">
+                    <Settings size={14} />
                     Settings
                   </Link>
                 ) : null}
                 <Link href={exit.href} className="btn-ghost btn-sm text-ink-soft">
-                  <Wrench size={14} />
+                  <Book size={14} />
                   {account.kind === "individual" ? "Goals and reports" : "Parent area"}
                 </Link>
               </span>

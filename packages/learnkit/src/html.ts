@@ -1,4 +1,4 @@
-import type { ArtifactBlueprint } from "@eco/contracts";
+import { collectQuestions, isGameBlueprint, type ArtifactBlueprint } from "@eco/contracts";
 import { LEARNKIT_RUNTIME_SOURCE } from "./runtime";
 import { PLAYER_CSS, PLAYER_SOURCE } from "./player";
 
@@ -37,7 +37,7 @@ function themeSurface(bp: ArtifactBlueprint): { ink: string; muted: string; card
 
 /** Pull inline <script> bodies, skipping the injected LearnKit runtime. */
 export function authoredScripts(html: string): string[] {
-  const authored = html.includes("window.LearnKit = {") ? html.replace(LEARNKIT_RUNTIME_SOURCE, "") : html;
+  const authored = html.replace(LEARNKIT_RUNTIME_SOURCE, "");
   const out: string[] = [];
   const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
@@ -80,8 +80,40 @@ export function withTouchGuards(html: string): string {
   return out;
 }
 
+/** A generated image stored with the artifact and inlined into the document. */
+export interface LessonAsset {
+  key: string;
+  mime: string;
+  dataBase64: string;
+}
+
+const ASSET_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function assetDataUri(asset: LessonAsset): string | null {
+  if (!ASSET_MIMES.has(asset.mime) || !/^[A-Za-z0-9+/=]+$/.test(asset.dataBase64)) return null;
+  return `data:${asset.mime};base64,${asset.dataBase64}`;
+}
+
+function assetMap(assets: LessonAsset[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const a of assets) {
+    const uri = assetDataUri(a);
+    if (uri) out[a.key] = uri;
+  }
+  return out;
+}
+
+/** Swap `asset:<key>` placeholders for inline data URIs. Unknown keys are left for validation to reject. */
+export function inlineAssets(html: string, assets: LessonAsset[]): string {
+  const map = assetMap(assets);
+  return html.replace(/(["'(])asset:([a-z0-9_-]{1,60})(["')])/g, (whole, open: string, key: string, close: string) => {
+    const uri = map[key];
+    return uri ? `${open}${uri}${close}` : whole;
+  });
+}
+
 /** Deterministic, complete lesson document driven purely by the blueprint. */
-export function renderBlueprintHtml(bp: ArtifactBlueprint): string {
+export function renderBlueprintHtml(bp: ArtifactBlueprint, assets: LessonAsset[] = []): string {
   const surface = themeSurface(bp);
   const themeVars = `:root{--lk-primary:${bp.theme.primary};--lk-accent:${bp.theme.accent};--lk-bg:${bp.theme.background};--lk-ink:${surface.ink};--lk-muted:${surface.muted};--lk-card:${surface.card};--lk-line:${surface.line};}`;
   return withTouchGuards(`<!doctype html>
@@ -95,7 +127,7 @@ export function renderBlueprintHtml(bp: ArtifactBlueprint): string {
 <body class="${surface.dark ? "lk-dark" : ""}">
 <div id="app" aria-live="off"></div>
 <script>${LEARNKIT_RUNTIME_SOURCE}</script>
-<script>window.__BLUEPRINT__=${jsonForScript(bp)};</script>
+<script>window.__BLUEPRINT__=${jsonForScript(bp)};window.__ASSETS__=${jsonForScript(assetMap(assets))};</script>
 <script>${PLAYER_SOURCE}</script>
 </body>
 </html>`);
@@ -106,8 +138,8 @@ export function renderBlueprintHtml(bp: ArtifactBlueprint): string {
  * ensure the CSP meta and the LearnKit runtime are present, as the first
  * things in <head> and the first script respectively.
  */
-export function normalizeGeneratedHtml(html: string): string {
-  let out = html.trim();
+export function normalizeGeneratedHtml(html: string, assets: LessonAsset[] = []): string {
+  let out = inlineAssets(html.trim(), assets);
   if (!/^<!doctype html>/i.test(out)) out = `<!doctype html>\n${out}`;
   if (!/<html[\s>]/i.test(out)) out = out.replace(/^<!doctype html>\s*/i, `<!doctype html>\n<html lang="en">`) + "\n</html>";
   if (!/<head[\s>]/i.test(out)) out = out.replace(/<html([^>]*)>/i, `<html$1>\n<head></head>`);
@@ -120,7 +152,8 @@ export function normalizeGeneratedHtml(html: string): string {
   // Remove any runtime the model tried to include (script src pointing at learnkit, or an inline copy).
   out = out.replace(/<script[^>]+src=["'][^"']*learnkit[^"']*["'][^>]*>\s*<\/script>/gi, "");
   const runtimeTag = `<script>${LEARNKIT_RUNTIME_SOURCE}</script>`;
-  if (!out.includes("window.LearnKit = {")) {
+  // Match the exact runtime: a model's own `window.LearnKit = {...}` stub must not stand in for it.
+  if (!out.includes(LEARNKIT_RUNTIME_SOURCE)) {
     // Place runtime as the first script in the document.
     const firstScript = out.search(/<script[\s>]/i);
     if (firstScript >= 0) out = out.slice(0, firstScript) + runtimeTag + "\n" + out.slice(firstScript);
@@ -143,9 +176,9 @@ export function validateArtifactHtml(html: string): HtmlValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const lower = html.toLowerCase();
-  const hasRuntime = html.includes("window.LearnKit = {");
+  const hasRuntime = html.includes(LEARNKIT_RUNTIME_SOURCE);
   // Author code = everything except the injected runtime.
-  const authored = hasRuntime ? html.replace(LEARNKIT_RUNTIME_SOURCE, "") : html;
+  const authored = html.replace(LEARNKIT_RUNTIME_SOURCE, "");
 
   if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) errors.push("document is not a complete <html> document");
   if (!hasRuntime) errors.push("LearnKit runtime missing");
@@ -170,6 +203,38 @@ export function validateArtifactHtml(html: string): HtmlValidationResult {
     const syntax = scriptSyntaxError(source);
     if (syntax) errors.push(`authored script ${i + 1} has a JavaScript syntax error (${syntax})`);
   }
+  const unresolved = html.match(/["'(]asset:[^"')\s]*/g);
+  if (unresolved) errors.push(`image placeholders with no generated image: ${[...new Set(unresolved.map((m) => m.slice(1)))].join(", ")}`);
 
   return { ok: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Generated code renders the blueprint; it does not redesign it. Every
+ * section and question id must appear, and no question id the blueprint does
+ * not define may appear (v2 ids are prefixed, so a stray q_ id is an added
+ * question the server could never grade).
+ */
+export function validateHtmlAgainstBlueprint(html: string, bp: ArtifactBlueprint): HtmlValidationResult {
+  const errors: string[] = [];
+  const authored = html.replace(LEARNKIT_RUNTIME_SOURCE, "");
+  const sectionIds = isGameBlueprint(bp)
+    ? [...bp.sessions.flatMap((s) => [s.id, ...s.bites.map((b) => b.id)]), "final_test"]
+    : bp.sections.map((s) => s.id);
+  const questionIds = collectQuestions(bp).map((q) => q.question.id);
+  const quoted = (id: string) => new RegExp(`["'\`]${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["'\`]`).test(authored);
+
+  const missingSections = sectionIds.filter((id) => !quoted(id));
+  if (missingSections.length) errors.push(`sections missing from the page: ${missingSections.join(", ")}`);
+  const missingQuestions = questionIds.filter((id) => !quoted(id));
+  if (missingQuestions.length) errors.push(`questions missing from the page: ${missingQuestions.join(", ")}`);
+
+  if (bp.schemaVersion === 2 || bp.schemaVersion === 3) {
+    const known = new Set(questionIds);
+    const found = new Set<string>();
+    for (const m of authored.matchAll(/["'`](q_[A-Za-z0-9_-]+)["'`]/g)) found.add(m[1]!);
+    const extra = [...found].filter((id) => !known.has(id));
+    if (extra.length) errors.push(`page adds questions that are not in the blueprint: ${extra.join(", ")}`);
+  }
+  return { ok: errors.length === 0, errors, warnings: [] };
 }

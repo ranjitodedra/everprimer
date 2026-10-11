@@ -4,9 +4,12 @@ import type { ChildRow, CurriculumRow, TopicProgressRow, TopicRow } from "@eco/d
 import { createCurriculum } from "@/app/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
-import { ArrowRight, Check, Play, Sparkles } from "@/components/icons";
+import { GenerationProgress } from "@/components/generation-progress";
+import { GoalDialog } from "@/components/goal-dialog";
+import { ArrowRight, Check, Play, Sparkles, Wrench } from "@/components/icons";
 import { Avatar, ProgressRing } from "@/components/ui";
 import { isKidMode, requireLearner } from "@/lib/auth";
+import { lessonFinished } from "@/lib/lesson-progress";
 import { createClient } from "@/lib/supabase/server";
 
 type Summary = {
@@ -35,7 +38,7 @@ export default async function ChildTopics(props: PageProps<"/learn/[childId]">) 
   const progressByTopic = new Map(((progress ?? []) as TopicProgressRow[]).map((p) => [p.topic_id, p]));
 
   const { data: topics } = curriculumRows.length
-    ? await supabase.from("topics").select("*").in("curriculum_id", curriculumRows.map((cur) => cur.id))
+    ? await supabase.from("topics").select("*").eq("kind", "lesson").in("curriculum_id", curriculumRows.map((cur) => cur.id))
     : { data: [] };
   const topicsByCurriculum = new Map<string, TopicRow[]>();
   for (const t of (topics ?? []) as TopicRow[]) topicsByCurriculum.set(t.curriculum_id, [...(topicsByCurriculum.get(t.curriculum_id) ?? []), t]);
@@ -49,7 +52,7 @@ export default async function ChildTopics(props: PageProps<"/learn/[childId]">) 
       for (const t of list) {
         const p = progressByTopic.get(t.id);
         if (!p) continue;
-        if (p.status === "completed") done++;
+        if (lessonFinished(p)) done++;
         if (p.status !== "not_started") started = true;
         if (p.last_activity_at) lastActivity = Math.max(lastActivity, Date.parse(p.last_activity_at));
       }
@@ -84,14 +87,27 @@ export default async function ChildTopics(props: PageProps<"/learn/[childId]">) 
       <ul className="space-y-4">
         {summaries.map((s, i) => (
           <li key={s.curriculum.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
-            {s.curriculum.status === "generating" || s.total === 0 ? (
+            {s.curriculum.status === "failed" && s.total === 0 ? (
+              <div className="card flex items-center gap-4">
+                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-sun-soft text-sun-deep" aria-hidden>
+                  <Wrench size={22} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-lg font-extrabold">{s.curriculum.title || s.curriculum.goal_text}</span>
+                  <span className="block text-sm text-ink-soft">Could not be set up. A grown-up can try again.</span>
+                </span>
+              </div>
+            ) : s.curriculum.status === "generating" || s.total === 0 ? (
               <div className="card flex items-center gap-4">
                 <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-violet-soft text-violet">
                   <Sparkles size={22} className="animate-pulse" />
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block text-lg font-extrabold">{s.curriculum.title || "Getting ready…"}</span>
                   <span className="block text-sm text-ink-soft">Your topic is being prepared.</span>
+                  {s.curriculum.status === "generating" ? (
+                    <GenerationProgress kind="curriculum" stage={s.curriculum.stage} stageAt={s.curriculum.stage_at} retrying={!!s.curriculum.error} size="compact" className="mt-2" />
+                  ) : null}
                 </span>
               </div>
             ) : (
@@ -107,18 +123,9 @@ export default async function ChildTopics(props: PageProps<"/learn/[childId]">) 
 function NewGoal({ childId }: { childId: string }) {
   const create = createCurriculum.bind(null, childId);
   return (
-    <form action={create} className="card mb-6 space-y-3">
-      <input type="hidden" name="from" value="learn" />
-      <label htmlFor="goal" className="flex items-center gap-2 font-extrabold">
-        <Sparkles size={16} className="text-sun-deep" />
-        New learning goal
-      </label>
-      <textarea id="goal" name="goal" required minLength={5} maxLength={600} rows={2} className="input" placeholder="I want to understand how compound interest works." />
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-ink-faint">Write it the way you would say it. 5 to 14 lessons.</p>
-        <button type="submit" className="btn-primary">Create</button>
-      </div>
-    </form>
+    <div className="mb-6">
+      <GoalDialog action={create} from="learn" self intro="Write it the way you would say it. Pick how deep to go." />
+    </div>
   );
 }
 

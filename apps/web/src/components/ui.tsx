@@ -131,9 +131,10 @@ export function Stat({ label, value, hint, icon, tone = "brand" }: { label: stri
   );
 }
 
-export function Notice({ tone = "info", children, action }: { tone?: "info" | "error" | "success"; children: ReactNode; action?: ReactNode }) {
+export function Notice({ tone = "info", children, action }: { tone?: "info" | "warning" | "error" | "success"; children: ReactNode; action?: ReactNode }) {
   const cls = {
     info: "border-brand/25 bg-brand-tint text-ink",
+    warning: "border-sun/30 bg-sun-soft text-sun-deep",
     error: "border-berry/25 bg-berry-soft text-berry",
     success: "border-brand/25 bg-brand-soft text-brand-deep",
   }[tone];
@@ -141,6 +142,7 @@ export function Notice({ tone = "info", children, action }: { tone?: "info" | "e
     <div className={`mb-6 flex flex-col gap-3 rounded-2xl border px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between ${cls}`}>
       <div className="flex items-center gap-3">
         {tone === "info" ? <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-brand" aria-hidden /> : null}
+        {tone === "warning" ? <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-sun" aria-hidden /> : null}
         <div>{children}</div>
       </div>
       {action}
