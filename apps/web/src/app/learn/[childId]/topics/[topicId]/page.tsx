@@ -42,6 +42,33 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
     );
   }
 
+  if (t.kind === "unit") {
+    const { data: parts } = await supabase.from("topics").select("id, title, description").eq("parent_topic_id", t.id).order("position");
+    return (
+      <div className="py-4">
+        <TopicHeader title={t.title} backHref={backHref} />
+        <div className="card">
+          <p className="eyebrow mb-1">Big topic</p>
+          <h2 className="text-2xl font-black">{t.title}</h2>
+          <p className="mt-1 text-ink-soft">There is a lot to discover here, so it comes in parts. Start with the first one.</p>
+          <ol className="mt-5 space-y-3">
+            {(parts ?? []).map((p, i) => (
+              <li key={p.id as string}>
+                <Link href={`/learn/${c.id}/topics/${p.id as string}`} className="card card-hover flex items-center gap-4 border-2">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-sm font-black text-white">{i + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block font-extrabold">{p.title as string}</span>
+                    <span className="block text-sm text-ink-soft">{p.description as string}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    );
+  }
+
   const artifact = await ensureArtifact(t.id);
   if (!artifact.ok) {
     return (
@@ -58,7 +85,15 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
     return (
       <div className="py-4">
         <TopicHeader title={t.title} backHref={backHref} />
-        <GeneratingState topicId={t.id} emoji="✨" failed={art?.status === "failed" ? art.error : null} retry={retryTopicGeneration.bind(null, c.id, t.id)} />
+        <GeneratingState
+          topicId={t.id}
+          emoji="✨"
+          stage={art?.status === "generating" ? art.stage : null}
+          stageAt={art?.status === "generating" ? art.stage_at : null}
+          retrying={art?.status === "generating" && !!art.error}
+          failed={art?.status === "failed" ? (art.error ?? "failed") : null}
+          retry={retryTopicGeneration.bind(null, c.id, t.id)}
+        />
       </div>
     );
   }
@@ -74,10 +109,18 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
 
   after(() => prewarmNextTopic(t.id));
 
+  const { data: progress } = await supabase
+    .from("topic_progress")
+    .select("sessions_completed")
+    .eq("child_id", c.id)
+    .eq("topic_id", t.id)
+    .maybeSingle();
+  const startSession = Math.max(0, Number((progress as { sessions_completed?: number } | null)?.sessions_completed ?? 0));
+
   return (
     <div className="py-4">
       <TopicHeader title={t.title} backHref={backHref} emoji={emoji} />
-      <ArtifactPlayer html={withTouchGuards(art.html)} sessionId={session.id as string} nonce={nonce} topicId={t.id} artifactId={art.id} title={t.title} backHref={backHref} />
+      <ArtifactPlayer html={withTouchGuards(art.html)} sessionId={session.id as string} nonce={nonce} topicId={t.id} artifactId={art.id} title={t.title} backHref={backHref} startSession={startSession} />
     </div>
   );
 }

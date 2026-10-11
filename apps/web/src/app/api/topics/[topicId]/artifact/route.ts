@@ -9,7 +9,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/topics/[topicId
   const supabase = await createClient();
   const { data } = await supabase
     .from("artifacts")
-    .select("id, version, status, used_fallback, error, published_at")
+    .select("id, version, status, stage, stage_at, used_fallback, error, created_at, published_at")
     .eq("topic_id", topicId)
     .order("version", { ascending: false })
     .limit(1)

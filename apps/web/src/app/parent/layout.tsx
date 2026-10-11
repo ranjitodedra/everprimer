@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireGrownup } from "@/lib/auth";
 import { enterKidMode, signOut } from "@/app/actions";
 import { ParentBottomNav } from "@/components/bottom-nav";
-import { Book, LogOut, Play, Wrench } from "@/components/icons";
+import { Book, LogOut, Play, Settings } from "@/components/icons";
 import { EverprimerMark, Wordmark } from "@/components/logo";
 
 export default async function ParentLayout({ children }: LayoutProps<"/parent">) {
@@ -16,7 +16,6 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
           <Link href={individual && myLearning ? myLearning : "/parent"} className="flex items-center gap-2.5 rounded-full pr-2">
             <EverprimerMark className="h-9 w-9" />
             <Wordmark className="text-lg sm:text-xl" />
-            {individual ? <span className="badge hidden bg-paper-deep text-ink-soft sm:inline-flex">My account</span> : null}
           </Link>
           <nav className="hidden items-center gap-1 text-sm sm:flex">
             {myLearning ? (
@@ -26,7 +25,7 @@ export default async function ParentLayout({ children }: LayoutProps<"/parent">)
               </Link>
             ) : null}
             <Link href="/parent/settings" className="btn-ghost btn-sm btn-icon" title="Settings" aria-label="Settings">
-              <Wrench size={16} />
+              <Settings size={16} />
             </Link>
             {individual ? null : (
               <form action={enterKidMode}>

@@ -1,3 +1,5 @@
+import { FINAL_TEST_PASS } from "@eco/contracts";
+
 /**
  * Explainable mastery estimation (rules.md sections 9 and 22).
  *
@@ -19,6 +21,8 @@ export interface ObjectiveEvidence {
   /** The answer was shown to the learner instead of being produced by them. */
   revealed?: boolean;
   activityType: ActivityType;
+  /** First-attempt answers on the lesson's final test weigh more. */
+  finalTest?: boolean;
   /** Milliseconds since this objective was last practised, if known. */
   msSinceLastEvidence?: number;
 }
@@ -50,7 +54,8 @@ export function evidenceWeight(e: ObjectiveEvidence): number {
   // Correct answers after a gap are stronger evidence of retention.
   const delay =
     e.correct && e.msSinceLastEvidence !== undefined && e.msSinceLastEvidence >= ONE_DAY_MS ? 1.3 : 1;
-  const w = difficulty * attempt * hints * delay;
+  const exam = e.finalTest ? 1.4 : 1;
+  const w = difficulty * attempt * hints * delay * exam;
   return Math.min(1.5, Math.max(0.15, w));
 }
 
@@ -100,11 +105,59 @@ export type TopicProgressStatus = "not_started" | "in_progress" | "needs_review"
  * Topic status is driven by whether the learner reached the end AND what the
  * evidence says, not by time or by a single quiz score.
  */
-export function topicStatus(summary: TopicSummary, reachedEnd: boolean, hasActivity: boolean): TopicProgressStatus {
+export function topicStatus(
+  summary: TopicSummary,
+  reachedEnd: boolean,
+  hasActivity: boolean,
+  finalScore?: number | null,
+): TopicProgressStatus {
   if (!hasActivity) return "not_started";
+  if (finalScore != null) {
+    if (finalScore >= FINAL_TEST_PASS) return "completed";
+    return "needs_review";
+  }
   if (!reachedEnd) return "in_progress";
   if (summary.weakObjectiveCodes.length > 0 || summary.mastery < 0.6) return "needs_review";
   return "completed";
+}
+
+export interface LessonFeedback {
+  mastery: number;
+  objectives: Array<{ code: string; text: string; status: MasteryStatus; score: number }>;
+  /** Objective texts the learner showed they can do. */
+  strong: string[];
+  /** Objective texts that come back in upcoming lessons as recall. */
+  practice: string[];
+  kid: string;
+  parent: string;
+}
+
+/**
+ * End-of-lesson feedback for the learner and the grown-up, built only from
+ * mastery evidence. Deterministic so it never invents how the lesson went.
+ */
+export function buildLessonFeedback(
+  topicTitle: string,
+  objectives: Array<{ code: string; text: string; state: ObjectiveMasteryState }>,
+): LessonFeedback {
+  const summary = summarizeTopic(objectives);
+  const rows = objectives.map((o) => ({ code: o.code, text: o.text, status: o.state.status, score: Number(o.state.score.toFixed(3)) }));
+  const assessed = objectives.filter((o) => o.state.evidenceCount > 0);
+  const strong = assessed.filter((o) => o.state.score >= 0.6).map((o) => o.text);
+  const practice = assessed.filter((o) => o.state.score < 0.6 || summary.weakObjectiveCodes.includes(o.code)).map((o) => o.text);
+  const pct = Math.round(summary.mastery * 100);
+
+  const kid =
+    practice.length === 0
+      ? `You finished ${topicTitle} and got the big ideas. Nice thinking!`
+      : `You finished ${topicTitle}. You've got ${strong.length} idea${strong.length === 1 ? "" : "s"} down. We'll practise "${practice[0]}" again soon.`;
+  const parent = [
+    `Finished "${topicTitle}" with an estimated mastery of ${pct}%.`,
+    strong.length ? `Showed: ${strong.join("; ")}.` : "No objective is secure yet.",
+    practice.length ? `Needs more practice: ${practice.join("; ")}. These come back as recall questions in the next lessons.` : "Nothing flagged for extra practice.",
+  ].join(" ");
+
+  return { mastery: Number(summary.mastery.toFixed(3)), objectives: rows, strong, practice, kid, parent };
 }
 
 function clamp01(n: number) {

@@ -1,18 +1,9 @@
+import { APICallError, LoadAPIKeyError } from "ai";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveModelSpec, type AiTask, type Tier } from "./provider";
+import { GEMINI, isPermanentAiError, resolveModelSpec, type AiTask, type Tier } from "./provider";
 
-const TASKS: AiTask[] = ["curriculum", "blueprint", "codegen", "factcheck", "report"];
-const KEYS = [
-  "AI_PROVIDER",
-  "GOOGLE_GENERATIVE_AI_API_KEY",
-  "ANTHROPIC_API_KEY",
-  "AI_MODEL_FREE_BLUEPRINT",
-  "AI_MODEL_FREE_CODEGEN",
-  "AI_MODEL_PAID_CODEGEN",
-  "AI_MODEL_PAID_MEMORY",
-  "AI_MODEL_MAX_BLUEPRINT",
-  "AI_MODEL_MAX_MEMORY",
-] as const;
+const TASKS: AiTask[] = ["curriculum", "planner", "blueprint", "factcheck", "report", "memory"];
+const KEYS = ["AI_PROVIDER", "GOOGLE_GENERATIVE_AI_API_KEY", "AI_MODEL_PAID_BLUEPRINT", "AI_MODEL_FREE_PLANNER"] as const;
 
 const saved = new Map<string, string | undefined>();
 
@@ -34,83 +25,58 @@ describe("resolveModelSpec", () => {
     restoreEnv();
   });
 
-  it("never sends the free tier to Anthropic, even when Gemini is missing", () => {
+  it("uses Gemini for every task and tier when the key is present", () => {
     rememberEnv();
     delete process.env.AI_PROVIDER;
-    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    delete process.env.AI_MODEL_FREE_CODEGEN;
-    for (const task of TASKS) {
-      expect(resolveModelSpec(task, "free").provider).not.toBe("anthropic");
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google";
+    for (const tier of ["free", "paid", "max"] as Tier[]) {
+      for (const task of TASKS) {
+        expect(resolveModelSpec(task, tier)).toEqual(GEMINI);
+      }
     }
   });
 
-  it("ignores a free-tier override that names Anthropic", () => {
-    rememberEnv();
-    delete process.env.AI_PROVIDER;
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google";
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    process.env.AI_MODEL_FREE_BLUEPRINT = "anthropic:claude-opus-4-1";
-    expect(resolveModelSpec("blueprint", "free")).toEqual({ provider: "google", modelId: "gemini-3.8-flash" });
-  });
-
-  it("uses mock for free when the Gemini key is absent", () => {
+  it("falls back to mock when the Gemini key is missing", () => {
     rememberEnv();
     delete process.env.AI_PROVIDER;
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    expect(resolveModelSpec("codegen", "free")).toEqual({ provider: "mock", modelId: "mock" });
+    expect(resolveModelSpec("blueprint", "paid")).toEqual({ provider: "mock", modelId: "mock" });
   });
 
-  it("routes Max the same way as Plus", () => {
+  it("honors a google: override and ignores any other provider", () => {
     rememberEnv();
     delete process.env.AI_PROVIDER;
     process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google";
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    for (const task of TASKS) {
-      expect(resolveModelSpec(task, "max")).toEqual(resolveModelSpec(task, "paid"));
-    }
-    expect(resolveModelSpec("blueprint", "max").provider).toBe("anthropic");
-    expect(resolveModelSpec("codegen", "max").provider).toBe("anthropic");
-    expect(resolveModelSpec("factcheck", "max").provider).toBe("google");
-  });
-
-  it("still honors a Plus env override", () => {
-    rememberEnv();
-    delete process.env.AI_PROVIDER;
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    process.env.AI_MODEL_PAID_CODEGEN = "anthropic:claude-opus-4-1";
-    expect(resolveModelSpec("codegen", "paid")).toEqual({ provider: "anthropic", modelId: "claude-opus-4-1" });
-  });
-
-  it("keeps memory compaction on Gemini and ignores an Anthropic override", () => {
-    rememberEnv();
-    delete process.env.AI_PROVIDER;
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google";
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    process.env.AI_MODEL_PAID_MEMORY = "anthropic:claude-opus-4-1";
-    process.env.AI_MODEL_MAX_MEMORY = "anthropic:claude-opus-4-1";
-    expect(resolveModelSpec("memory", "paid")).toEqual({ provider: "google", modelId: "gemini-3.8-flash" });
-    expect(resolveModelSpec("memory", "max")).toEqual({ provider: "google", modelId: "gemini-3.8-flash" });
-    expect(resolveModelSpec("memory", "free")).toEqual({ provider: "google", modelId: "gemini-3.8-flash" });
-  });
-
-  it("does not fall back to Claude when memory has no Gemini key", () => {
-    rememberEnv();
-    delete process.env.AI_PROVIDER;
-    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    expect(resolveModelSpec("memory", "paid")).toEqual({ provider: "mock", modelId: "mock" });
-    expect(resolveModelSpec("memory", "max")).toEqual({ provider: "mock", modelId: "mock" });
+    process.env.AI_MODEL_PAID_BLUEPRINT = "google:gemini-3.8-pro";
+    expect(resolveModelSpec("blueprint", "paid")).toEqual({ provider: "google", modelId: "gemini-3.8-pro" });
+    process.env.AI_MODEL_PAID_BLUEPRINT = "anthropic:claude-sonnet-4-5";
+    expect(resolveModelSpec("blueprint", "paid")).toEqual(GEMINI);
   });
 
   it("lets AI_PROVIDER=mock short-circuit every tier", () => {
     rememberEnv();
     process.env.AI_PROVIDER = "mock";
-    process.env.ANTHROPIC_API_KEY = "test-anthropic";
-    const tiers: Tier[] = ["free", "paid", "max"];
-    for (const tier of tiers) {
-      expect(resolveModelSpec("codegen", tier)).toEqual({ provider: "mock", modelId: "mock" });
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-google";
+    for (const tier of ["free", "paid", "max"] as Tier[]) {
+      expect(resolveModelSpec("planner", tier)).toEqual({ provider: "mock", modelId: "mock" });
     }
+  });
+});
+
+describe("isPermanentAiError", () => {
+  const apiError = (statusCode: number, isRetryable: boolean) =>
+    new APICallError({ message: "provider said no", url: "https://example.invalid", requestBodyValues: {}, statusCode, isRetryable });
+
+  it("treats an invalid or revoked key as permanent", () => {
+    expect(isPermanentAiError(apiError(400, false))).toBe(true);
+    expect(isPermanentAiError(apiError(401, false))).toBe(true);
+    expect(isPermanentAiError(apiError(403, false))).toBe(true);
+    expect(isPermanentAiError(new LoadAPIKeyError({ message: "missing key" }))).toBe(true);
+  });
+
+  it("keeps rate limits, server errors and our own errors retryable", () => {
+    expect(isPermanentAiError(apiError(429, true))).toBe(false);
+    expect(isPermanentAiError(apiError(503, true))).toBe(false);
+    expect(isPermanentAiError(new Error("curriculum did not match the schema"))).toBe(false);
   });
 });

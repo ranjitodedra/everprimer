@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactBlueprint } from "@eco/contracts";
-import { ArtifactBlueprint as BlueprintSchema, lintBlueprint, parseBlueprint } from "@eco/contracts";
-import { normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml, withTouchGuards } from "./html";
+import { ArtifactBlueprint as BlueprintSchema, isGameBlueprint, lintBlueprint, parseBlueprint } from "@eco/contracts";
+import { inlineAssets, normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml, validateHtmlAgainstBlueprint, withTouchGuards } from "./html";
+import { LEARNKIT_RUNTIME_SOURCE } from "./runtime";
 
 const bp: ArtifactBlueprint = {
   schemaVersion: 1,
@@ -56,6 +57,7 @@ describe("blueprint fixture", () => {
       ],
     };
     const parsed = parseBlueprint(raw);
+    if (isGameBlueprint(parsed)) throw new Error("expected classic blueprint");
     expect(parsed.sections.some((s) => (s as { type: string }).type === "flashcards")).toBe(false);
     expect(parsed.sections.map((s) => s.id)).toEqual(["s1", "s2", "s3", "s4"]);
   });
@@ -100,6 +102,76 @@ describe("normalizeGeneratedHtml", () => {
     expect(html).toContain("Content-Security-Policy");
     expect(html.indexOf("window.LearnKit = {")).toBeLessThan(html.indexOf("LearnKit.emit('question_answered'"));
     expect(validateArtifactHtml(html).ok).toBe(true);
+  });
+
+  it("still injects the runtime when the model wrote its own LearnKit stub", () => {
+    const stub = `if (typeof window.LearnKit === "undefined") { window.LearnKit = { emit: function () {} }; }`;
+    const html = normalizeGeneratedHtml(`<html><head></head><body><script>${stub}LearnKit.emit('question_answered',{});LearnKit.emit('topic_completed',{})</script></body></html>`);
+    expect(html).toContain(LEARNKIT_RUNTIME_SOURCE);
+    expect(html.indexOf(LEARNKIT_RUNTIME_SOURCE)).toBeLessThan(html.indexOf(stub));
+  });
+});
+
+describe("Case 9: generated code must follow the blueprint", () => {
+  const v2: ArtifactBlueprint = {
+    ...bp,
+    schemaVersion: 2,
+    facts: [{ id: "f1", text: "Jupiter is a gas giant." }],
+    sections: [
+      { type: "simple_explain", id: "s_gas", title: "Gas giant", stage: "understand", objectiveCodes: ["lo1", "lo2"], factIds: ["f1"], simple: "Jupiter is a giant ball of gas.", term: "Gas giant", definition: "A huge planet made mostly of gas." },
+      {
+        type: "quiz", id: "s_final", role: "final_check", title: "Check", stage: "practice",
+        questions: [{ kind: "true_false", id: "q_gas", prompt: "Jupiter is a gas giant.", answer: true, difficulty: 1, objectiveCodes: ["lo1", "lo2"], factIds: ["f1"], explanation: "Jupiter is a gas giant with no solid surface." }],
+      },
+    ],
+  };
+  const page = (extra = "") =>
+    normalizeGeneratedHtml(
+      `<html><head></head><body><script>var S=["s_gas","s_final"];var Q=["q_gas"${extra}];LearnKit.emit('question_answered',{});LearnKit.emit('topic_completed',{})</script></body></html>`,
+    );
+
+  it("a page that renders exactly the blueprint passes", () => {
+    expect(validateHtmlAgainstBlueprint(page(), v2).errors).toEqual([]);
+  });
+
+  it("a page that adds a question fails", () => {
+    const r = validateHtmlAgainstBlueprint(page(`,"q_bonus"`), v2);
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(" ")).toMatch(/adds questions that are not in the blueprint: q_bonus/);
+  });
+
+  it("a page that drops a section fails", () => {
+    const html = normalizeGeneratedHtml(`<html><head></head><body><script>var Q=["q_gas"];LearnKit.emit('question_answered',{});LearnKit.emit('topic_completed',{})</script></body></html>`);
+    expect(validateHtmlAgainstBlueprint(html, v2).errors.join(" ")).toMatch(/sections missing from the page: s_gas, s_final/);
+  });
+
+  it("the fallback player always satisfies the blueprint", () => {
+    expect(validateHtmlAgainstBlueprint(renderBlueprintHtml(v2), v2).errors).toEqual([]);
+  });
+});
+
+describe("lesson images", () => {
+  const png = { key: "img_moons", mime: "image/png", dataBase64: "iVBORw0KGgo=" };
+
+  it("inlines asset placeholders as data URIs", () => {
+    const html = inlineAssets(`<img src="asset:img_moons" alt="Moons">`, [png]);
+    expect(html).toBe(`<img src="data:image/png;base64,iVBORw0KGgo=" alt="Moons">`);
+  });
+
+  it("rejects a placeholder with no generated image", () => {
+    const html = normalizeGeneratedHtml(`<html><head></head><body><img src="asset:img_missing" alt="x"><script>LearnKit.emit('question_answered',{});LearnKit.emit('topic_completed',{})</script></body></html>`, [png]);
+    expect(validateArtifactHtml(html).errors.join(" ")).toMatch(/image placeholders with no generated image: asset:img_missing/);
+  });
+
+  it("ignores assets with an unsupported type", () => {
+    const html = inlineAssets(`<img src="asset:img_moons">`, [{ ...png, mime: "image/svg+xml" }]);
+    expect(html).toContain("asset:img_moons");
+  });
+
+  it("the fallback player receives assets by key", () => {
+    const html = renderBlueprintHtml(bp, [png]);
+    expect(html).toContain(`window.__ASSETS__={"img_moons":"data:image/png;base64,iVBORw0KGgo="}`);
+    expect(validateArtifactHtml(html).errors).toEqual([]);
   });
 });
 

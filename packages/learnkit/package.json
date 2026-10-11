@@ -13,7 +13,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@eco/contracts": "workspace:*"
+    "@eco/contracts": "workspace:*",
+    "jsdom": "^30.1.2"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

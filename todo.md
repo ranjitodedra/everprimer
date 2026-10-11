@@ -37,3 +37,9 @@ I want to make login simples it should first show 4 cards arking who you are lik
 4. parent child shared account.
 
 once they click each user only see their login or sign up thing not confusing options.
+
+
+help me write issue for github for fixes in ui
+
+1.  on "http://localhost:3000/parent/settings" the setting should fill the width, and be responsive based on screen. right now it is just mobile friendly even on laptop screen.
+2.  on ""

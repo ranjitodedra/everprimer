@@ -4,9 +4,11 @@ import type { ArtifactRow, ChildRow, CurriculumRow, ObjectiveMasteryRow, Objecti
 import { regenerateArtifact, retryCurriculum } from "@/app/actions";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
-import { Check, ChevronDown, Play, Refresh } from "@/components/icons";
+import { Check, ChevronDown, Layers, Play, Refresh } from "@/components/icons";
+import { LessonFeedback } from "@/components/lesson-feedback";
 import { BackLink, MasteryBar, Notice, PageHeader, ProgressRing, StatusBadge } from "@/components/ui";
 import { requireGrownup } from "@/lib/auth";
+import { lessonFinished } from "@/lib/lesson-progress";
 import { planFor } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 
@@ -45,7 +47,11 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
   const c = child as ChildRow;
 
   const generating = curriculum.status === "generating" || [...latestArtifact.values()].some((a) => a.status === "generating");
-  const completedCount = topicRows.filter((t) => progressByTopic.get(t.id)?.status === "completed").length;
+  const lessons = topicRows.filter((t) => t.kind === "lesson");
+  const completedCount = lessons.filter((t) => lessonFinished(progressByTopic.get(t.id))).length;
+  const lessonNumber = new Map(lessons.map((t, i) => [t.id, i + 1]));
+  const titleById = new Map(topicRows.map((t) => [t.id, t.title]));
+  const partsOf = (unitId: string) => topicRows.filter((t) => t.parent_topic_id === unitId).length;
 
   return (
     <>
@@ -55,9 +61,9 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
       <PageHeader
         eyebrow="Curriculum"
         leading={
-          topicRows.length ? (
-            <ProgressRing value={completedCount / topicRows.length} size={64} stroke={6} className="mt-1">
-              <span className="text-sm font-black tabular-nums text-brand-deep">{completedCount}/{topicRows.length}</span>
+          lessons.length ? (
+            <ProgressRing value={completedCount / lessons.length} size={64} stroke={6} className="mt-1">
+              <span className="text-sm font-black tabular-nums text-brand-deep">{completedCount}/{lessons.length}</span>
             </ProgressRing>
           ) : undefined
         }
@@ -66,7 +72,9 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
         actions={<StatusBadge status={curriculum.status} />}
       />
 
-      {curriculum.status === "generating" ? (
+      {curriculum.status === "generating" && curriculum.error ? (
+        <Notice tone="warning">The last attempt failed and another one is queued: {curriculum.error}</Notice>
+      ) : curriculum.status === "generating" ? (
         <Notice>
           Turning &ldquo;{curriculum.goal_text}&rdquo; into an ordered set of lessons. This page refreshes on its own.
         </Notice>
@@ -86,6 +94,20 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
 
       <ol className="relative space-y-4 before:absolute before:top-6 before:bottom-6 before:left-[1.4rem] before:w-0.5 before:bg-line sm:before:left-[1.65rem]">
         {topicRows.map((t) => {
+          if (t.kind === "unit") {
+            return (
+              <li key={t.id} className="relative flex gap-4 sm:gap-5">
+                <span className="relative z-10 mt-3 grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-line-strong bg-paper-deep text-ink-soft shadow-soft sm:h-13 sm:w-13" aria-hidden>
+                  <Layers size={18} />
+                </span>
+                <div className="min-w-0 flex-1 py-3">
+                  <p className="eyebrow">Unit · {partsOf(t.id)} parts</p>
+                  <h2 className="text-lg font-extrabold">{t.title}</h2>
+                  <p className="mt-0.5 text-sm text-ink-soft">This topic was too big for one lesson, so it was split into the parts below. The lesson credit was refunded.</p>
+                </div>
+              </li>
+            );
+          }
           const p = progressByTopic.get(t.id);
           const art = latestArtifact.get(t.id);
           const objs = objectivesByTopic.get(t.id) ?? [];
@@ -100,19 +122,37 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
                   ? "bg-sky text-white"
                   : "bg-card text-ink-soft border-2 border-line-strong";
           return (
-            <li key={t.id} className="relative flex gap-4 sm:gap-5">
+            <li key={t.id} className={`relative flex gap-4 sm:gap-5 ${t.parent_topic_id ? "sm:pl-6" : ""}`}>
               <span className={`relative z-10 mt-4 grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-black shadow-soft sm:h-13 sm:w-13 ${marker}`} aria-hidden>
-                {status === "completed" ? <Check size={20} /> : t.position}
+                {status === "completed" ? <Check size={20} /> : lessonNumber.get(t.id)}
               </span>
               <div className="card min-w-0 flex-1">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0 flex-1">
+                    {t.parent_topic_id ? <p className="eyebrow">Part of {titleById.get(t.parent_topic_id)}</p> : null}
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg font-extrabold">{t.title}</h2>
                       <StatusBadge status={status} />
                     </div>
                     <p className="mt-1 text-sm text-ink-soft">{t.description}</p>
-                    {p && p.status !== "not_started" ? <MasteryBar value={Number(p.mastery)} showLabel className="mt-3 max-w-sm" /> : null}
+                    {p?.sessions_completed ? (
+                      <p className="mt-2 text-sm font-bold text-ink-soft">
+                        Session {p.sessions_completed}
+                        {sessionTotalOf(art) ? ` of ${sessionTotalOf(art)}` : ""}
+                        {p.final_score != null ? ` · final ${Math.round(Number(p.final_score) * 100)}%` : ""}
+                      </p>
+                    ) : null}
+                    {p?.status === "in_progress" ? (
+                      <div className="mt-3 max-w-sm">
+                        <p className="mb-1.5 text-xs font-extrabold tracking-wide text-ink-soft uppercase">Mastery</p>
+                        <MasteryBar value={Number(p.mastery)} showLabel />
+                      </div>
+                    ) : null}
+                    {p?.feedback ? (
+                      <div className="mt-3">
+                        <LessonFeedback feedback={p.feedback} compact />
+                      </div>
+                    ) : null}
                     {objs.length ? (
                       <details className="group mt-3">
                         <summary className="inline-flex cursor-pointer items-center gap-1 text-sm font-bold text-brand-deep select-none">
@@ -144,6 +184,7 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
                       )}
                     </p>
                     {art?.status === "failed" ? <p className="mt-1 text-xs font-bold text-berry">Last generation failed: {art.error}</p> : null}
+                    {art?.status === "generating" && art.error ? <p className="mt-1 text-xs font-bold text-sun-deep">Retrying after an error: {art.error}</p> : null}
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
                     <Link href={`/learn/${c.id}/topics/${t.id}`} className="btn-secondary btn-sm">
@@ -167,4 +208,11 @@ export default async function CurriculumPage(props: PageProps<"/parent/curricula
       </ol>
     </>
   );
+}
+
+function sessionTotalOf(art: ArtifactRow | undefined): number | null {
+  const sessions = art?.blueprint && typeof art.blueprint === "object" && art.blueprint !== null && "sessions" in art.blueprint
+    ? (art.blueprint as { sessions?: unknown }).sessions
+    : null;
+  return Array.isArray(sessions) ? sessions.length : null;
 }

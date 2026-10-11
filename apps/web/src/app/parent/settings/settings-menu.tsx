@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import type { FormState } from "@/app/actions";
-import { ChevronRight, X } from "@/components/icons";
+import { X } from "@/components/icons";
 import { PLANS, formatPrice, planFor, type PlanId } from "@/lib/plans";
 
 export type SettingsBilling = {
@@ -61,45 +61,57 @@ export function SettingsMenu({
   }, [pinState]);
 
   return (
-    <div className="max-w-xl">
-      <div className="divide-y divide-line border-y border-line">
-        <div className="flex items-center justify-between gap-4 py-3">
-          <p className="font-extrabold">Profile</p>
-          <p className="truncate text-sm text-ink-soft">{email || "No email"}</p>
-        </div>
-        <div className="flex items-center justify-between gap-4 py-3">
-          <p className="font-extrabold">Usage</p>
-          <p className="text-sm text-ink-soft">{billing.creditBalance} left · {used} used</p>
-        </div>
-        <button type="button" className="flex w-full items-center justify-between gap-4 py-3 text-left" onClick={() => subscriptionRef.current?.showModal()}>
-          <span className="font-extrabold">Subscription</span>
-          <span className="inline-flex items-center gap-1 text-sm text-ink-soft">
-            {plan.name}
-            <ChevronRight size={16} />
-          </span>
-        </button>
+    <div>
+      {pinState.message ? <p role="status" className="mb-4 rounded-xl border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-bold text-brand-deep">{pinState.message}</p> : null}
+
+      <div className="flex w-full flex-col gap-4">
+        <section className="card">
+          <h2 className="text-lg font-extrabold">Profile</h2>
+          <p className="mt-1 text-sm break-all text-ink-soft">{email || "No email"}</p>
+        </section>
+        <section className="card">
+          <h2 className="text-lg font-extrabold">Usage</h2>
+          <p className="mt-1 text-sm text-ink-soft">{billing.creditBalance} left · {used} used</p>
+        </section>
+        <section className="card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-extrabold">Subscription</h2>
+              <p className="mt-1 text-sm text-ink-soft">
+                {plan.name}
+                {when ? ` · ${when}` : ""}
+              </p>
+            </div>
+            <button type="button" className="btn-secondary shrink-0" onClick={() => subscriptionRef.current?.showModal()}>
+              View plans
+            </button>
+          </div>
+        </section>
         {showPin ? (
-          <button type="button" className="flex w-full items-center justify-between gap-4 py-3 text-left" onClick={() => pinRef.current?.showModal()}>
-            <span className="font-extrabold">PIN</span>
-            <span className="inline-flex items-center gap-1 text-sm text-ink-soft">
-              {hasPin ? "On" : "Set"}
-              <ChevronRight size={16} />
-            </span>
-          </button>
+          <section className="card">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-extrabold">PIN</h2>
+                <p className="mt-1 text-sm text-ink-soft">{hasPin ? "On. Used to leave kid mode on a shared device." : "Not set. Kid mode needs one to keep children out of this area."}</p>
+              </div>
+              <button type="button" className="btn-secondary shrink-0" onClick={() => pinRef.current?.showModal()}>
+                {hasPin ? "Change PIN" : "Set PIN"}
+              </button>
+            </div>
+          </section>
         ) : null}
       </div>
-      {pinState.message ? <p role="status" className="mt-3 rounded-xl border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-bold text-brand-deep">{pinState.message}</p> : null}
 
       <dialog
         ref={subscriptionRef}
         aria-labelledby="subscription_title"
-        className="card m-auto max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto text-ink backdrop:bg-ink/40"
+        className="card m-auto max-h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] max-w-3xl overflow-y-auto text-ink backdrop:bg-ink/40 sm:w-[calc(100%-2rem)]"
         onClick={(e) => {
           if (e.target === subscriptionRef.current) subscriptionRef.current?.close();
         }}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 id="subscription_title" className="text-lg font-extrabold">{plan.name}</h2>
             <p className="text-sm text-ink-soft">
               {billing.creditBalance} of {plan.credits} lesson credits left
@@ -112,23 +124,23 @@ export function SettingsMenu({
         </div>
         {billing.hasCustomer && stripeReady ? (
           <form action={portal} className="mb-4">
-            <button type="submit" className="btn-secondary">Manage billing</button>
+            <button type="submit" className="btn-secondary w-full sm:w-auto">Manage billing</button>
           </form>
         ) : null}
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {(Object.keys(PLANS) as PlanId[]).map((id) => {
             const item = PLANS[id];
             const current = item.id === plan.id;
             return (
               <article key={id} className={`rounded-2xl border p-4 ${current ? "border-brand bg-brand-soft/40" : "border-line bg-paper"}`}>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-black">{item.name}</h3>
                   {current ? <span className="badge bg-brand text-white">Current</span> : null}
                 </div>
                 <p className="mt-1 text-sm font-extrabold">{item.price === 0 ? formatPrice(0) : `${formatPrice(item.price)}/month`}</p>
                 <ul className="mt-3 space-y-1 text-sm text-ink-soft">
                   <li>{item.credits} lesson credits a month</li>
-                  <li>{item.id === "free" ? "Gemini lessons" : "Claude writes the lessons"}</li>
+                  <li>Gemini lessons</li>
                   <li>{item.regenerate ? "Regenerate a lesson" : "New lessons from your credits"}</li>
                   <li>{item.childCap === 1 ? "1 child profile" : `Up to ${item.childCap} child profiles`}</li>
                 </ul>
@@ -148,20 +160,20 @@ export function SettingsMenu({
         <dialog
           ref={pinRef}
           aria-labelledby="pin_title"
-          className="card m-auto w-[calc(100%-2rem)] max-w-md text-ink backdrop:bg-ink/40"
+          className="card m-auto w-[calc(100%-1.5rem)] max-w-md text-ink backdrop:bg-ink/40 sm:w-[calc(100%-2rem)]"
           onClick={(e) => {
             if (e.target === pinRef.current) pinRef.current?.close();
           }}
         >
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 id="pin_title" className="text-lg font-extrabold">{pinTitle}</h2>
-            <button type="button" className="btn-ghost" aria-label="Close" onClick={() => pinRef.current?.close()}>
+            <button type="button" className="btn-ghost shrink-0" aria-label="Close" onClick={() => pinRef.current?.close()}>
               <X size={18} />
             </button>
           </div>
           <p className="mb-4 text-sm text-ink-soft">Needed to leave kid mode on a shared device. Forgot it? Sign out and sign back in with your password.</p>
           <form action={pinAction} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="pin" className="label">{hasPin ? "New PIN" : "PIN"}</label>
                 <input id="pin" name="pin" type="password" inputMode="numeric" pattern="\d{4,6}" required className="input tracking-[0.3em]" placeholder="4–6 digits" />
@@ -172,7 +184,7 @@ export function SettingsMenu({
               </div>
             </div>
             {pinState.error ? <p role="alert" className="rounded-xl border border-berry/25 bg-berry-soft px-3 py-2 text-sm font-bold text-berry">{pinState.error}</p> : null}
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex flex-wrap justify-end gap-2 pt-2">
               <button type="button" className="btn-ghost" onClick={() => pinRef.current?.close()}>Cancel</button>
               <button type="submit" disabled={pinPending} className="btn-primary">{hasPin ? "Change PIN" : "Save PIN"}</button>
             </div>

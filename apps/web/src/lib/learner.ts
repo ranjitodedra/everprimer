@@ -1,4 +1,4 @@
-import { ageFromBirth, cardsForPrompt, type LearnerContext } from "@eco/contracts";
+import { ageFromBirth, cardsForPrompt, clampLearnerAge, type LearnerContext } from "@eco/contracts";
 import type { ChildRow, MemoryRow, PersonalizationRow, Tier } from "@eco/db";
 
 /** Build the minimal learner context generators are allowed to see. */
@@ -20,10 +20,10 @@ export function learnerContextFrom(
     })),
     tier,
   );
-  const age = child.birth_year != null && child.birth_month != null ? ageFromBirth(child.birth_year, child.birth_month) : child.age;
+  const raw = child.birth_year != null && child.birth_month != null ? ageFromBirth(child.birth_year, child.birth_month) : child.age;
   return {
     displayName: child.display_name,
-    age,
+    age: raw == null ? null : clampLearnerAge(raw),
     readingLevel: child.reading_level,
     ...folded,
   };

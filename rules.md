@@ -325,6 +325,13 @@ Not every topic needs all seven levels. The artifact generator should select the
 
 The artifact generator should normally include a combination of the following components.
 
+There is no fixed lesson order. A planner first decides, per learning objective, what the child
+should be able to do (identify, explain, explain a process, compare, sequence, predict, apply) and
+then picks the sections and their order that teach it best. Two lessons on the same curriculum may
+look different. The written plan is linted before any content is generated, and the blueprint must
+follow the plan section by section. The components below are the building blocks the planner
+chooses from.
+
 ## 8.1 Introduction
 
 Start with a short, engaging introduction.
@@ -409,11 +416,52 @@ Better:
 
 Feedback should teach, not punish.
 
-## 8.8 Review then quiz
+## 8.8 Lesson shape rules
 
-After the visual, recap the most important ideas in a few short bullets.
+These replace the old fixed order (introduction, visual, review, quiz). They are enforced by lint.
 
-The lesson ends with a quiz. The child should be able to understand the main idea from the recap without rereading the whole artifact.
+- **Intent decides the representation.** Every objective needs at least one teaching bite. An
+  objective to explain or explain a process needs both a representation (an exploration or an
+  explanation with a visual) and an explanation; a quiz alone never satisfies it. An apply
+  objective, or any objective planned at transfer depth, needs an apply bite before the final
+  test. Deep-mastery goals need at least one transfer-depth objective; quick overviews do not go
+  deeper than they need to.
+- **Every visual has a purpose.** Each diagram or interactive must state what it shows the child,
+  not decorate the page.
+- **Every claim cites a fact.** The blueprint lists the facts the lesson relies on. Each bite and
+  question points to the facts it uses, so the fact-check reviews a closed list. The child's
+  interest (for example dinosaurs) may frame an example but never changes a correct answer.
+- **Age limits are hard limits.** Content is written for ages 4 to 18. The planner may make a
+  lesson shorter, never longer:
+
+  | Age | Sessions | Min bites | Words per bite | Final-test questions |
+  | --- | --- | --- | --- | --- |
+  | 4-6 | 3 | 21 | 25 | 5 |
+  | 7-9 | 4 | 24 | 45 | 8 |
+  | 10-12 | 4 | 24 | 60 | 10 |
+  | 13-18 | 5 | 25 | 80 | 12 |
+
+- **Too big means split.** If a topic needs more concept clusters than the age allows, the planner
+  turns it into a unit of smaller lessons instead of cramming. The parts appear under the original
+  topic, and the credit for the planning step is refunded. A part is never split again.
+- **Voice.** Every line talks to the learner. No instructions, no "in this lesson", no labels like
+  Objective. The built-in player renders the lesson; there is no AI-written HTML and no generated
+  images.
+
+## 8.9 Spaced recall
+
+Objectives that were not clearly learned in earlier lessons come back. Each new lesson can include
+up to two recall questions on earlier objectives that are still unknown or developing, oldest
+first. Recall questions count toward mastery of the earlier objective, not the current lesson.
+
+## 8.10 Final check and feedback
+
+Every lesson ends with a final check quiz that assesses every objective in the lesson.
+
+The end screen tells the child, per objective, what is strong and what to practise, and that the
+things to practise will come back in later lessons. The grown-up sees the same summary on the
+curriculum page and in the daily report, with the list of objectives that will come back as recall
+questions. Learner memory is updated after each lesson.
 
 ---
 

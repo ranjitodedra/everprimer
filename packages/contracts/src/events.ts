@@ -22,6 +22,8 @@ export const LearningEventType = z.enum([
   "answer_revealed",
   "quiz_started",
   "quiz_completed",
+  "session_completed",
+  "final_test_completed",
   "topic_completed",
   "review_completed",
 ]);
@@ -109,5 +111,7 @@ export const HostInitMessage = z.object({
   topicId: z.string(),
   artifactId: z.string(),
   reducedMotion: z.boolean(),
+  /** Session index the player should open on (0-based). */
+  startSession: z.number().int().min(0).optional(),
 });
 export type HostInitMessage = z.infer<typeof HostInitMessage>;

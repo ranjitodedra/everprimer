@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ChildRow, DailyReportRow } from "@eco/db";
+import type { ChildRow, DailyReportRow, LessonFeedbackRow, TopicProgressRow } from "@eco/db";
 import { generateReportNow } from "@/app/actions";
 import { ArrowLeft, ArrowRight, Book, Check, Clock, Sparkles, Target } from "@/components/icons";
+import { LessonFeedback } from "@/components/lesson-feedback";
 import { Avatar, BackLink, PageHeader, Stat } from "@/components/ui";
 import { requireGrownup } from "@/lib/auth";
 import { computeDailyStats, todayIso, type DailyStats } from "@/lib/report";
@@ -27,6 +28,19 @@ export default async function ReportPage(props: PageProps<"/parent/children/[chi
   const report = reportRow as DailyReportRow | null;
   // Live numbers are always computed; the written summary is generated on demand.
   const stats: DailyStats = await computeDailyStats(childId, date);
+  const dayStart = `${date}T00:00:00Z`;
+  const dayEnd = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const { data: finished } = await supabase
+    .from("topic_progress")
+    .select("topic_id, feedback, last_activity_at, topics!inner(title)")
+    .eq("child_id", childId)
+    .not("feedback", "is", null)
+    .gte("last_activity_at", dayStart)
+    .lt("last_activity_at", dayEnd)
+    .order("last_activity_at", { ascending: true });
+  const lessonFeedback = ((finished ?? []) as unknown as Array<Pick<TopicProgressRow, "topic_id" | "feedback"> & { topics: { title: string } }>).filter(
+    (r): r is typeof r & { feedback: LessonFeedbackRow } => r.feedback !== null,
+  );
   const generate = generateReportNow.bind(null, childId, date);
 
   const prev = new Date(`${date}T00:00:00Z`);
@@ -79,9 +93,19 @@ export default async function ReportPage(props: PageProps<"/parent/children/[chi
           ) : (
             <div className="card-muted dotted-bg text-center">
               <p className="font-bold">No written summary yet for this day.</p>
-              <p className="mt-1 text-sm text-ink-soft">Generate one from the numbers on this page. It takes a few seconds.</p>
+              <p className="mt-1 text-sm text-ink-soft">              Generate one from the numbers on this page. It takes a few seconds.</p>
             </div>
           )}
+          {lessonFeedback.length ? (
+            <div className="mt-6 border-t border-line pt-5">
+              <h3 className="mb-3 font-extrabold">End-of-lesson feedback</h3>
+              <div className="space-y-3">
+                {lessonFeedback.map((r) => (
+                  <LessonFeedback key={r.topic_id} title={r.topics.title} feedback={r.feedback} />
+                ))}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <aside className="space-y-4">

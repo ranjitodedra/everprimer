@@ -15,7 +15,7 @@ export const LEARNKIT_RUNTIME_SOURCE = String.raw`
   var V = 1;
   var nonce = null;
   var queue = [];
-  var ctx = { topicId: null, artifactId: null };
+  var ctx = { topicId: null, artifactId: null, startSession: 0 };
   var reducedMotion = false;
   try { reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
 
@@ -62,6 +62,7 @@ export const LEARNKIT_RUNTIME_SOURCE = String.raw`
     if (!d || d.source !== "learnkit-host" || d.kind !== "init") return;
     nonce = String(d.nonce);
     ctx.topicId = d.topicId; ctx.artifactId = d.artifactId;
+    if (typeof d.startSession === "number" && d.startSession >= 0) ctx.startSession = Math.floor(d.startSession);
     reducedMotion = reducedMotion || !!d.reducedMotion;
     applyMotion();
     flush();

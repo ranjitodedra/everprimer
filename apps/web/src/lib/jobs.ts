@@ -1,7 +1,17 @@
 import "server-only";
 import { after } from "next/server";
-import { ArtifactBlueprint } from "@eco/contracts";
-import { blockingIssues, compactLearnerMemory, generateArtifactHtml, generateBlueprint, generateCurriculum, type PipelineMeta, type Tier } from "@eco/ai";
+import { ArtifactBlueprint, type ArtifactStage, type CurriculumStage, type LessonPlan } from "@eco/contracts";
+import {
+  blockingIssues,
+  compactLearnerMemory,
+  generateCurriculum,
+  generateLesson,
+  isPermanentAiError,
+  type PipelineMeta,
+  type RecallCandidate,
+  type Tier,
+} from "@eco/ai";
+import { renderBlueprintHtml } from "@eco/learnkit";
 import type { ArtifactRow, ChildRow, CurriculumRow, GenerationJobRow, JobKind, MemoryRow, ObjectiveRow, PersonalizationRow, TopicRow } from "@eco/db";
 import { refundCredit, spendCredit, startArtifactJob, type CreditError } from "@/lib/credits";
 import { learnerContextFrom } from "@/lib/learner";
@@ -54,6 +64,10 @@ function refundOnSkip(result: unknown): boolean {
   return !!result && typeof result === "object" && (result as { skipped?: boolean }).skipped === true;
 }
 
+function isSplit(result: unknown): boolean {
+  return !!result && typeof result === "object" && (result as { split?: boolean }).split === true;
+}
+
 /** Claim and run one job. Safe to call concurrently; the claim is atomic. */
 export async function runJob(jobId: string): Promise<void> {
   const db = createServiceClient();
@@ -75,8 +89,15 @@ export async function runJob(jobId: string): Promise<void> {
     }
     await db
       .from("generation_jobs")
-      .update({ status: "done", finished_at: new Date().toISOString(), usage: usage ?? null, attempts: job.attempts + 1 })
+      .update({ status: "done", finished_at: new Date().toISOString(), usage: usage ?? null, attempts: job.attempts + 1, error: null })
       .eq("id", job.id);
+    if (job.kind === "artifact" && isSplit(usage) && typeof job.payload.topicId === "string") {
+      try {
+        await prewarmFirstPart(job.payload.topicId);
+      } catch (err) {
+        console.error(`[jobs] first part after split ${job.id} failed:`, err);
+      }
+    }
     if (job.kind === "curriculum") {
       const curriculumId = job.payload.curriculumId;
       if (typeof curriculumId === "string") {
@@ -90,8 +111,14 @@ export async function runJob(jobId: string): Promise<void> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const attempts = job.attempts + 1;
-    const retry = attempts < job.max_attempts;
-    if (!retry) {
+    const retry = attempts < job.max_attempts && !isPermanentAiError(err);
+    if (retry) {
+      try {
+        await noteRetry(job, message);
+      } catch (noteErr) {
+        console.error(`[jobs] retry note ${job.id} failed:`, noteErr);
+      }
+    } else {
       try {
         await refundCredit(job.id);
       } catch (refundErr) {
@@ -152,17 +179,42 @@ async function dispatch(job: GenerationJobRow): Promise<unknown> {
 }
 
 async function markJobFailed(job: GenerationJobRow, message: string): Promise<void> {
+  await updateJobTarget(job, { status: "failed" }, message);
+}
+
+/** The row stays generating; its error tells the waiting screens a retry is pending. */
+async function noteRetry(job: GenerationJobRow, message: string): Promise<void> {
+  await updateJobTarget(job, {}, message);
+}
+
+async function updateJobTarget(job: GenerationJobRow, patch: { status?: "failed" }, message: string): Promise<void> {
   const db = createServiceClient();
   const note = message.slice(0, 2000);
   if (job.kind === "curriculum" && typeof job.payload.curriculumId === "string") {
-    await db.from("curricula").update({ status: "failed", error: note.slice(0, 1000) }).eq("id", job.payload.curriculumId);
+    await db.from("curricula").update({ ...patch, error: note.slice(0, 1000) }).eq("id", job.payload.curriculumId).eq("status", "generating");
   }
   if (job.kind === "artifact") {
     if (typeof job.payload.artifactId === "string") {
-      await db.from("artifacts").update({ status: "failed", error: note }).eq("id", job.payload.artifactId).eq("status", "generating");
+      await db.from("artifacts").update({ ...patch, error: note }).eq("id", job.payload.artifactId).eq("status", "generating");
     } else if (typeof job.payload.topicId === "string") {
-      await db.from("artifacts").update({ status: "failed", error: note }).eq("topic_id", job.payload.topicId).eq("status", "generating");
+      await db.from("artifacts").update({ ...patch, error: note }).eq("topic_id", job.payload.topicId).eq("status", "generating");
     }
+  }
+}
+
+/**
+ * Record the step a generation job is on for the waiting screens. Only rows
+ * still generating move; a failure here never fails the job.
+ */
+async function setStage(table: "curricula", id: string, stage: CurriculumStage): Promise<void>;
+async function setStage(table: "artifacts", id: string, stage: ArtifactStage): Promise<void>;
+async function setStage(table: "curricula" | "artifacts", id: string, stage: CurriculumStage | ArtifactStage): Promise<void> {
+  try {
+    const db = createServiceClient();
+    const { error } = await db.from(table).update({ stage, stage_at: new Date().toISOString(), error: null }).eq("id", id).eq("status", "generating");
+    if (error) console.error(`[jobs] stage ${table} ${id} ${stage}:`, error.message);
+  } catch (err) {
+    console.error(`[jobs] stage ${table} ${id} ${stage}:`, err);
   }
 }
 
@@ -193,8 +245,17 @@ async function runCurriculumJob(curriculumId: string): Promise<PipelineMeta> {
   const curriculum = cur as CurriculumRow;
   const { learner, tier } = await loadChildContext(curriculum.child_id);
 
-  const { curriculum: generated, meta } = await generateCurriculum({ goal: curriculum.goal_text, learner, tier });
+  await setStage("curricula", curriculumId, "outlining");
+  const { curriculum: generated, meta } = await generateCurriculum({
+    goal: curriculum.goal_text,
+    scope: curriculum.scope,
+    scopeNote: curriculum.scope_note,
+    interest: curriculum.interest,
+    learner,
+    tier,
+  });
 
+  await setStage("curricula", curriculumId, "saving");
   // Idempotency: if topics already exist for this curriculum, do not duplicate.
   const { count } = await db.from("topics").select("id", { count: "exact", head: true }).eq("curriculum_id", curriculumId);
   if (!count) {
@@ -236,6 +297,7 @@ async function prewarmFirstTopics(curriculumId: string): Promise<void> {
     .from("topics")
     .select("id")
     .eq("curriculum_id", curriculumId)
+    .eq("kind", "lesson")
     .order("position", { ascending: true })
     .limit(2);
   for (const t of firstTopics ?? []) {
@@ -249,6 +311,8 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
   const { data: topicRow } = await db.from("topics").select("*").eq("id", topicId).single();
   if (!topicRow) throw new Error(`topic ${topicId} not found`);
   const topic = topicRow as TopicRow;
+  // A unit has no lesson of its own; its child topics do.
+  if (topic.kind === "unit") return { skipped: true, unit: true };
 
   let target: ArtifactRow;
   if (artifactId) {
@@ -256,6 +320,7 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
     if (!data) throw new Error(`artifact ${artifactId} not found`);
     target = data as ArtifactRow;
     if (target.status === "published") return { artifactId: target.id, alreadyDone: true };
+    if (target.status === "split") return { skipped: true, artifactId: target.id };
     if (target.status === "failed") {
       await db.from("artifacts").update({ status: "generating", error: null }).eq("id", target.id);
       target = { ...target, status: "generating", error: null };
@@ -278,22 +343,43 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
 
   const [{ data: cur }, { data: siblings }, { data: objectiveRows }] = await Promise.all([
     db.from("curricula").select("*").eq("id", topic.curriculum_id).single(),
-    db.from("topics").select("title, position").eq("curriculum_id", topic.curriculum_id).order("position"),
+    db.from("topics").select("title, position, kind").eq("curriculum_id", topic.curriculum_id).order("position"),
     db.from("learning_objectives").select("*").eq("topic_id", topicId).order("position"),
   ]);
   const curriculum = cur as CurriculumRow;
   const objectives = (objectiveRows ?? []) as ObjectiveRow[];
   const { learner, tier } = await loadChildContext(curriculum.child_id);
-  const priorPerformance = await describePriorPerformance(curriculum.child_id, topic.curriculum_id);
+  const [priorPerformance, recallCandidates] = await Promise.all([
+    describePriorPerformance(curriculum.child_id, topic.curriculum_id),
+    loadRecallCandidates(curriculum.child_id, topic.curriculum_id, topicId),
+  ]);
 
-  const bpResult = await generateBlueprint({
+  const lesson = await generateLesson({
     topic: { slug: topic.slug, title: topic.title, description: topic.description, objectives: objectives.map((o) => o.text), difficulty: topic.difficulty },
-    curriculum: { title: curriculum.title, description: curriculum.description, topicTitles: (siblings ?? []).map((s) => s.title as string) },
+    curriculum: {
+      title: curriculum.title,
+      description: curriculum.description,
+      topicTitles: (siblings ?? []).filter((s) => s.kind !== "unit").map((s) => s.title as string),
+      scope: curriculum.scope,
+      scopeNote: curriculum.scope_note,
+    },
     learner,
+    framingInterest: curriculum.interest,
     priorPerformance,
+    recallCandidates,
+    allowSplit: topic.parent_topic_id === null,
     tier,
+    onStage: (stage) => setStage("artifacts", target.id, stage),
   });
-  const blueprint = ArtifactBlueprint.parse(bpResult.blueprint);
+
+  // Too big for one lesson: the topic becomes a unit, its child topics take
+  // its place in the path, and the reserved credit is refunded.
+  if (lesson.kind === "split") {
+    await splitTopic(topic, target.id, lesson.plan);
+    return { skipped: true, split: true, artifactId: target.id, usage: lesson.meta.usage };
+  }
+
+  const blueprint = ArtifactBlueprint.parse(lesson.blueprint);
 
   // Keep objective rows in sync with the blueprint (models occasionally add one).
   const known = new Set(objectives.map((o) => o.code));
@@ -305,36 +391,109 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
   // Only safety issues block publishing. Critical factual issues went through
   // one automatic repair pass and any remaining ones are recorded on the
   // artifact's validation report so the parent (and dev) can see them.
-  const blocked = blockingIssues(bpResult.factcheck);
+  const blocked = blockingIssues(lesson.factcheck);
   if (blocked.length > 0) {
     throw new Error(`fact-check blocked publishing (safety): ${blocked.map((c) => `${c.where}: ${c.problem}`).join("; ")}`);
   }
 
-  const code = await generateArtifactHtml({ blueprint, tier });
+  await setStage("artifacts", target.id, "building");
+  const html = lesson.html ?? renderBlueprintHtml(blueprint);
 
   await db
     .from("artifacts")
     .update({
       status: "published",
       blueprint,
-      html: code.html,
-      used_fallback: code.usedFallback,
-      provider: code.meta.provider,
-      model: code.meta.modelId,
-      prompt_version: code.meta.promptVersion,
+      lesson_plan: lesson.plan,
+      html,
+      used_fallback: true,
+      provider: lesson.meta.provider,
+      model: lesson.meta.modelId,
+      prompt_version: lesson.meta.promptVersion,
       validation_report: {
-        html: code.validation,
-        lint: bpResult.lintProblems,
-        factcheck: bpResult.factcheck,
-        codegenAttempts: code.attempts,
-        blueprintModel: `${bpResult.meta.provider}:${bpResult.meta.modelId}`,
+        lint: lesson.lintProblems,
+        plan: { usedDefault: lesson.usedDefaultPlan, problems: lesson.planProblems, replanned: lesson.replanned },
+        factcheck: lesson.factcheck,
+        blueprintModel: `${lesson.meta.provider}:${lesson.meta.modelId}`,
       },
       error: null,
       published_at: new Date().toISOString(),
     })
     .eq("id", target.id);
 
-  return { artifactId: target.id, usage: [...bpResult.meta.usage, ...code.meta.usage] };
+  return { artifactId: target.id, usage: lesson.meta.usage };
+}
+
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "part"
+  );
+}
+
+async function splitTopic(topic: TopicRow, artifactId: string, plan: LessonPlan): Promise<void> {
+  const db = createServiceClient();
+  const proposals = plan.proposedChildTopics ?? [];
+  const { data: existing } = await db.from("topics").select("slug").eq("curriculum_id", topic.curriculum_id);
+  const used = new Set((existing ?? []).map((r) => r.slug as string));
+  const children = proposals.map((p) => {
+    const base = `${topic.slug.slice(0, 40)}-${slugify(p.title)}`;
+    let slug = base;
+    for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+    used.add(slug);
+    return { slug, title: p.title, description: p.description, objectives: p.objectiveTexts };
+  });
+
+  const { error } = await db.rpc("split_topic_into_unit", { p_topic_id: topic.id, p_artifact_id: artifactId, p_plan: plan, p_children: children });
+  if (error) throw new Error(error.message);
+}
+
+/** The learner was waiting on the unit; start its first part. Runs after the unit's credit is refunded. */
+async function prewarmFirstPart(unitTopicId: string): Promise<void> {
+  const db = createServiceClient();
+  const { data: first } = await db.from("topics").select("id").eq("parent_topic_id", unitTopicId).order("position").limit(1).maybeSingle();
+  if (!first) return;
+  const started = await startArtifactJob(first.id as string, "prewarm");
+  if (started.ok && started.jobId) kickJob(started.jobId);
+}
+
+/**
+ * Earlier objectives in this curriculum the learner has attempted but not
+ * secured, oldest evidence first, so the planner can space their recall.
+ */
+async function loadRecallCandidates(childId: string, curriculumId: string, topicId: string): Promise<RecallCandidate[]> {
+  const db = createServiceClient();
+  const { data, error } = await db
+    .from("objective_mastery")
+    .select("objective_id, status, score, last_evidence_at, learning_objectives!inner(text, topic_id, topics!inner(title, curriculum_id))")
+    .eq("child_id", childId)
+    .in("status", ["unknown", "developing"])
+    .gt("evidence_count", 0)
+    .eq("learning_objectives.topics.curriculum_id", curriculumId)
+    .neq("learning_objectives.topic_id", topicId)
+    .order("last_evidence_at", { ascending: true, nullsFirst: false })
+    .limit(6);
+  if (error) {
+    console.error("[jobs] recall candidates:", error.message);
+    return [];
+  }
+  const rows = (data ?? []) as unknown as Array<{
+    objective_id: string;
+    status: string;
+    score: number;
+    learning_objectives: { text: string; topics: { title: string } };
+  }>;
+  return rows.map((r) => ({
+    objectiveId: r.objective_id,
+    text: r.learning_objectives.text,
+    topicTitle: r.learning_objectives.topics.title,
+    status: `${r.status}, score ${(Number(r.score) * 100).toFixed(0)}%`,
+  }));
 }
 
 /** Short natural-language summary of how the child has done so far in this curriculum. */
@@ -396,6 +555,8 @@ export async function ensureArtifact(topicId: string, opts: { regenerate?: boole
   const latest = (data as ArtifactRow | null) ?? null;
 
   if (opts.regenerate && latest?.status === "generating") return { ok: true, artifact: latest };
+  // A split topic is a unit now; it never gets a lesson of its own.
+  if (latest?.status === "split") return { ok: true, artifact: latest };
   // A failed lesson stays failed until someone asks to try again. Refreshing
   // the page must not reserve another credit or call a model.
   if (!opts.regenerate && latest) return { ok: true, artifact: latest };
@@ -420,6 +581,7 @@ export async function prewarmNextTopic(topicId: string): Promise<void> {
     .from("topics")
     .select("id")
     .eq("curriculum_id", t.curriculum_id)
+    .eq("kind", "lesson")
     .gt("position", t.position)
     .order("position")
     .limit(1)
