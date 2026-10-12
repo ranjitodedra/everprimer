@@ -3,85 +3,56 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { enterKidMode, exitChildMode, signOut } from "@/app/actions";
-import { Book, Home, Lock, LogOut, Play, Settings, Users } from "./icons";
+import { enterKidMode } from "@/app/actions";
+import { Book, Chart, Play, Settings, Users } from "./icons";
 
-const TAB = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 text-[0.6875rem] font-extrabold transition active:scale-95";
+const TAB = "press flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-1 text-[0.6875rem] font-semibold";
 
 function Bar({ children }: { children: ReactNode }) {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line/80 bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 bg-paper/90 pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-1px_0_var(--color-line)] backdrop-blur-xl sm:hidden"
     >
-      <div className="mx-auto flex max-w-md items-stretch px-2">{children}</div>
+      <div className="mx-auto flex max-w-md items-stretch px-4 pt-1">{children}</div>
     </nav>
   );
 }
 
 function TabLink({ href, label, icon, active }: { href: string; label: string; icon: ReactNode; active: boolean }) {
   return (
-    <Link href={href} className={`${TAB} ${active ? "text-brand" : "text-ink-soft"}`} aria-current={active ? "page" : undefined}>
+    <Link href={href} className={`${TAB} ${active ? "text-leaf" : "text-ink-faint"}`} aria-current={active ? "page" : undefined}>
       {icon}
       {label}
     </Link>
   );
 }
 
-function TabAction({ action, label, icon }: { action: () => Promise<void>; label: string; icon: ReactNode }) {
-  return (
-    <form action={action} className="flex flex-1">
-      <button type="submit" className={`${TAB} text-ink-soft`}>
-        {icon}
-        {label}
-      </button>
-    </form>
-  );
-}
-
-export function ParentBottomNav({ kind, myLearning }: { kind: "individual" | "parent"; myLearning: string | null }) {
+/** Phone tab bar for grown-ups. Sign out lives in Settings, never one tap away. */
+export function ParentBottomNav({ kind, selfChildId }: { kind: "individual" | "parent"; selfChildId: string | null }) {
   const pathname = usePathname();
+  const inSettings = pathname.startsWith("/parent/settings");
   if (kind === "individual") {
     return (
       <Bar>
-        {myLearning ? <TabLink href={myLearning} label="My learning" icon={<Book size={22} />} active={false} /> : null}
-        <TabLink href="/parent/settings" label="Settings" icon={<Settings size={22} />} active={pathname.startsWith("/parent/settings")} />
-        <TabAction action={signOut} label="Sign out" icon={<LogOut size={22} />} />
+        {selfChildId ? <TabLink href={`/learn/${selfChildId}`} label="Learn" icon={<Book size={24} />} active={false} /> : null}
+        {selfChildId ? <TabLink href={`/parent/children/${selfChildId}`} label="Progress" icon={<Chart size={24} />} active={!inSettings} /> : null}
+        <TabLink href="/parent/settings" label="Settings" icon={<Settings size={24} />} active={inSettings} />
       </Bar>
     );
   }
   return (
     <Bar>
-      <TabLink href="/parent" label="Children" icon={<Users size={22} />} active={pathname === "/parent" || pathname.startsWith("/parent/children")} />
-      <TabAction action={enterKidMode} label="Kid mode" icon={<Play size={22} />} />
-      <TabLink href="/parent/settings" label="Settings" icon={<Settings size={22} />} active={pathname.startsWith("/parent/settings")} />
-      <TabAction action={signOut} label="Sign out" icon={<LogOut size={22} />} />
-    </Bar>
-  );
-}
-
-export type LearnExit = { kind: "grownups" } | { kind: "account"; href: string } | { kind: "signout" };
-
-/**
- * `exit` is what the second tab does: the PIN-gated grown-up area on a shared
- * device, the account area for a learner's own profile, or sign out for a
- * child login.
- */
-export function KidBottomNav({ exit, settingsHref }: { exit: LearnExit; settingsHref?: string }) {
-  const pathname = usePathname();
-  if (/^\/learn\/[^/]+\/topics\//.test(pathname)) return null;
-  const childId = pathname.match(/^\/learn\/([^/]+)/)?.[1];
-  return (
-    <Bar>
-      <TabLink href={childId ? `/learn/${childId}` : "/learn"} label="Home" icon={<Home size={22} />} active />
-      {exit.kind === "signout" ? (
-        <TabAction action={signOut} label="Sign out" icon={<LogOut size={22} />} />
-      ) : exit.kind === "account" ? (
-        <TabLink href={exit.href} label={settingsHref ? "Goals" : "Account"} icon={<Book size={22} />} active={false} />
-      ) : (
-        <TabAction action={exitChildMode} label="Grown-ups" icon={<Lock size={22} />} />
-      )}
-      {settingsHref ? <TabLink href={settingsHref} label="Settings" icon={<Settings size={22} />} active={pathname.startsWith("/parent/settings")} /> : null}
+      <TabLink href="/parent" label="Family" icon={<Users size={24} />} active={!inSettings} />
+      <form action={enterKidMode} className="flex flex-1">
+        <button type="submit" className={`${TAB} text-ink`}>
+          <span className="grid h-7 w-12 place-items-center rounded-full bg-leaf text-white">
+            <Play size={14} />
+          </span>
+          Kid mode
+        </button>
+      </form>
+      <TabLink href="/parent/settings" label="Settings" icon={<Settings size={24} />} active={inSettings} />
     </Bar>
   );
 }

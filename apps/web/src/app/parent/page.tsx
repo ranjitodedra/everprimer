@@ -1,24 +1,26 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ChildRow, CurriculumRow, TopicProgressRow } from "@eco/db";
+import type { ChildRow, TopicProgressRow } from "@eco/db";
 import { ageFromBirth } from "@eco/contracts";
 import { createChild, createSelfProfile, enterChildMode } from "@/app/actions";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
-import { Book, ChevronRight, Play, Users } from "@/components/icons";
-import { Avatar, EmptyState, PageHeader, SectionTitle } from "@/components/ui";
+import { Play, Plus } from "@/components/icons";
+import { Avatar, EmptyState, ListRow, PageHeader, RowContent } from "@/components/ui";
 import { requireGrownup } from "@/lib/auth";
 import { planFor } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/server";
 import { AddChildDialog } from "./add-child-dialog";
 import { SelfProfileDialog } from "./self-profile-dialog";
 
-function readingLabel(level: string | null) {
-  return level ? `${level.replace("_", " ")} reader` : null;
-}
-
 function learnerAge(child: ChildRow): number | null {
   if (child.birth_year != null && child.birth_month != null) return ageFromBirth(child.birth_year, child.birth_month);
   return child.age;
+}
+
+function summary(child: ChildRow, done: number) {
+  const age = learnerAge(child);
+  const lessons = done ? `${done} ${done === 1 ? "lesson" : "lessons"} done` : "No lessons yet";
+  return age ? `${age} years old, ${lessons.toLowerCase()}` : lessons;
 }
 
 export default async function ParentHome(props: PageProps<"/parent">) {
@@ -26,14 +28,11 @@ export default async function ParentHome(props: PageProps<"/parent">) {
   const sp = await props.searchParams;
   if (account.kind === "individual" && account.selfChildId) redirect(`/learn/${account.selfChildId}`);
   const supabase = await createClient();
-  const [{ data }, { data: curricula }, { data: progress }] = await Promise.all([
+  const [{ data }, { data: progress }] = await Promise.all([
     supabase.from("children").select("*").eq("kind", "child").order("created_at"),
-    supabase.from("curricula").select("id, child_id, status").order("created_at"),
     supabase.from("topic_progress").select("child_id, status"),
   ]);
   const children = (data ?? []) as ChildRow[];
-  const curriculaByChild = new Map<string, number>();
-  for (const c of (curricula ?? []) as Pick<CurriculumRow, "id" | "child_id" | "status">[]) curriculaByChild.set(c.child_id, (curriculaByChild.get(c.child_id) ?? 0) + 1);
   const completedByChild = new Map<string, number>();
   for (const p of (progress ?? []) as Pick<TopicProgressRow, "child_id" | "status">[]) if (p.status === "completed") completedByChild.set(p.child_id, (completedByChild.get(p.child_id) ?? 0) + 1);
 
@@ -43,85 +42,63 @@ export default async function ParentHome(props: PageProps<"/parent">) {
   return (
     <>
       <BillingNotice code={billingCode(sp.billing)} audience="grownup" />
-      <PageHeader eyebrow="Your family" title="Children" description="Each child gets their own curricula, progress and daily summaries." />
+      <PageHeader title="Your family" />
 
-      <div>
-        <section>
-          <SectionTitle hint={children.length ? `${children.length} ${children.length === 1 ? "learner" : "learners"}` : undefined}>Learners</SectionTitle>
-          {children.length === 0 ? (
-            <EmptyState icon={<Users size={22} />} title="Add your first child" body="Start with a name and birthday. You can add interests afterwards so lessons feel familiar to them." />
-          ) : (
-            <ul className="space-y-3">
-              {children.map((c, i) => {
-                const enter = enterChildMode.bind(null, c.id);
-                const age = learnerAge(c);
-                const meta = [age ? `Age ${age}` : "Age not set", readingLabel(c.reading_level)].filter(Boolean).join(" · ");
-                const n = curriculaByChild.get(c.id) ?? 0;
-                const done = completedByChild.get(c.id) ?? 0;
-                return (
-                  <li key={c.id} className="card card-hover animate-rise grid grid-cols-1 items-center gap-4 md:grid-cols-[minmax(0,1fr)_auto]" style={{ animationDelay: `${i * 40}ms` }}>
-                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                      <Avatar emoji={c.avatar} size="lg" />
-                      <div className="min-w-0">
-                        <h3 className="text-lg font-black break-words">{c.display_name}</h3>
-                        <p className="text-sm leading-snug text-ink-soft">{meta}</p>
-                        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-ink-soft">
-                          <span className="inline-flex items-center gap-1.5"><Book size={14} className="text-brand" />{n} {n === 1 ? "curriculum" : "curricula"}</span>
-                          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-brand" aria-hidden />{done} {done === 1 ? "topic" : "topics"} completed</span>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2 sm:flex-row md:shrink-0">
-                      <Link href={`/parent/children/${c.id}`} className="btn-secondary w-full sm:flex-1 md:w-auto md:flex-none">
-                        Manage
-                        <ChevronRight size={16} />
-                      </Link>
-                      {c.shared_device ? (
-                        <form action={enter} className="w-full sm:flex-1 md:w-auto md:flex-none">
-                          <button type="submit" className="btn-primary w-full">
-                            <Play size={14} />
-                            Start learning
-                          </button>
-                        </form>
-                      ) : (
-                        <span className="badge justify-center bg-paper-deep px-3 py-2 text-ink-soft">Uses their own login</span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      {children.length === 0 ? (
+        <EmptyState
+          emoji="🌱"
+          title="Who's learning?"
+          body="Add a name and a birthday. Lessons are written for their age."
+          action={<AddChildDialog action={createChild} triggerClassName="btn-primary btn-lg" />}
+        />
+      ) : (
+        <ul className="list-group">
+          {children.map((c) => {
+            const enter = enterChildMode.bind(null, c.id);
+            return (
+              <li key={c.id} className="flex items-center">
+                <Link href={`/parent/children/${c.id}`} className="list-row min-w-0 flex-1">
+                  <RowContent leading={<Avatar emoji={c.avatar} id={c.id} size="md" />} title={c.display_name} subtitle={summary(c, completedByChild.get(c.id) ?? 0)} />
+                </Link>
+                {c.shared_device ? (
+                  <form action={enter} className="pr-3">
+                    <button type="submit" className="btn-primary btn-icon" aria-label={`Start learning as ${c.display_name}`}>
+                      <Play size={16} className="ml-0.5" />
+                    </button>
+                  </form>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-          <div className="mt-8 space-y-3">
+      <ul className="list-group mt-6">
+          {children.length > 0 ? (
+            <li>
+              {atCap ? (
+                <ListRow href="/parent/settings" title="Add a child" subtitle={`The ${plan.name} plan includes ${plan.childCap === 1 ? "1 child" : `${plan.childCap} children`}. See plans.`} leading={<RowIcon />} />
+              ) : (
+                <AddChildDialog action={createChild} triggerClassName="list-row w-full text-left" trigger={<RowContent leading={<RowIcon />} title="Add a child" />} />
+              )}
+            </li>
+          ) : null}
+          <li>
             {account.selfChildId ? (
-              <div className="card flex flex-wrap items-center justify-between gap-4">
-                <p className="text-sm text-ink-soft">You have your own learner profile.</p>
-                <div className="flex gap-2">
-                  <Link href={`/parent/children/${account.selfChildId}`} className="btn-secondary">
-                    Manage
-                    <ChevronRight size={16} />
-                  </Link>
-                  <Link href={`/learn/${account.selfChildId}`} className="btn-primary">
-                    <Book size={14} />
-                    My learning
-                  </Link>
-                </div>
-              </div>
+              <ListRow href={`/learn/${account.selfChildId}`} title="My own lessons" subtitle="Learn something yourself" leading={<RowIcon emoji="📖" />} />
             ) : (
-              <SelfProfileDialog action={createSelfProfile} />
+              <SelfProfileDialog action={createSelfProfile} triggerClassName="list-row w-full text-left" trigger={<RowContent leading={<RowIcon emoji="📖" />} title="Learn something yourself" subtitle="Your own lessons, at your level" />} />
             )}
-            {atCap ? (
-              <div className="card flex flex-wrap items-center justify-between gap-4">
-                <p className="text-sm text-ink-soft">The {plan.name} plan includes {plan.childCap === 1 ? "1 child profile" : `${plan.childCap} child profiles`}. Profiles you already added stay.</p>
-                <Link href="/parent/settings" className="btn-primary shrink-0">View plans</Link>
-              </div>
-            ) : (
-              <AddChildDialog action={createChild} />
-            )}
-          </div>
-        </section>
-      </div>
+          </li>
+      </ul>
     </>
+  );
+}
+
+function RowIcon({ emoji }: { emoji?: string }) {
+  return (
+    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-paper text-xl text-leaf" aria-hidden>
+      {emoji ?? <Plus size={20} />}
+    </span>
   );
 }

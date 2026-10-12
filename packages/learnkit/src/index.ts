@@ -5,6 +5,7 @@ export {
   inlineAssets,
   jsonForScript,
   renderBlueprintHtml,
+  refreshPlayerHtml,
   normalizeGeneratedHtml,
   validateArtifactHtml,
   validateHtmlAgainstBlueprint,

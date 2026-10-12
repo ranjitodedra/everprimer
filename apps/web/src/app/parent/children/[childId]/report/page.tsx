@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ChildRow, DailyReportRow, LessonFeedbackRow, TopicProgressRow } from "@eco/db";
 import { generateReportNow } from "@/app/actions";
-import { ArrowLeft, ArrowRight, Book, Check, Clock, Sparkles, Target } from "@/components/icons";
+import { ArrowLeft, ArrowRight, ChevronDown, Refresh, Sparkles } from "@/components/icons";
 import { LessonFeedback } from "@/components/lesson-feedback";
-import { Avatar, BackLink, PageHeader, Stat } from "@/components/ui";
+import { BackLink } from "@/components/ui";
 import { requireGrownup } from "@/lib/auth";
 import { computeDailyStats, todayIso, type DailyStats } from "@/lib/report";
 import { createClient } from "@/lib/supabase/server";
@@ -49,99 +49,116 @@ export default async function ReportPage(props: PageProps<"/parent/children/[chi
   next.setUTCDate(next.getUTCDate() + 1);
   const isToday = date === todayIso();
 
+  const who = c.kind === "self" ? "You" : c.display_name;
+  const lead = stats.topicsOpened.length === 0
+    ? `${who} didn't open a lesson ${isToday ? "today" : "this day"}.`
+    : `${who} opened ${stats.topicsOpened.length === 1 ? "one lesson" : `${stats.topicsOpened.length} lessons`}${stats.questionsAnswered ? ` and got ${stats.questionsCorrect} of ${stats.questionsAnswered} questions right` : ""}.`;
+
   return (
     <>
-      <BackLink href={`/parent/children/${c.id}`}>{c.display_name}</BackLink>
-      <PageHeader
-        eyebrow="Daily summary"
-        leading={<Avatar emoji={c.avatar} size="lg" className="mt-1" />}
-        title={isToday ? "Today" : prettyDate(date)}
-        description="Numbers are computed from learning activity. The written summary only phrases them and never guesses at mood or behaviour."
-        actions={
-          <div className="flex items-center gap-1 rounded-full border border-line bg-card p-1 shadow-soft">
-            <Link href={`?date=${prev.toISOString().slice(0, 10)}`} className="btn-ghost btn-sm btn-icon" aria-label="Previous day">
-              <ArrowLeft size={16} />
-            </Link>
-            <span className="px-2 text-sm font-bold tabular-nums">{date}</span>
-            <Link href={`?date=${next.toISOString().slice(0, 10)}`} className={`btn-ghost btn-sm btn-icon ${isToday ? "pointer-events-none opacity-30" : ""}`} aria-label="Next day" aria-disabled={isToday}>
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-        }
-      />
+      <BackLink href={`/parent/children/${c.id}`}>{c.kind === "self" ? "Your progress" : c.display_name}</BackLink>
+      <header className="mb-8 flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="display text-[2.5rem] sm:text-5xl">{isToday ? "Today" : prettyDate(date)}</h1>
+          <p className="mt-2 max-w-xl text-lg text-pretty">{lead}</p>
+        </div>
+        <nav className="flex shrink-0 gap-1" aria-label="Day">
+          <Link href={`?date=${prev.toISOString().slice(0, 10)}`} className="btn-secondary btn-icon" aria-label="Previous day">
+            <ArrowLeft size={18} />
+          </Link>
+          <Link href={`?date=${next.toISOString().slice(0, 10)}`} className={`btn-secondary btn-icon ${isToday ? "pointer-events-none opacity-30" : ""}`} aria-label="Next day" aria-disabled={isToday}>
+            <ArrowRight size={18} />
+          </Link>
+        </nav>
+      </header>
 
-      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Topics opened" value={stats.topicsOpened.length} icon={<Book size={18} />} tone="sky" />
-        <Stat label="Completed" value={stats.topicsCompleted.length} icon={<Check size={18} />} tone="brand" />
-        <Stat label="Questions" value={`${stats.questionsCorrect}/${stats.questionsAnswered}`} hint={stats.questionsAnswered ? `${stats.firstAttemptCorrect} right first time` : undefined} icon={<Target size={18} />} tone="violet" />
-        <Stat label="Active" value={`${stats.minutesActive} min`} hint="Context, not proof of learning" icon={<Clock size={18} />} tone="sun" />
-      </div>
+      <dl className="mb-10 grid grid-cols-3 gap-2 sm:gap-3">
+        <Figure label="Lessons finished" value={String(stats.topicsCompleted.length)} />
+        <Figure label="Right first time" value={stats.questionsAnswered ? `${stats.firstAttemptCorrect}/${stats.questionsAnswered}` : "0"} />
+        <Figure label="Minutes" value={String(stats.minutesActive)} />
+      </dl>
 
-      <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
-        <section className="card h-fit">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-extrabold">Written summary</h2>
-            <form action={generate}>
-              <button type="submit" className="btn-secondary btn-sm">
-                <Sparkles size={14} />
-                {report ? "Regenerate" : "Write summary"}
-              </button>
-            </form>
-          </div>
-          {report ? (
-            <p className="text-[1.05rem] leading-relaxed whitespace-pre-line">{report.summary}</p>
-          ) : (
-            <div className="card-muted dotted-bg text-center">
-              <p className="font-bold">No written summary yet for this day.</p>
-              <p className="mt-1 text-sm text-ink-soft">              Generate one from the numbers on this page. It takes a few seconds.</p>
+      <div className="grid gap-10 md:grid-cols-[1.4fr_1fr] md:gap-12">
+        <div className="space-y-8">
+          <section aria-labelledby="summary_title">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 id="summary_title" className="display text-2xl">In words</h2>
+              {report ? (
+                <form action={generate}>
+                  <button type="submit" className="btn-ghost btn-sm">
+                    <Refresh size={14} />
+                    Rewrite
+                  </button>
+                </form>
+              ) : null}
             </div>
-          )}
+            {report ? (
+              <p className="text-[1.0625rem] leading-relaxed whitespace-pre-line">{report.summary}</p>
+            ) : (
+              <form action={generate} className="rounded-[1.25rem] bg-mist px-5 py-6">
+                <p className="text-ink-soft">A short note written from the numbers above. It never guesses at mood.</p>
+                <button type="submit" className="btn-secondary mt-4 bg-paper">
+                  <Sparkles size={16} />
+                  Write it
+                </button>
+              </form>
+            )}
+          </section>
+
           {lessonFeedback.length ? (
-            <div className="mt-6 border-t border-line pt-5">
-              <h3 className="mb-3 font-extrabold">End-of-lesson feedback</h3>
+            <section aria-labelledby="lessons_title">
+              <h2 id="lessons_title" className="display mb-3 text-2xl">Lessons</h2>
               <div className="space-y-3">
                 {lessonFeedback.map((r) => (
                   <LessonFeedback key={r.topic_id} title={r.topics.title} feedback={r.feedback} />
                 ))}
               </div>
-            </div>
+            </section>
           ) : null}
-        </section>
+        </div>
 
-        <aside className="space-y-4">
-          <section className="card">
-            <h3 className="mb-3 font-extrabold">Observed</h3>
-            <dl className="space-y-3 text-sm">
+        <aside className="space-y-6">
+          <section className="rounded-[1.25rem] bg-leaf-soft px-5 py-5 text-leaf-deep">
+            <h2 className="text-sm font-semibold">Next up</h2>
+            <p className="mt-1 text-lg font-semibold text-pretty">{stats.suggestedNext ?? "Nothing to review. Any next lesson is a good one."}</p>
+          </section>
+
+          <details className="group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 font-semibold text-ink-soft [&::-webkit-details-marker]:hidden">
+              <ChevronDown size={18} className="transition-transform duration-200 group-open:rotate-180" />
+              Details
+            </summary>
+            <dl className="mt-3 divide-y divide-line rounded-[1.25rem] bg-mist px-5">
               <Row label="Opened" items={stats.topicsOpened} />
-              <Row label="Completed" items={stats.topicsCompleted} />
-              <Row label="Needs review" items={stats.needsReview} />
-              <Row label="Strengths" items={stats.strengths} />
-              <Row label="Struggled" items={stats.struggles} />
-              <div className="flex justify-between border-t border-line pt-3">
-                <dt className="text-ink-soft">Hints used</dt>
-                <dd className="font-bold tabular-nums">{stats.hintsUsed}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-ink-soft">Items explored</dt>
-                <dd className="font-bold tabular-nums">{stats.itemsExplored}</dd>
-              </div>
+              <Row label="Finished" items={stats.topicsCompleted} />
+              <Row label="To review" items={stats.needsReview} />
+              <Row label="Strong" items={stats.strengths} />
+              <Row label="Found hard" items={stats.struggles} />
+              <Row label="Hints used" items={[String(stats.hintsUsed)]} />
+              <Row label="Things explored" items={[String(stats.itemsExplored)]} />
             </dl>
-          </section>
-          <section className="rounded-2xl border border-brand/25 bg-brand-tint p-5">
-            <p className="eyebrow mb-1">Next up</p>
-            <p className="text-sm font-bold">{stats.suggestedNext ?? "Nothing to review. Pick any unlocked topic next."}</p>
-          </section>
+            <p className="mt-3 text-sm text-ink-faint">Numbers come straight from lesson activity. Minutes show time spent, not how much was learned.</p>
+          </details>
         </aside>
       </div>
     </>
   );
 }
 
+function Figure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.25rem] bg-mist px-3 py-4 sm:px-5 sm:py-5">
+      <dt className="text-sm leading-tight text-ink-soft">{label}</dt>
+      <dd className="display mt-2 text-[2rem] tabular-nums sm:text-5xl">{value}</dd>
+    </div>
+  );
+}
+
 function Row({ label, items }: { label: string; items: string[] }) {
   return (
-    <div>
-      <dt className="text-xs font-extrabold tracking-wider text-ink-soft uppercase">{label}</dt>
-      <dd className="mt-0.5">{items.length ? items.join(", ") : <span className="text-ink-faint">—</span>}</dd>
+    <div className="flex justify-between gap-4 py-3 text-sm">
+      <dt className="shrink-0 text-ink-soft">{label}</dt>
+      <dd className="text-right">{items.length ? items.join(", ") : <span className="text-ink-faint">None</span>}</dd>
     </div>
   );
 }

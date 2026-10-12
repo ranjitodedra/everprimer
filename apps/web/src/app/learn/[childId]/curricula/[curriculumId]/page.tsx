@@ -4,8 +4,8 @@ import { LESSON_LIMITS, ageBandFor } from "@eco/contracts";
 import type { ChildRow, CurriculumRow, TopicProgressRow, TopicRow } from "@eco/db";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { GenerationProgress } from "@/components/generation-progress";
-import { Check, Play, Refresh, Sparkles, Wrench } from "@/components/icons";
-import { BackLink, ProgressRing } from "@/components/ui";
+import { ArrowLeft, Check, Play, Refresh } from "@/components/icons";
+import { Beads, fieldFor } from "@/components/ui";
 import { requireLearner } from "@/lib/auth";
 import { lessonFinished } from "@/lib/lesson-progress";
 import { createClient } from "@/lib/supabase/server";
@@ -49,99 +49,77 @@ export default async function SubtopicPath(props: PageProps<"/learn/[childId]/cu
   const done = list.filter((t) => lessonFinished(progressByTopic.get(t.id))).length;
   const current =
     list.find((t) => statusOf(t) === "in_progress") ?? list.find((t) => statusOf(t) === "not_started");
+  const currentSessions = current ? (progressByTopic.get(current.id)?.sessions_completed ?? 0) : 0;
+  const field = fieldFor(cur.id);
 
   return (
-    <div className="py-2">
+    <div className={`${field} text-(--field-ink)`}>
+      <div className="field fixed inset-0 -z-10" aria-hidden />
       {cur.status === "generating" ? <AutoRefresh intervalMs={3000} /> : null}
-      <BackLink href={`/learn/${c.id}`}>My topics</BackLink>
-      <div className="mb-10 flex items-center gap-4">
-        {list.length ? (
-          <ProgressRing value={done / list.length} size={56} stroke={6}>
-            <span className="text-xs font-black tabular-nums text-brand-deep">{done}/{list.length}</span>
-          </ProgressRing>
-        ) : null}
-        <div className="min-w-0">
-          <h1 className="text-2xl font-black tracking-tight sm:text-3xl">{cur.title || "Getting ready…"}</h1>
-          {cur.description ? <p className="text-ink-soft">{cur.description}</p> : null}
-        </div>
+      <Link href={`/learn/${c.id}`} className="press -ml-2 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-2 font-semibold opacity-70">
+        <ArrowLeft size={18} />
+        My topics
+      </Link>
+      <div className="mt-3 mb-12">
+        <h1 className="display text-[2.75rem] sm:text-6xl">{cur.status === "generating" || !cur.title ? "Getting ready" : cur.title}</h1>
+        {list.length ? <Beads done={done} total={list.length} className="mt-4" /> : null}
       </div>
 
       {list.length === 0 && cur.status === "failed" ? (
-        <div className="card flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sun-soft text-sun-deep" aria-hidden>
-            <Wrench size={18} />
-          </span>
-          <p>We could not set up these lessons. A grown-up can try again.</p>
+        <div className="flex flex-col items-center py-10 text-center">
+          <span className="text-6xl" aria-hidden>🛠️</span>
+          <p className="mt-4 text-lg font-semibold">These lessons couldn&apos;t be made.</p>
+          <p className="opacity-75">A grown-up can try again.</p>
         </div>
       ) : list.length === 0 ? (
-        <div className="card flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-soft text-violet">
-              <Sparkles size={18} className="animate-pulse" />
-            </span>
-            <p>Your lessons are being prepared. They will appear here in a moment.</p>
-          </div>
-          {cur.status === "generating" ? <GenerationProgress kind="curriculum" stage={cur.stage} stageAt={cur.stage_at} retrying={!!cur.error} /> : null}
+        <div className="flex flex-col items-center py-10 text-center" role="status">
+          <span className="animate-breathe text-6xl" aria-hidden>✨</span>
+          <p className="mt-4 text-lg font-semibold">Your lessons are on their way.</p>
+          {cur.status === "generating" ? <GenerationProgress kind="curriculum" stage={cur.stage} stageAt={cur.stage_at} retrying={!!cur.error} className="mt-5 max-w-64" /> : null}
         </div>
       ) : (
-        <ol className="flex flex-col items-center gap-8 pb-8">
+        <ol className="flex flex-col items-center gap-9 pb-32">
           {all.map((t, i) => {
             if (t.kind === "unit") {
               return (
-                <li key={t.id} className="animate-rise w-full max-w-sm" style={{ animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-                  <div className="rounded-2xl border-2 border-dashed border-line-strong bg-card px-4 py-3 text-center">
-                    <p className="text-xs font-black tracking-widest text-ink-faint uppercase">Big topic</p>
-                    <p className="text-lg leading-tight font-extrabold">{t.title}</p>
-                    <p className="text-sm text-ink-soft">Explore it one part at a time.</p>
-                  </div>
+                <li key={t.id} className="w-full max-w-sm text-center">
+                  <span className="inline-block rounded-full bg-paper/60 px-4 py-2 font-semibold">{t.title}</span>
                 </li>
               );
             }
             const status = statusOf(t);
             const isCurrent = current?.id === t.id;
-            const nodeClass = isCurrent && status !== "needs_review" ? "path-node-current" : NODE_CLASS[status];
+            const nodeClass = isCurrent && status !== "needs_review" ? "path-node-current" : NODE_CLASS[status === "in_progress" ? "not_started" : status];
             return (
-              <li
-                key={t.id}
-                className="animate-rise flex flex-col items-center"
-                style={{ transform: `translateX(${WAVE[i % WAVE.length] * STEP_REM}rem)`, animationDelay: `${Math.min(i, 10) * 40}ms` }}
-              >
-                <Link
-                  href={`/learn/${c.id}/topics/${t.id}`}
-                  className="relative flex flex-col items-center gap-2"
-                  aria-label={`${t.title}${isCurrent ? " (start here)" : ""}`}
-                >
-                  {isCurrent ? (
-                    <span className="animate-float mb-1 rounded-xl border-2 border-line bg-card px-3 py-1 text-sm font-black tracking-wide text-brand-deep uppercase shadow-soft">
-                      Start
-                    </span>
-                  ) : null}
-                  <span className={`relative ${isCurrent ? "path-ring" : ""}`}>
-                    <span className={`path-node ${nodeClass} ${isCurrent ? "path-node-lg" : ""}`}>
-                      {status === "completed" ? (
-                        <Check size={isCurrent ? 34 : 28} />
-                      ) : status === "needs_review" ? (
-                        <Refresh size={isCurrent ? 32 : 26} />
-                      ) : isCurrent ? (
-                        <Play size={32} />
-                      ) : (
-                        <span className="text-xl font-black tabular-nums">{lessonNumber.get(t.id)}</span>
-                      )}
-                    </span>
+              <li key={t.id} className="flex flex-col items-center" style={{ transform: `translateX(${WAVE[i % WAVE.length] * STEP_REM}rem)` }}>
+                <Link href={`/learn/${c.id}/topics/${t.id}`} className="flex flex-col items-center gap-3" aria-label={`${t.title}${isCurrent ? ", up next" : ""}`}>
+                  <span className={`path-node ${nodeClass}`}>
+                    {status === "completed" ? (
+                      <Check size={30} />
+                    ) : status === "needs_review" ? (
+                      <Refresh size={28} />
+                    ) : isCurrent ? (
+                      <Play size={34} className="ml-1" />
+                    ) : (
+                      <span className="display text-2xl tabular-nums">{lessonNumber.get(t.id)}</span>
+                    )}
                   </span>
-                  <span className="max-w-[9rem] text-center text-sm leading-tight font-extrabold">{t.title}</span>
-                  {progressByTopic.get(t.id)?.sessions_completed ? (
-                    <span className="text-xs font-bold text-ink-soft">
-                      Session {progressByTopic.get(t.id)!.sessions_completed} of {sessionTotal}
-                      {progressByTopic.get(t.id)?.final_score != null ? ` · ${Math.round(Number(progressByTopic.get(t.id)!.final_score) * 100)}%` : ""}
-                    </span>
-                  ) : null}
+                  <span className={`max-w-[10rem] text-center leading-tight ${isCurrent ? "text-lg font-bold" : "text-sm font-semibold opacity-75"}`}>{t.title}</span>
                 </Link>
               </li>
             );
           })}
         </ol>
       )}
+
+      {current ? (
+        <div className="fixed inset-x-0 bottom-0 z-20 px-5 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
+          <Link href={`/learn/${c.id}/topics/${current.id}`} className="btn-field btn-lg mx-auto flex w-full max-w-sm shadow-[0_14px_30px_-12px_rgb(0_0_0/0.4)]">
+            <Play size={16} />
+            {currentSessions ? `Keep going, part ${currentSessions + 1} of ${sessionTotal}` : "Start next lesson"}
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }

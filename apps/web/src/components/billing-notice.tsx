@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CURRICULUM_HOURLY_LIMIT, MAX_CONCURRENT_JOBS, PLANS, formatPrice } from "@/lib/plans";
+import type { ReactNode } from "react";
+import { CURRICULUM_HOURLY_LIMIT, MAX_CONCURRENT_JOBS } from "@/lib/plans";
 
 export type BillingAudience = "grownup" | "learner";
 
@@ -7,88 +8,41 @@ export function billingCode(value: string | string[] | undefined): string | unde
   return typeof value === "string" ? value : undefined;
 }
 
-/** Grown-ups see prices. Learners get a request to ask a grown-up, with no prices. */
-export function BillingNotice({ code, audience }: { code?: string; audience: BillingAudience }) {
-  if (!code) return null;
-  if (code === "credits") return <Paywall audience={audience} reason="credits" />;
-  if (code === "plan") return <Paywall audience={audience} reason="plan" />;
-  if (code === "concurrency") {
-    return (
-      <div className="card mb-6">
-        <h2 className="text-lg font-extrabold">Two lessons are already being built</h2>
-        <p className="mt-1 text-sm text-ink-soft">This account can build {MAX_CONCURRENT_JOBS} lessons at a time. Wait for one to finish, then try again.</p>
-      </div>
-    );
-  }
-  if (code === "rate_limit") {
-    return (
-      <div className="card mb-6">
-        <h2 className="text-lg font-extrabold">That is enough new goals for this hour</h2>
-        <p className="mt-1 text-sm text-ink-soft">You can start {CURRICULUM_HOURLY_LIMIT} new curricula an hour. Try again a little later.</p>
-      </div>
-    );
-  }
-  if (code === "children") {
-    return (
-      <div className="card mb-6">
-        <h2 className="text-lg font-extrabold">This plan is full of child profiles</h2>
-        <p className="mt-1 text-sm text-ink-soft">Profiles you already added stay. Upgrade to add another.</p>
-        {audience === "grownup" ? (
-          <Link href="/parent/settings" className="btn-primary mt-4">
-            View plans
-          </Link>
-        ) : null}
-      </div>
-    );
-  }
+function Box({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
-    <div className="card mb-6">
-      <h2 className="text-lg font-extrabold">That could not be started</h2>
-      <p className="mt-1 text-sm text-ink-soft">Refresh the page and try again.</p>
+    <div role="status" className="mb-6 flex flex-col gap-4 rounded-3xl bg-spark-soft px-5 py-4 text-spark-deep sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-bold">{title}</p>
+        <p className="mt-0.5 text-sm">{body}</p>
+      </div>
+      {action}
     </div>
   );
 }
 
-function Paywall({ audience, reason }: { audience: BillingAudience; reason: "credits" | "plan" }) {
-  if (audience === "learner") {
-    return (
-      <div className="card mx-auto max-w-lg py-10 text-center">
-        <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-sun-soft text-3xl" aria-hidden>
-          🌱
+/** Grown-ups get a way to fix it. Learners get a request to ask a grown-up, with no prices. */
+export function BillingNotice({ code, audience }: { code?: string; audience: BillingAudience }) {
+  if (!code) return null;
+  const plans = audience === "grownup" ? <Link href="/parent/settings" className="btn-primary btn-sm shrink-0">See plans</Link> : undefined;
+
+  if (code === "credits" || code === "plan") {
+    if (audience === "learner") {
+      return (
+        <div className="flex flex-col items-center px-6 py-16 text-center">
+          <span className="text-6xl" aria-hidden>🌱</span>
+          <h2 className="display mt-4 text-3xl">No new lessons right now</h2>
+          <p className="mt-2 opacity-75">Ask a grown-up to add more.</p>
         </div>
-        <h2 className="text-2xl font-black">No lessons left right now</h2>
-        <p className="mt-2 text-ink-soft">Ask a grown-up to add more lessons.</p>
-      </div>
+      );
+    }
+    return code === "plan" ? (
+      <Box title="Rebuilding a lesson is on Plus and Max" body="Playing it again is always free." action={plans} />
+    ) : (
+      <Box title="Out of lesson credits" body="Lessons you already have still play. Credits refresh each month." action={plans} />
     );
   }
-
-  const title = reason === "plan" ? "Regenerating a lesson is on Plus and Max" : "This account is out of lesson credits";
-  const body =
-    reason === "plan"
-      ? "A published lesson can be rebuilt on Plus or Max. Playing it again is free."
-      : "A credit is one new lesson, or one new curriculum outline. Lessons you already have stay playable.";
-
-  return (
-    <div className="card mb-6">
-      <h2 className="text-xl font-black">{title}</h2>
-      <p className="mt-1 text-sm text-ink-soft">{body}</p>
-      <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-        <li className="rounded-2xl bg-paper px-3 py-3">
-          <span className="block font-extrabold">{PLANS.free.name}</span>
-          <span className="text-ink-soft">{formatPrice(PLANS.free.price)} · {PLANS.free.credits} credits / month</span>
-        </li>
-        <li className="rounded-2xl bg-paper px-3 py-3">
-          <span className="block font-extrabold">{PLANS.paid.name}</span>
-          <span className="text-ink-soft">{formatPrice(PLANS.paid.price)}/month · {PLANS.paid.credits} credits</span>
-        </li>
-        <li className="rounded-2xl bg-paper px-3 py-3">
-          <span className="block font-extrabold">{PLANS.max.name}</span>
-          <span className="text-ink-soft">{formatPrice(PLANS.max.price)}/month · {PLANS.max.credits} credits</span>
-        </li>
-      </ul>
-      <Link href="/parent/settings" className="btn-primary mt-4">
-        See plans
-      </Link>
-    </div>
-  );
+  if (code === "concurrency") return <Box title="Two lessons are already being made" body={`Up to ${MAX_CONCURRENT_JOBS} at a time. Try again when one is ready.`} />;
+  if (code === "rate_limit") return <Box title="That's enough new goals for now" body={`Up to ${CURRICULUM_HOURLY_LIMIT} an hour. Try again a little later.`} />;
+  if (code === "children") return <Box title="This plan is full" body="Profiles you added stay. Upgrade to add another." action={plans} />;
+  return <Box title="That couldn't start" body="Refresh the page and try again." />;
 }

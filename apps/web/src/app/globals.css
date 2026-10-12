@@ -1,69 +1,80 @@
 @import "tailwindcss";
 
 /*
- * Everprimer design tokens.
- * Warm paper background, leaf-green brand, amber "sun" accent. Semantic
- * colours (sky / sun / berry) are for status, never for decoration.
+ * Everprimer design tokens: "one page of the book".
+ * White paper, forest ink, leaf for the one primary action, spark for rewards
+ * only. Child-facing surfaces sit on flat picture-book "fields"; each field is
+ * a tint plus a deep ink of the same hue.
  */
 @theme {
-  --font-sans: var(--font-nunito), ui-rounded, system-ui, sans-serif;
+  --font-sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-bricolage), ui-rounded, system-ui, sans-serif;
 
-  --color-ink: #1f2a24;
-  --color-ink-soft: #5f6b64;
-  --color-ink-faint: #97a29b;
+  --color-ink: #143d27;
+  --color-ink-soft: #5e7366;
+  --color-ink-faint: #9aa89f;
 
-  --color-paper: #f8f5ee;
-  --color-paper-deep: #efeadf;
-  --color-card: #ffffff;
-  --color-line: #e5dfd2;
-  --color-line-strong: #d6cfbf;
+  --color-paper: #ffffff;
+  --color-mist: #f3f5f1;
+  --color-mist-deep: #e7ebe4;
+  --color-line: #e3e8e0;
 
-  --color-brand: #15803d;
-  --color-brand-deep: #166534;
-  --color-brand-soft: #e3f3e8;
-  --color-brand-tint: #f2f9f4;
+  --color-leaf: #177c3f;
+  --color-leaf-deep: #196236;
+  --color-leaf-soft: #e3f3e6;
 
-  --color-sun: #f59e0b;
-  --color-sun-deep: #b45309;
-  --color-sun-soft: #fdf1d6;
+  --color-spark: #f29908;
+  --color-spark-deep: #9a5b00;
+  --color-spark-soft: #fff1d6;
 
-  --color-sky: #0369a1;
-  --color-sky-soft: #e0f2fe;
+  --color-berry: #c2264b;
+  --color-berry-soft: #fde6eb;
 
-  --color-berry: #be185d;
-  --color-berry-soft: #fce7f3;
+  --color-meadow: #ddf3d0;
+  --color-meadow-ink: #1b4d2b;
+  --color-sun: #ffe7a3;
+  --color-sun-ink: #6a4300;
+  --color-sky: #d3e9ff;
+  --color-sky-ink: #123f70;
+  --color-bloom: #ffdce6;
+  --color-bloom-ink: #7a2142;
+  --color-lilac: #e6deff;
+  --color-lilac-ink: #3b2b86;
 
-  --color-violet: #6d28d9;
-  --color-violet-soft: #ede9fe;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* status aliases kept for existing markup */
-  --color-leaf: #15803d;
-  --color-leaf-soft: #dcfce7;
+  --animate-rise: rise 420ms var(--ease-out) both;
+  --animate-pop: pop 460ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  --animate-breathe: breathe 3.2s ease-in-out infinite;
+  --animate-swap: swap 380ms var(--ease-out) both;
 
-  --radius-2xl: 1.25rem;
-  --radius-3xl: 1.75rem;
-  --radius-4xl: 2.25rem;
-
-  --shadow-card: 0 1px 0 rgb(31 42 36 / 0.04), 0 12px 32px -14px rgb(31 42 36 / 0.16);
-  --shadow-lift: 0 2px 0 rgb(31 42 36 / 0.04), 0 22px 44px -18px rgb(31 42 36 / 0.22);
-  --shadow-soft: 0 1px 2px rgb(31 42 36 / 0.05);
-
-  --animate-float: float 6s ease-in-out infinite;
-  --animate-pop: pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
-  --animate-rise: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
-
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
+  @keyframes swap {
+    from {
+      opacity: 0;
+      filter: blur(6px);
+      transform: translateY(4px);
     }
-    50% {
-      transform: translateY(-8px);
+    to {
+      opacity: 1;
+      filter: none;
+      transform: none;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: none;
+      opacity: 1;
     }
   }
   @keyframes pop {
     from {
-      transform: scale(0.85);
+      transform: scale(0.6);
       opacity: 0;
     }
     to {
@@ -71,14 +82,13 @@
       opacity: 1;
     }
   }
-  @keyframes rise {
-    from {
-      transform: translateY(10px);
-      opacity: 0;
+  @keyframes breathe {
+    0%,
+    100% {
+      transform: scale(1);
     }
-    to {
-      transform: translateY(0);
-      opacity: 1;
+    50% {
+      transform: scale(1.06);
     }
   }
 }
@@ -88,17 +98,16 @@
     color: var(--color-ink);
     background: var(--color-paper);
     -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
-    /* Kills double-tap-to-zoom while keeping normal taps snappy. */
+    overscroll-behavior: none;
     touch-action: manipulation;
   }
   body {
     min-height: 100dvh;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
-    touch-action: manipulation;
     overscroll-behavior: none;
   }
   a,
@@ -111,140 +120,128 @@
   [role="button"] {
     touch-action: manipulation;
   }
-  @supports (height: 100svh) {
-    body {
-      min-height: 100svh;
-    }
+  button,
+  summary,
+  [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
   h1,
   h2,
   h3 {
     text-wrap: balance;
-    letter-spacing: -0.015em;
   }
   p {
     text-wrap: pretty;
   }
   :focus-visible {
-    outline: 3px solid var(--color-sun);
+    outline: 2.5px solid var(--color-leaf);
     outline-offset: 3px;
-    border-radius: 6px;
+    border-radius: 10px;
   }
   ::selection {
-    background: var(--color-sun-soft);
+    background: var(--color-spark-soft);
   }
   summary {
     list-style: none;
+    cursor: pointer;
   }
   summary::-webkit-details-marker {
     display: none;
   }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Type ---------- */
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  font-variation-settings: "wdth" 88;
 }
 
 /* ---------- Buttons ---------- */
 
 @utility btn {
   display: inline-flex;
-  min-height: 2.75rem;
+  min-height: 3rem;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   border-radius: 9999px;
-  padding-inline: 1.25rem;
-  font-size: 0.9375rem;
-  font-weight: 800;
+  padding-inline: 1.375rem;
+  font-size: 1rem;
+  font-weight: 650;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
   transition:
-    transform 120ms ease,
+    transform 160ms var(--ease-out),
     background-color 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    color 160ms ease,
+    opacity 160ms ease;
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
   &:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
-    transform: none;
+    opacity: 0.45;
   }
 }
 
 @layer components {
   .btn-primary {
     @apply btn;
-    background: var(--color-brand);
+    background: var(--color-leaf);
     color: #fff;
-    box-shadow: 0 3px 0 var(--color-brand-deep);
+  }
+  .btn-primary:active:not(:disabled) {
+    background: var(--color-leaf-deep);
   }
   @media (hover: hover) and (pointer: fine) {
     .btn-primary:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--color-brand) 92%, white);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 0 var(--color-brand-deep);
+      background: var(--color-leaf-deep);
     }
-  }
-  .btn-primary:active:not(:disabled) {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 var(--color-brand-deep);
-  }
-
-  .btn-sun {
-    @apply btn;
-    background: var(--color-sun);
-    color: #3b2200;
-    box-shadow: 0 3px 0 var(--color-sun-deep);
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .btn-sun:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 0 var(--color-sun-deep);
-    }
-  }
-  .btn-sun:active:not(:disabled) {
-    transform: translateY(2px);
-    box-shadow: 0 1px 0 var(--color-sun-deep);
   }
 
   .btn-secondary {
     @apply btn;
-    background: var(--color-card);
+    background: var(--color-mist);
     color: var(--color-ink);
-    border: 1.5px solid var(--color-line-strong);
-    box-shadow: 0 2px 0 var(--color-line);
+  }
+  .btn-secondary:active:not(:disabled) {
+    background: var(--color-mist-deep);
   }
   @media (hover: hover) and (pointer: fine) {
     .btn-secondary:hover:not(:disabled) {
-      border-color: var(--color-brand);
-      color: var(--color-brand-deep);
-      transform: translateY(-1px);
+      background: var(--color-mist-deep);
     }
-  }
-  .btn-secondary:active:not(:disabled) {
-    transform: translateY(1px);
-    box-shadow: none;
   }
 
-  .btn-soft {
+  /* On a field: deep field ink with the field tint as text. */
+  .btn-field {
     @apply btn;
-    background: var(--color-brand-soft);
-    color: var(--color-brand-deep);
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .btn-soft:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--color-brand-soft) 70%, var(--color-brand) 30%);
-      color: #fff;
-    }
+    background: var(--field-ink, var(--color-ink));
+    color: var(--field, #fff);
   }
 
   .btn-ghost {
     @apply btn;
     color: var(--color-ink-soft);
   }
+  .btn-ghost:active:not(:disabled) {
+    background: var(--color-mist);
+  }
   @media (hover: hover) and (pointer: fine) {
     .btn-ghost:hover:not(:disabled) {
-      background: var(--color-paper-deep);
+      background: var(--color-mist);
       color: var(--color-ink);
     }
   }
@@ -255,199 +252,301 @@
     font-size: 1.0625rem;
   }
   .btn-sm {
-    min-height: 2.25rem;
-    padding-inline: 0.875rem;
-    font-size: 0.8125rem;
+    min-height: 2.5rem;
+    padding-inline: 1rem;
+    font-size: 0.9375rem;
   }
   .btn-icon {
     width: 2.75rem;
+    min-height: 2.75rem;
     padding-inline: 0;
   }
 
-  /* ---------- Surfaces ---------- */
-
-  .card {
-    background: var(--color-card);
-    border: 1px solid var(--color-line);
-    border-radius: var(--radius-2xl);
-    padding: 1.25rem;
-    box-shadow: var(--shadow-card);
+  .press {
+    transition: transform 160ms var(--ease-out);
   }
-  .card-hover {
-    transition:
-      transform 180ms ease,
-      box-shadow 180ms ease,
-      border-color 180ms ease;
+  .press:active {
+    transform: scale(0.97);
+  }
+
+  /* ---------- Fields ---------- */
+
+  .f-meadow {
+    --field: var(--color-meadow);
+    --field-ink: var(--color-meadow-ink);
+  }
+  .f-sun {
+    --field: var(--color-sun);
+    --field-ink: var(--color-sun-ink);
+  }
+  .f-sky {
+    --field: var(--color-sky);
+    --field-ink: var(--color-sky-ink);
+  }
+  .f-bloom {
+    --field: var(--color-bloom);
+    --field-ink: var(--color-bloom-ink);
+  }
+  .f-lilac {
+    --field: var(--color-lilac);
+    --field-ink: var(--color-lilac-ink);
+  }
+  .field {
+    background: var(--field);
+    color: var(--field-ink);
+  }
+
+  /* ---------- Grouped lists ---------- */
+
+  .list-group {
+    overflow: hidden;
+    border-radius: 1.25rem;
+    background: var(--color-mist);
+  }
+  .list-row {
+    position: relative;
+    display: flex;
+    width: 100%;
+    min-height: 3.75rem;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    transition: background-color 120ms ease;
+  }
+  .list-group > * + * {
+    background-image: linear-gradient(var(--color-mist-deep), var(--color-mist-deep));
+    background-repeat: no-repeat;
+    background-position: 1rem 0;
+    background-size: calc(100% - 1rem) 1px;
+  }
+  a.list-row:active,
+  button.list-row:active,
+  summary.list-row:active {
+    background: var(--color-mist-deep);
   }
   @media (hover: hover) and (pointer: fine) {
-    .card-hover:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-lift);
-      border-color: var(--color-line-strong);
+    a.list-row:hover,
+    button.list-row:hover,
+    summary.list-row:hover {
+      background: var(--color-mist-deep);
     }
   }
-  .card-muted {
-    background: var(--color-paper-deep);
-    border: 1px solid transparent;
-    border-radius: var(--radius-2xl);
-    padding: 1.25rem;
-  }
-  .tile {
-    display: grid;
-    place-items: center;
-    flex: none;
-    border-radius: 1rem;
-    background: var(--color-brand-soft);
-    color: var(--color-brand-deep);
-  }
 
-  /* ---------- Kid path ---------- */
+  /* ---------- Sheet (dialog) ---------- */
 
-  .path-node {
-    --node-edge: var(--color-line-strong);
-    display: grid;
-    place-items: center;
-    width: 4.5rem;
-    height: 4.5rem;
-    border-radius: 9999px;
-    box-shadow: 0 6px 0 var(--node-edge);
-    transition:
-      transform 120ms ease,
-      box-shadow 120ms ease;
+  .sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    /* Important: parent space-* utilities would otherwise lift a top-layer dialog. */
+    margin: 0 auto !important;
+    width: 100%;
+    max-width: 36rem;
+    max-height: calc(100dvh - max(1.5rem, env(safe-area-inset-top, 0px)));
+    overflow: hidden auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 1.75rem 1.75rem 0 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    /* A dialog inherits from wherever it sits in the DOM, not the top layer. */
+    text-align: start;
+    font-weight: normal;
+    padding: 0;
+    box-shadow: 0 -12px 48px -12px rgb(20 61 39 / 0.25);
   }
-  a:hover > * > .path-node {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 0 var(--node-edge);
+  .sheet[open] {
+    animation: sheet-up 340ms var(--ease-drawer) backwards;
   }
-  a:active > * > .path-node {
-    transform: translateY(4px);
-    box-shadow: 0 2px 0 var(--node-edge);
+  .sheet-body {
+    padding: 0 1.25rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
   }
-  .path-node-lg {
-    width: 5.25rem;
-    height: 5.25rem;
+  .sheet::backdrop {
+    background: rgb(20 61 39 / 0.32);
+    animation: fade-in 240ms ease both;
   }
-  .path-node-done {
-    --node-edge: var(--color-brand-deep);
-    background: var(--color-brand);
-    color: #fff;
+  .sheet-wide {
+    max-width: 56rem;
   }
-  .path-node-current {
-    --node-edge: var(--color-brand-deep);
-    background: var(--color-brand);
-    color: #fff;
+  @media (min-width: 640px) {
+    .sheet {
+      inset: 0;
+      margin: auto !important;
+      width: calc(100% - 3rem);
+      height: fit-content;
+      max-height: calc(100dvh - 4rem);
+      border-radius: 1.75rem;
+    }
+    .sheet-body {
+      padding: 0 1.75rem 1.75rem;
+    }
+    .sheet[open] {
+      animation: sheet-in 220ms var(--ease-out) backwards;
+    }
   }
-  .path-node-review {
-    --node-edge: var(--color-sun-deep);
-    background: var(--color-sun);
-    color: #3b2200;
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: none;
+    }
   }
-  .path-node-new {
-    --node-edge: var(--color-line-strong);
-    background: var(--color-paper-deep);
-    color: var(--color-ink-soft);
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
-  .path-ring::before {
-    content: "";
-    position: absolute;
-    inset: -0.6rem -0.6rem -0.95rem;
-    border-radius: 9999px;
-    border: 5px solid color-mix(in srgb, var(--color-brand) 30%, transparent);
-    pointer-events: none;
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
   }
 
   /* ---------- Forms ---------- */
 
   .input {
     width: 100%;
-    min-height: 2.875rem;
+    min-height: 3.25rem;
     border-radius: 0.875rem;
-    border: 1.5px solid var(--color-line-strong);
-    background: var(--color-card);
-    padding-inline: 0.9rem;
-    /* 16px minimum on mobile prevents iOS Safari zoom-on-focus. */
+    border: 0;
+    background: var(--color-mist);
+    padding-inline: 1rem;
     font-size: 1rem;
     color: var(--color-ink);
-    /* Leaves room above/below when the browser scrolls a focused field into view
-     * (e.g. under a sticky header or above the on-screen keyboard). */
     scroll-margin-block: 6rem;
     transition:
-      border-color 140ms ease,
+      background-color 140ms ease,
       box-shadow 140ms ease;
   }
   .input::placeholder {
     color: var(--color-ink-faint);
   }
   .input:focus {
-    border-color: var(--color-brand);
     outline: none;
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-brand) 16%, transparent);
+    background: var(--color-paper);
+    box-shadow: 0 0 0 2px var(--color-leaf);
   }
   textarea.input {
-    padding-block: 0.7rem;
-    line-height: 1.5;
-    resize: vertical;
+    padding-block: 0.875rem;
+    line-height: 1.45;
+    resize: none;
   }
   select.input {
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235f6b64' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235e7366' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 0.8rem center;
-    padding-right: 2.4rem;
+    background-position: right 0.9rem center;
+    padding-right: 2.5rem;
   }
   .label {
     display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.8125rem;
-    font-weight: 800;
+    margin-bottom: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--color-ink-soft);
   }
 
-  /* ---------- Text ---------- */
-
-  .eyebrow {
+  /* Choice chip: a radio styled as a pill. Pair with `peer` on the input. */
+  .chip {
     display: inline-flex;
+    min-height: 2.75rem;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.75rem;
-    font-weight: 900;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-brand);
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
     border-radius: 9999px;
-    padding: 0.2rem 0.65rem;
-    font-size: 0.75rem;
-    font-weight: 800;
-    line-height: 1.3;
-    white-space: nowrap;
+    background: var(--color-mist);
+    padding-inline: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease,
+      transform 160ms var(--ease-out);
   }
+  .chip:active {
+    transform: scale(0.97);
+  }
+  :checked + .chip,
+  .chip[aria-pressed="true"] {
+    background: var(--color-ink);
+    color: #fff;
+  }
+  :focus-visible + .chip {
+    outline: 2.5px solid var(--color-leaf);
+    outline-offset: 2px;
+  }
+
   .link {
-    color: var(--color-brand-deep);
-    font-weight: 700;
+    color: var(--color-leaf);
+    font-weight: 600;
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    text-decoration-color: color-mix(in srgb, var(--color-leaf) 35%, transparent);
     text-underline-offset: 3px;
   }
-  .link:hover {
-    text-decoration-color: var(--color-brand);
+
+  /* ---------- Kid path ---------- */
+
+  .path-node {
+    display: grid;
+    place-items: center;
+    width: 4.75rem;
+    height: 4.75rem;
+    border-radius: 9999px;
+    transition: transform 160ms var(--ease-out);
+  }
+  a:active .path-node {
+    transform: scale(0.94);
+  }
+  .path-node-done {
+    background: var(--field-ink);
+    color: var(--field);
+  }
+  .path-node-review {
+    background: var(--color-spark);
+    color: #3b2200;
+  }
+  .path-node-new {
+    background: color-mix(in srgb, var(--field-ink) 12%, transparent);
+    color: var(--field-ink);
+  }
+  .path-node-current {
+    width: 6rem;
+    height: 6rem;
+    background: var(--color-spark);
+    color: #3b2200;
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--color-spark) 28%, transparent),
+      0 14px 30px -10px color-mix(in srgb, var(--color-spark-deep) 60%, transparent);
   }
 
-  /* ---------- Decoration ---------- */
-
-  .dotted-bg {
-    background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1px, transparent 1px);
-    background-size: 18px 18px;
+  /* Horizontal shelf with native snap physics. */
+  .shelf {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1.25rem;
+    padding-inline: 1.25rem;
+    margin-inline: -1.25rem;
+    padding-bottom: 0.5rem;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
-  .kid-sky {
-    background:
-      radial-gradient(60% 45% at 15% 0%, color-mix(in srgb, var(--color-sky-soft) 85%, transparent) 0%, transparent 70%),
-      radial-gradient(50% 40% at 90% 10%, color-mix(in srgb, var(--color-sun-soft) 90%, transparent) 0%, transparent 70%),
-      var(--color-paper);
+  .shelf::-webkit-scrollbar,
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .shelf > * {
+    scroll-snap-align: start;
+    flex: none;
   }
 }
 
@@ -455,7 +554,8 @@
   *,
   *::before,
   *::after {
-    animation: none !important;
-    transition: none !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

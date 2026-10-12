@@ -135,6 +135,11 @@ export const Wrench = (p: IconProps) => (
     <path d="M14.7 6.3 18 3l3 3-3.3 3.3" />
   </svg>
 );
+export const Star = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8Z" fill="currentColor" stroke="none" />
+  </svg>
+);
 export const Layers = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="m12 3 9 5-9 5-9-5 9-5Z" />

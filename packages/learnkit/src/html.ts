@@ -134,6 +134,24 @@ export function renderBlueprintHtml(bp: ArtifactBlueprint, assets: LessonAsset[]
 }
 
 /**
+ * Swap the player stylesheet and script in a stored blueprint document for the
+ * current ones, keeping its blueprint, assets and theme. Lessons are stored at
+ * generation time, so this is how older lessons pick up player changes.
+ * Documents not produced by `renderBlueprintHtml` are returned unchanged.
+ */
+export function refreshPlayerHtml(html: string): string {
+  const data = html.indexOf("window.__BLUEPRINT__=");
+  if (data < 0) return html;
+  const dataEnd = html.indexOf("</script>", data);
+  const open = html.indexOf("<script>", dataEnd);
+  const close = open < 0 ? -1 : html.indexOf("</script>", open);
+  if (dataEnd < 0 || close < 0) return html;
+  let out = `${html.slice(0, open)}<script>${PLAYER_SOURCE}${html.slice(close)}`;
+  out = out.replace(/<style>[\s\S]*?(:root\{--lk-primary:[^}]*\})<\/style>/, (_whole, vars: string) => `<style>${PLAYER_CSS}${vars}</style>`);
+  return out;
+}
+
+/**
  * Make a model-generated document conform to the runtime contract:
  * ensure the CSP meta and the LearnKit runtime are present, as the first
  * things in <head> and the first script respectively.

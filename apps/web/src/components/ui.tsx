@@ -1,30 +1,42 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "./icons";
+import { ArrowLeft, ChevronRight } from "./icons";
+
+/* ---------- Fields ---------- */
+
+export const FIELDS = ["meadow", "sky", "sun", "bloom", "lilac"] as const;
+export type Field = (typeof FIELDS)[number];
+
+/** Stable field class for an id, so a topic or learner keeps its colour everywhere. */
+export function fieldFor(id: string): `f-${Field}` {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return `f-${FIELDS[Math.abs(h) % FIELDS.length]}`;
+}
 
 /* ---------- Status ---------- */
 
-const STATUS: Record<string, { label: string; cls: string; dot: string }> = {
-  not_started: { label: "Not started", cls: "bg-paper-deep text-ink-soft", dot: "bg-ink-faint" },
-  locked: { label: "Locked", cls: "bg-paper-deep text-ink-soft", dot: "bg-ink-faint" },
-  in_progress: { label: "In progress", cls: "bg-sky-soft text-sky", dot: "bg-sky" },
-  needs_review: { label: "Needs review", cls: "bg-sun-soft text-sun-deep", dot: "bg-sun" },
-  completed: { label: "Completed", cls: "bg-brand-soft text-brand-deep", dot: "bg-brand" },
-  generating: { label: "Generating", cls: "bg-violet-soft text-violet", dot: "bg-violet animate-pulse" },
-  ready: { label: "Ready", cls: "bg-brand-soft text-brand-deep", dot: "bg-brand" },
-  published: { label: "Ready", cls: "bg-brand-soft text-brand-deep", dot: "bg-brand" },
-  failed: { label: "Failed", cls: "bg-berry-soft text-berry", dot: "bg-berry" },
-  unknown: { label: "No data", cls: "bg-paper-deep text-ink-soft", dot: "bg-ink-faint" },
-  developing: { label: "Developing", cls: "bg-sun-soft text-sun-deep", dot: "bg-sun" },
-  proficient: { label: "Proficient", cls: "bg-sky-soft text-sky", dot: "bg-sky" },
-  mastered: { label: "Mastered", cls: "bg-brand-soft text-brand-deep", dot: "bg-brand" },
+const STATUS: Record<string, { label: string; text: string; dot: string }> = {
+  not_started: { label: "Not started", text: "text-ink-soft", dot: "bg-ink-faint" },
+  locked: { label: "Locked", text: "text-ink-soft", dot: "bg-ink-faint" },
+  in_progress: { label: "In progress", text: "text-sky-ink", dot: "bg-sky-ink" },
+  needs_review: { label: "Needs review", text: "text-spark-deep", dot: "bg-spark" },
+  completed: { label: "Done", text: "text-leaf", dot: "bg-leaf" },
+  generating: { label: "Preparing", text: "text-lilac-ink", dot: "bg-lilac-ink animate-pulse" },
+  ready: { label: "Ready", text: "text-leaf", dot: "bg-leaf" },
+  published: { label: "Ready", text: "text-leaf", dot: "bg-leaf" },
+  failed: { label: "Failed", text: "text-berry", dot: "bg-berry" },
+  unknown: { label: "No data yet", text: "text-ink-faint", dot: "bg-ink-faint" },
+  developing: { label: "Developing", text: "text-spark-deep", dot: "bg-spark" },
+  proficient: { label: "Proficient", text: "text-sky-ink", dot: "bg-sky-ink" },
+  mastered: { label: "Mastered", text: "text-leaf", dot: "bg-leaf" },
 };
 
 export function StatusBadge({ status }: { status: string }) {
-  const s = STATUS[status] ?? { label: status, cls: "bg-paper-deep text-ink-soft", dot: "bg-ink-faint" };
+  const s = STATUS[status] ?? { label: status, text: "text-ink-soft", dot: "bg-ink-faint" };
   return (
-    <span className={`badge ${s.cls}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} aria-hidden />
+    <span className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold whitespace-nowrap ${s.text}`}>
+      <span className={`h-2 w-2 rounded-full ${s.dot}`} aria-hidden />
       {s.label}
     </span>
   );
@@ -32,58 +44,62 @@ export function StatusBadge({ status }: { status: string }) {
 
 /* ---------- Progress ---------- */
 
-export function MasteryBar({ value, className = "", showLabel = false }: { value: number; className?: string; showLabel?: boolean }) {
+/** Thin progress line in the current text colour. `value` is 0..1. */
+export function ProgressLine({ value, className = "", label }: { value: number; className?: string; label?: string }) {
   const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-paper-deep" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`Mastery ${pct}%`}>
-        <div className="h-full rounded-full bg-gradient-to-r from-brand to-sun transition-[width] duration-500" style={{ width: `${pct}%` }} />
-      </div>
-      {showLabel ? <span className="w-9 shrink-0 text-right text-xs font-extrabold tabular-nums text-ink-soft">{pct}%</span> : null}
+    <div
+      className={`h-1.5 w-full overflow-hidden rounded-full bg-current/15 ${className}`}
+      role="progressbar"
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `${pct}% complete`}
+    >
+      <div className="h-full rounded-full bg-current transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
-/** Circular progress. `value` is 0..1. */
-export function ProgressRing({ value, size = 56, stroke = 6, children, className = "" }: { value: number; size?: number; stroke?: number; children?: ReactNode; className?: string }) {
-  const pct = Math.max(0, Math.min(1, value));
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
+/** One bead per lesson, filled when done. Counts children can read at a glance. */
+export function Beads({ done, total, size = "md", className = "" }: { done: number; total: number; size?: "sm" | "md"; className?: string }) {
+  const dot = size === "sm" ? "h-2 w-2" : "h-3 w-3";
   return (
-    <div className={`relative grid place-items-center ${className}`} style={{ width: size, height: size }} role="img" aria-label={`${Math.round(pct * 100)}% complete`}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-paper-deep)" strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-brand)" strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} className="transition-[stroke-dashoffset] duration-700" />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center">{children}</div>
-    </div>
+    <span className={`flex flex-wrap gap-1.5 ${className}`} role="img" aria-label={`${done} of ${total} lessons done`}>
+      {Array.from({ length: total }, (_, i) => (
+        <span key={i} className={`${dot} rounded-full ${i < done ? "bg-current" : "bg-current/20"}`} />
+      ))}
+    </span>
+  );
+}
+
+/* ---------- Identity ---------- */
+
+/** Emoji avatar on the learner's own field. */
+export function Avatar({ emoji, id, size = "md", className = "" }: { emoji: string; id?: string; size?: "sm" | "md" | "lg" | "xl"; className?: string }) {
+  const sizes = {
+    sm: "h-10 w-10 text-xl",
+    md: "h-12 w-12 text-2xl",
+    lg: "h-16 w-16 text-4xl",
+    xl: "h-28 w-28 text-6xl",
+  };
+  return (
+    <span className={`field grid shrink-0 place-items-center rounded-full ${id ? fieldFor(id) : "f-meadow"} ${sizes[size]} ${className}`} aria-hidden>
+      {emoji}
+    </span>
   );
 }
 
 /* ---------- Layout ---------- */
 
-export function EmptyState({ title, body, action, icon }: { title: string; body: string; action?: ReactNode; icon?: ReactNode }) {
+export function PageHeader({ title, subtitle, leading, actions }: { title: ReactNode; subtitle?: ReactNode; leading?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="card dotted-bg flex flex-col items-start gap-3 border-dashed border-line-strong">
-      {icon ? <div className="tile h-12 w-12 text-2xl">{icon}</div> : null}
-      <div>
-        <h3 className="text-lg font-extrabold">{title}</h3>
-        <p className="mt-1 text-ink-soft">{body}</p>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-export function PageHeader({ eyebrow, title, description, actions, leading }: { eyebrow?: string; title: ReactNode; description?: string; actions?: ReactNode; leading?: ReactNode }) {
-  return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex items-start gap-4">
+    <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex min-w-0 items-center gap-4">
         {leading}
-        <div>
-          {eyebrow ? <p className="eyebrow mb-1.5">{eyebrow}</p> : null}
-          <h1 className="text-3xl font-black tracking-tight sm:text-4xl">{title}</h1>
-          {description ? <p className="mt-2 max-w-2xl text-ink-soft">{description}</p> : null}
+        <div className="min-w-0">
+          <h1 className="display text-[2.5rem] break-words sm:text-5xl">{title}</h1>
+          {subtitle ? <p className="mt-2 text-ink-soft">{subtitle}</p> : null}
         </div>
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
@@ -91,76 +107,94 @@ export function PageHeader({ eyebrow, title, description, actions, leading }: { 
   );
 }
 
-export function SectionTitle({ children, hint, actions }: { children: ReactNode; hint?: string; actions?: ReactNode }) {
-  return (
-    <div className="mb-3 flex items-end justify-between gap-3">
-      <div>
-        <h2 className="text-lg font-extrabold">{children}</h2>
-        {hint ? <p className="text-sm text-ink-soft">{hint}</p> : null}
-      </div>
-      {actions}
-    </div>
-  );
-}
-
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="mb-4 inline-flex items-center gap-1.5 text-sm font-bold text-ink-soft transition hover:text-brand-deep">
-      <ArrowLeft size={16} />
+    <Link href={href} className="press -ml-2 mb-3 inline-flex min-h-11 items-center gap-1 rounded-full pr-3 pl-2 font-semibold text-ink-soft">
+      <ArrowLeft size={18} />
       {children}
     </Link>
   );
 }
 
-export function Stat({ label, value, hint, icon, tone = "brand" }: { label: string; value: string | number; hint?: string; icon?: ReactNode; tone?: "brand" | "sun" | "sky" | "violet" }) {
-  const tones = {
-    brand: "bg-brand-soft text-brand-deep",
-    sun: "bg-sun-soft text-sun-deep",
-    sky: "bg-sky-soft text-sky",
-    violet: "bg-violet-soft text-violet",
-  };
-  return (
-    <div className="card flex items-start gap-3 py-4">
-      {icon ? <span className={`tile h-10 w-10 ${tones[tone]}`}>{icon}</span> : null}
-      <div className="min-w-0">
-        <p className="text-xs font-extrabold tracking-wider text-ink-soft uppercase">{label}</p>
-        <p className="mt-0.5 text-2xl font-black tabular-nums">{value}</p>
-        {hint ? <p className="text-xs text-ink-soft">{hint}</p> : null}
-      </div>
-    </div>
-  );
-}
-
 export function Notice({ tone = "info", children, action }: { tone?: "info" | "warning" | "error" | "success"; children: ReactNode; action?: ReactNode }) {
   const cls = {
-    info: "border-brand/25 bg-brand-tint text-ink",
-    warning: "border-sun/30 bg-sun-soft text-sun-deep",
-    error: "border-berry/25 bg-berry-soft text-berry",
-    success: "border-brand/25 bg-brand-soft text-brand-deep",
+    info: "bg-mist text-ink",
+    warning: "bg-spark-soft text-spark-deep",
+    error: "bg-berry-soft text-berry",
+    success: "bg-leaf-soft text-leaf-deep",
   }[tone];
   return (
-    <div className={`mb-6 flex flex-col gap-3 rounded-2xl border px-4 py-3.5 text-sm sm:flex-row sm:items-center sm:justify-between ${cls}`}>
-      <div className="flex items-center gap-3">
-        {tone === "info" ? <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-brand" aria-hidden /> : null}
-        {tone === "warning" ? <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-sun" aria-hidden /> : null}
-        <div>{children}</div>
-      </div>
+    <div role={tone === "error" ? "alert" : "status"} className={`mb-6 flex flex-col gap-3 rounded-2xl px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between ${cls}`}>
+      <div className="min-w-0 font-medium">{children}</div>
       {action}
     </div>
   );
 }
 
-/** Emoji avatar in a coloured tile. */
-export function Avatar({ emoji, size = "md", className = "" }: { emoji: string; size?: "sm" | "md" | "lg" | "xl"; className?: string }) {
-  const sizes = {
-    sm: "h-10 w-10 text-xl rounded-xl",
-    md: "h-12 w-12 text-2xl rounded-2xl",
-    lg: "h-16 w-16 text-4xl rounded-3xl",
-    xl: "h-24 w-24 text-6xl rounded-[1.75rem]",
-  };
+export function EmptyState({ emoji, title, body, action }: { emoji?: string; title: string; body?: string; action?: ReactNode }) {
   return (
-    <span className={`grid shrink-0 place-items-center bg-gradient-to-br from-sun-soft to-brand-soft ${sizes[size]} ${className}`} aria-hidden>
-      {emoji}
-    </span>
+    <div className="flex flex-col items-center px-6 py-14 text-center">
+      {emoji ? <span className="mb-4 text-6xl" aria-hidden>{emoji}</span> : null}
+      <h2 className="display text-3xl">{title}</h2>
+      {body ? <p className="mt-2 max-w-xs text-ink-soft">{body}</p> : null}
+      {action ? <div className="mt-6">{action}</div> : null}
+    </div>
   );
+}
+
+/** One row of a grouped list. Renders a link when `href` is set. */
+export function ListRow({
+  href,
+  leading,
+  title,
+  subtitle,
+  trailing,
+  chevron = !!href,
+}: {
+  href?: string;
+  leading?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  trailing?: ReactNode;
+  chevron?: boolean;
+}) {
+  const body = (
+    <>
+      {leading}
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold break-words">{title}</span>
+        {subtitle ? <span className="mt-0.5 block text-sm text-ink-soft">{subtitle}</span> : null}
+      </span>
+      {trailing}
+      {chevron ? <ChevronRight size={18} className="text-ink-faint" /> : null}
+    </>
+  );
+  return href ? (
+    <Link href={href} className="list-row">
+      {body}
+    </Link>
+  ) : (
+    <div className="list-row">{body}</div>
+  );
+}
+
+/** Same content as `ListRow`, for use as a `Sheet` trigger or other custom wrapper. */
+export function RowContent({ leading, title, subtitle, trailing }: { leading?: ReactNode; title: ReactNode; subtitle?: ReactNode; trailing?: ReactNode }) {
+  return (
+    <>
+      {leading}
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold break-words">{title}</span>
+        {subtitle ? <span className="mt-0.5 block text-sm text-ink-soft">{subtitle}</span> : null}
+      </span>
+      {trailing}
+      <ChevronRight size={18} className="text-ink-faint" />
+    </>
+  );
+}
+
+export function FormFeedback({ error, message }: { error?: string; message?: string }) {
+  if (error) return <p role="alert" className="rounded-2xl bg-berry-soft px-4 py-3 text-sm font-semibold text-berry">{error}</p>;
+  if (message) return <p role="status" className="rounded-2xl bg-leaf-soft px-4 py-3 text-sm font-semibold text-leaf-deep">{message}</p>;
+  return null;
 }

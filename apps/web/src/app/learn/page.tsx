@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ChildRow } from "@eco/db";
 import { enterChildMode } from "@/app/actions";
-import { Avatar } from "@/components/ui";
+import { EmptyState, fieldFor } from "@/components/ui";
 import { homeFor, requireAccount } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,34 +15,35 @@ export default async function LearnHome() {
   const { data } = await supabase.from("children").select("*").eq("kind", "child").eq("shared_device", true).order("created_at");
   const children = (data ?? []) as ChildRow[];
 
+  if (children.length === 0) {
+    return (
+      <EmptyState
+        emoji="🌱"
+        title="No one here yet"
+        body="Add a child in the grown-up area."
+        action={<Link href="/parent" className="btn-primary">Grown-up area</Link>}
+      />
+    );
+  }
+
   return (
-    <div className="py-8">
-      <p className="eyebrow mb-2 flex justify-center">Kid mode</p>
-      <h1 className="mb-10 text-center text-4xl font-black tracking-tight sm:text-5xl">Who is learning today?</h1>
-      {children.length === 0 ? (
-        <p className="text-center text-ink-soft">
-          No children on this device yet.{" "}
-          <Link href="/parent" className="link">
-            Add one in the grown-up area.
-          </Link>
-        </p>
-      ) : (
-        <ul className="mx-auto flex max-w-2xl flex-wrap justify-center gap-4">
-          {children.map((c, i) => {
-            const enter = enterChildMode.bind(null, c.id);
-            return (
-              <li key={c.id} className="animate-pop w-[calc(50%-0.5rem)] sm:w-44" style={{ animationDelay: `${i * 70}ms` }}>
-                <form action={enter}>
-                  <button type="submit" className="card card-hover flex w-full flex-col items-center gap-4 py-8 hover:border-brand/50 active:translate-y-0.5">
-                    <Avatar emoji={c.avatar} size="xl" />
-                    <span className="text-xl font-black">{c.display_name}</span>
-                  </button>
-                </form>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+    <div className="pt-6 sm:pt-12">
+      <h1 className="display text-center text-5xl sm:text-6xl">Who&apos;s learning?</h1>
+      <ul className={`mx-auto mt-10 grid max-w-2xl gap-4 ${children.length === 1 ? "max-w-[12rem] grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
+        {children.map((c, i) => {
+          const enter = enterChildMode.bind(null, c.id);
+          return (
+            <li key={c.id} className="animate-rise" style={{ animationDelay: `${i * 60}ms` }}>
+              <form action={enter}>
+                <button type="submit" className={`press field ${fieldFor(c.id)} flex aspect-[4/5] w-full flex-col items-center justify-center gap-4 rounded-[2rem]`}>
+                  <span className="text-7xl" aria-hidden>{c.avatar}</span>
+                  <span className="display text-2xl">{c.display_name}</span>
+                </button>
+              </form>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

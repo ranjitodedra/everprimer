@@ -26,7 +26,7 @@ export default async function SettingsPage(props: PageProps<"/parent/settings">)
   const stripeReady = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_PLUS && process.env.STRIPE_PRICE_MAX);
 
   return (
-    <>
+    <div className="mx-auto max-w-3xl">
       <PageHeader title="Settings" />
 
       {sp.checkout === "success" ? <Notice tone="success">Payment received. Credits show up as soon as Stripe confirms the invoice.</Notice> : null}
@@ -50,6 +50,6 @@ export default async function SettingsPage(props: PageProps<"/parent/settings">)
         portal={startPortal}
         setPin={setGrownupPin}
       />
-    </>
+    </div>
   );
 }

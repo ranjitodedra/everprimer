@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactBlueprint } from "@eco/contracts";
 import { ArtifactBlueprint as BlueprintSchema, isGameBlueprint, lintBlueprint, parseBlueprint } from "@eco/contracts";
-import { inlineAssets, normalizeGeneratedHtml, renderBlueprintHtml, validateArtifactHtml, validateHtmlAgainstBlueprint, withTouchGuards } from "./html";
+import { inlineAssets, normalizeGeneratedHtml, refreshPlayerHtml, renderBlueprintHtml, validateArtifactHtml, validateHtmlAgainstBlueprint, withTouchGuards } from "./html";
+import { PLAYER_CSS, PLAYER_SOURCE } from "./player";
 import { LEARNKIT_RUNTIME_SOURCE } from "./runtime";
 
 const bp: ArtifactBlueprint = {
@@ -191,5 +192,19 @@ describe("withTouchGuards", () => {
     expect(count(twice, `name="viewport"`)).toBe(1);
     expect(count(twice, "data-lk-touch")).toBe(1);
     expect(twice.indexOf("Content-Security-Policy")).toBeLessThan(twice.indexOf("data-lk-touch"));
+  });
+});
+
+describe("refreshPlayerHtml", () => {
+  it("swaps in the current player and keeps the blueprint, assets and theme", () => {
+    const fresh = renderBlueprintHtml(bp, [{ key: "pic", mime: "image/png", dataBase64: "AAAA" }]);
+    const stale = fresh.replace(PLAYER_CSS, ".old{}").replace(PLAYER_SOURCE, "/* old player */");
+    expect(stale).not.toContain(PLAYER_SOURCE);
+    expect(refreshPlayerHtml(stale)).toBe(fresh);
+  });
+
+  it("leaves generated documents alone", () => {
+    const html = "<!doctype html><html><head><style>body{}</style></head><body><script>1</script></body></html>";
+    expect(refreshPlayerHtml(html)).toBe(html);
   });
 });

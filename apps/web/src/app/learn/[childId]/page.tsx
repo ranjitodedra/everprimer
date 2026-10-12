@@ -6,8 +6,8 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
 import { GenerationProgress } from "@/components/generation-progress";
 import { GoalDialog } from "@/components/goal-dialog";
-import { ArrowRight, Check, Play, Sparkles, Wrench } from "@/components/icons";
-import { Avatar, ProgressRing } from "@/components/ui";
+import { Check, Play, Plus } from "@/components/icons";
+import { Avatar, Beads, EmptyState, fieldFor } from "@/components/ui";
 import { isKidMode, requireLearner } from "@/lib/auth";
 import { lessonFinished } from "@/lib/lesson-progress";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +19,10 @@ type Summary = {
   started: boolean;
   lastActivity: number;
 };
+
+function ready(s: Summary) {
+  return s.curriculum.status !== "generating" && s.total > 0;
+}
 
 export default async function ChildTopics(props: PageProps<"/learn/[childId]">) {
   const { childId } = await props.params;
@@ -61,113 +65,120 @@ export default async function ChildTopics(props: PageProps<"/learn/[childId]">) 
     .sort((a, b) => b.lastActivity - a.lastActivity);
 
   const anyGenerating = curriculumRows.some((cur) => cur.status === "generating");
+  const featured = summaries.find((s) => ready(s) && s.done < s.total) ?? summaries.find(ready);
+  const shelf = summaries.filter((s) => s !== featured);
+  const newGoal = setsOwnGoals ? createCurriculum.bind(null, c.id) : null;
 
   return (
-    <div className="py-2">
+    <div>
       {anyGenerating ? <AutoRefresh intervalMs={5000} /> : null}
       <BillingNotice code={billingCode(sp.billing)} audience={account.kind === "child" || kidMode ? "learner" : "grownup"} />
-      <div className="mb-8 flex items-center gap-3 sm:mb-10 sm:gap-4">
-        <Avatar emoji={c.avatar} size="lg" className="animate-float" />
-        <div className="min-w-0">
-          <h1 className="text-2xl font-black tracking-tight sm:text-4xl">Hi {c.display_name}!</h1>
-          <p className="text-ink-soft">{setsOwnGoals ? "Pick up where you left off, or set a new goal." : "Pick a topic to explore."}</p>
-        </div>
+
+      <div className="mt-2 mb-7 flex items-center gap-4">
+        <Avatar emoji={c.avatar} id={c.id} size="lg" />
+        <h1 className="display min-w-0 text-[2.75rem] break-words sm:text-6xl">Hi {c.display_name}</h1>
       </div>
 
-      {setsOwnGoals ? <NewGoal childId={c.id} /> : null}
-
       {summaries.length === 0 ? (
-        <div className="card dotted-bg py-12 text-center">
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-sun-soft text-3xl" aria-hidden>🌱</div>
-          <p className="text-lg font-extrabold">Nothing here yet</p>
-          <p className="text-ink-soft">{setsOwnGoals ? "Write your first learning goal above." : "Ask a grown-up to add a learning goal."}</p>
-        </div>
+        <EmptyState
+          emoji="🌱"
+          title="Nothing here yet"
+          body={setsOwnGoals ? "What do you want to learn?" : "Ask a grown-up to add something to learn."}
+          action={newGoal ? <GoalDialog action={newGoal} from="learn" self triggerClassName="btn-primary btn-lg" /> : null}
+        />
       ) : null}
 
-      <ul className="space-y-4">
-        {summaries.map((s, i) => (
-          <li key={s.curriculum.id} className="animate-rise" style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}>
-            {s.curriculum.status === "failed" && s.total === 0 ? (
-              <div className="card flex items-center gap-4">
-                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-sun-soft text-sun-deep" aria-hidden>
-                  <Wrench size={22} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-extrabold">{s.curriculum.title || s.curriculum.goal_text}</span>
-                  <span className="block text-sm text-ink-soft">Could not be set up. A grown-up can try again.</span>
-                </span>
-              </div>
-            ) : s.curriculum.status === "generating" || s.total === 0 ? (
-              <div className="card flex items-center gap-4">
-                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-violet-soft text-violet">
-                  <Sparkles size={22} className="animate-pulse" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-extrabold">{s.curriculum.title || "Getting ready…"}</span>
-                  <span className="block text-sm text-ink-soft">Your topic is being prepared.</span>
-                  {s.curriculum.status === "generating" ? (
-                    <GenerationProgress kind="curriculum" stage={s.curriculum.stage} stageAt={s.curriculum.stage_at} retrying={!!s.curriculum.error} size="compact" className="mt-2" />
-                  ) : null}
-                </span>
-              </div>
-            ) : (
-              <TopicCard childId={c.id} summary={s} featured={i === 0} />
-            )}
-          </li>
-        ))}
-      </ul>
+      {featured ? <Featured childId={c.id} summary={featured} /> : null}
+
+      {shelf.length || newGoal ? (
+        <section className="mt-8" aria-label="More to learn">
+          {featured ? <h2 className="mb-3 font-semibold text-ink-soft">More to explore</h2> : null}
+          <ul className="shelf">
+            {shelf.map((s) => (
+              <li key={s.curriculum.id}>
+                <Book childId={c.id} summary={s} />
+              </li>
+            ))}
+            {newGoal && summaries.length > 0 ? (
+              <li>
+                <GoalDialog
+                  action={newGoal}
+                  from="learn"
+                  self
+                  triggerClassName="press flex h-56 w-40 flex-col items-center justify-center gap-3 rounded-[1.75rem] border-2 border-dashed border-mist-deep font-semibold text-ink-soft"
+                  trigger={
+                    <>
+                      <span className="grid h-12 w-12 place-items-center rounded-full bg-mist text-ink">
+                        <Plus size={22} />
+                      </span>
+                      New goal
+                    </>
+                  }
+                />
+              </li>
+            ) : null}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
 
-function NewGoal({ childId }: { childId: string }) {
-  const create = createCurriculum.bind(null, childId);
-  return (
-    <div className="mb-6">
-      <GoalDialog action={create} from="learn" self intro="Write it the way you would say it. Pick how deep to go." />
-    </div>
-  );
-}
-
-function TopicCard({ childId, summary, featured }: { childId: string; summary: Summary; featured: boolean }) {
+function Featured({ childId, summary }: { childId: string; summary: Summary }) {
   const { curriculum, total, done, started } = summary;
-  const allDone = done === total;
+  const allDone = done >= total;
   const label = allDone ? "All done" : started ? "Keep going" : "New";
-  const href = `/learn/${childId}/curricula/${curriculum.id}`;
+  return (
+    <Link
+      href={`/learn/${childId}/curricula/${curriculum.id}`}
+      className={`press field ${fieldFor(curriculum.id)} animate-rise relative flex min-h-[19rem] flex-col justify-between overflow-hidden rounded-[2rem] p-6 sm:min-h-[22rem] sm:p-8`}
+    >
+      <div>
+        <p className="font-semibold opacity-75">{label}</p>
+        <h2 className="display mt-2 max-w-lg text-[2.5rem] sm:text-6xl">{curriculum.title}</h2>
+      </div>
+      <div className="mt-8 flex items-end justify-between gap-6">
+        <Beads done={done} total={total} className="max-w-[60%]" />
+        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-(--field-ink) text-(--field) shadow-[0_10px_24px_-8px_rgb(0_0_0/0.35)]" aria-hidden>
+          {allDone ? <Check size={28} /> : <Play size={26} className="ml-1" />}
+        </span>
+      </div>
+    </Link>
+  );
+}
 
-  if (featured) {
+function Book({ childId, summary }: { childId: string; summary: Summary }) {
+  const { curriculum, total, done } = summary;
+  const base = "flex h-56 w-40 flex-col justify-between rounded-[1.75rem] p-4";
+
+  if (curriculum.status === "failed" && total === 0) {
     return (
-      <Link
-        href={href}
-        className="group relative flex items-center gap-4 overflow-hidden rounded-3xl bg-brand p-5 text-white shadow-lift transition hover:-translate-y-0.5 sm:gap-6 sm:p-6"
-      >
-        <span className="pointer-events-none absolute -top-20 -right-12 h-48 w-48 rounded-full bg-white/10" aria-hidden />
-        <span className="pointer-events-none absolute -bottom-28 right-36 h-40 w-40 rounded-full bg-sun/15" aria-hidden />
-        <span className="relative grid h-16 w-16 shrink-0 place-items-center rounded-full bg-white/15">
-          <span className="text-sm font-black tabular-nums">{done}/{total}</span>
+      <div className={`${base} bg-mist text-ink-soft`}>
+        <span className="text-3xl" aria-hidden>🛠️</span>
+        <span>
+          <span className="block leading-tight font-semibold text-ink">{curriculum.title || curriculum.goal_text}</span>
+          <span className="mt-1 block text-sm">A grown-up can try again.</span>
         </span>
-        <span className="relative min-w-0 flex-1">
-          <span className="mb-0.5 block text-xs font-black tracking-widest text-white/75 uppercase">{label}</span>
-          <span className="block text-xl leading-tight font-black sm:text-2xl">{curriculum.title}</span>
-          {curriculum.description ? <span className="mt-1 line-clamp-1 block text-sm text-white/80">{curriculum.description}</span> : null}
-        </span>
-        <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-brand-deep shadow-soft transition group-hover:scale-105" aria-hidden>
-          {allDone ? <Check size={20} /> : <Play size={20} />}
-        </span>
-      </Link>
+      </div>
     );
   }
-
+  if (!ready(summary)) {
+    return (
+      <div className={`${base} field ${fieldFor(curriculum.id)} opacity-80`}>
+        <span className="animate-breathe text-3xl" aria-hidden>✨</span>
+        <span>
+          <span className="block leading-tight font-semibold">{curriculum.status === "generating" ? "Getting ready" : curriculum.title}</span>
+          {curriculum.status === "generating" ? (
+            <GenerationProgress kind="curriculum" stage={curriculum.stage} stageAt={curriculum.stage_at} retrying={!!curriculum.error} size="compact" className="mt-2" />
+          ) : null}
+        </span>
+      </div>
+    );
+  }
   return (
-    <Link href={href} className="card card-hover flex items-center gap-4 border-2">
-      <ProgressRing value={total ? done / total : 0} size={56} stroke={6}>
-        <span className="text-xs font-black tabular-nums text-brand-deep">{done}/{total}</span>
-      </ProgressRing>
-      <span className="min-w-0 flex-1">
-        <span className="block text-lg leading-tight font-extrabold">{curriculum.title}</span>
-        <span className="mt-0.5 block text-sm text-ink-soft">{label}</span>
-      </span>
-      <ArrowRight size={18} className="text-ink-faint" />
+    <Link href={`/learn/${childId}/curricula/${curriculum.id}`} className={`press ${base} field ${fieldFor(curriculum.id)}`}>
+      <Beads done={done} total={total} size="sm" />
+      <span className="display text-[1.375rem] leading-[1.05]">{curriculum.title}</span>
     </Link>
   );
 }
