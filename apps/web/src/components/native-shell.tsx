@@ -24,7 +24,7 @@ export function NativeShell() {
       document.documentElement.classList.add("native-app");
       await StatusBar.setStyle({ style: Style.Dark });
       if (Capacitor.getPlatform() === "android") {
-        await StatusBar.setBackgroundColor({ color: "#f8f5ee" });
+        await StatusBar.setBackgroundColor({ color: "#ffffff" });
       }
       await SplashScreen.hide();
 

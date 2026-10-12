@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LEARNKIT_PROTOCOL_VERSION, LearnKitMessage, type HostInitMessage, type LearningEvent } from "@eco/contracts";
+import { Star } from "@/components/icons";
+import { SheetPanel, closeSheet, openSheet } from "@/components/sheet";
 import { newId } from "@/lib/uuid";
 
 interface Props {
@@ -34,9 +36,16 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
   const inFlightRef = useRef(false);
   const followRef = useRef(false);
   const followKeepaliveRef = useRef(false);
-  const [height, setHeight] = useState(720);
   const [completed, setCompleted] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const done = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!completed) return;
+    // Let the lesson's own score screen land before offering the way out.
+    const t = setTimeout(() => openSheet(done), 1800);
+    return () => clearTimeout(t);
+  }, [completed]);
 
   const flush = useCallback(
     // Recursive self-call after a follow-up batch; the compiler cannot memoize it.
@@ -121,13 +130,8 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
       const parsed = LearnKitMessage.safeParse(e.data);
       if (!parsed.success) return;
       const msg = parsed.data;
+      // The frame fills the screen and the lesson scrolls inside it, so resize messages are ignored.
       if (msg.kind === "ready") sendInit();
-      else if (msg.kind === "resize") {
-        // No slack: the artifact measures its own content, and anything we add
-        // here is re-measured on the next tick and grows the frame forever.
-        const next = Math.max(480, Math.min(4000, Math.ceil(msg.height)));
-        setHeight((prev) => (Math.abs(prev - next) > 4 ? next : prev));
-      }
       else if (msg.kind === "event") {
         if (msg.nonce !== nonce) return;
         enqueue(msg.event);
@@ -152,31 +156,33 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
   }, [artifactId, enqueue, flush, nonce, sendInit]);
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-lift">
-        <iframe
-          ref={iframeRef}
-          title={title}
-          srcDoc={html}
-          sandbox="allow-scripts"
-          referrerPolicy="no-referrer"
-          loading="eager"
-          onLoad={sendInit}
-          style={{ height }}
-          className="block w-full border-0"
-        />
-      </div>
-      <div className="flex items-center justify-between gap-3 px-1 text-xs font-bold text-ink-soft" aria-live="polite">
-        <span className="inline-flex items-center gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${saveState === "saving" ? "animate-pulse bg-sun" : saveState === "error" ? "bg-berry" : "bg-brand"}`} aria-hidden />
-          {saveState === "saving" ? "Saving progress…" : saveState === "error" ? "Progress will save when you're back online." : "Progress saves automatically."}
-        </span>
-        {completed ? (
-          <Link href={backHref} className="btn-primary animate-pop">
-            Back to path
-          </Link>
+    <div className="relative min-h-0 flex-1 pb-[env(safe-area-inset-bottom,0px)]">
+      <iframe
+        ref={iframeRef}
+        title={title}
+        srcDoc={html}
+        sandbox="allow-scripts"
+        referrerPolicy="no-referrer"
+        loading="eager"
+        onLoad={sendInit}
+        className="block h-full w-full border-0"
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-4" aria-live="polite">
+        {saveState === "error" ? (
+          <p className="animate-rise rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">Progress will save when you&apos;re back online.</p>
         ) : null}
       </div>
+
+      <SheetPanel ref={done} title="Lesson done">
+        <div className="flex flex-col items-center pb-2 text-center">
+          <span className="animate-pop grid h-24 w-24 place-items-center rounded-full bg-spark-soft text-spark" aria-hidden>
+            <Star size={48} />
+          </span>
+          <p className="mt-5 text-lg text-ink-soft">That one is in the bag.</p>
+          <Link href={backHref} className="btn-primary btn-lg mt-7 w-full">Back to path</Link>
+          <button type="button" onClick={() => closeSheet(done)} className="btn-ghost mt-2 w-full">Stay here</button>
+        </div>
+      </SheetPanel>
     </div>
   );
 }

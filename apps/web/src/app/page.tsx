@@ -4,7 +4,7 @@ import { getAccount, homeFor } from "@/lib/auth";
 import { Landing } from "./landing";
 
 export const metadata: Metadata = {
-  title: { absolute: "Everprimer — Lessons that grow around your child." },
+  title: { absolute: "Everprimer: learning, written for one child" },
 };
 
 export default async function Home(props: PageProps<"/">) {

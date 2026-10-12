@@ -2,16 +2,25 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ageFromBirth } from "@eco/contracts";
 import type { ChildRow, CurriculumRow, MemoryRow, PersonalizationRow, TopicProgressRow, TopicRow } from "@eco/db";
-import { createCurriculum, enterChildMode, removeContext, removeMemory, setLearnerBirth } from "@/app/actions";
-import { Book, Chart, ChevronRight, Play, Sparkles, X } from "@/components/icons";
+import { createCurriculum, removeContext, removeMemory, setLearnerBirth } from "@/app/actions";
+import { Chart, ChevronRight, X } from "@/components/icons";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
 import { GoalDialog } from "@/components/goal-dialog";
-import { Avatar, EmptyState, PageHeader, ProgressRing, SectionTitle, StatusBadge } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
+import { Avatar, BackLink, ProgressLine, RowContent, StatusBadge, fieldFor } from "@/components/ui";
 import { requireGrownup } from "@/lib/auth";
 import { lessonFinished } from "@/lib/lesson-progress";
 import { createClient } from "@/lib/supabase/server";
 import { BirthdayCard } from "./birthday-card";
 import { ChildAccess } from "./child-access";
+
+const MEMORY_LABEL: Record<MemoryRow["kind"], string> = {
+  interest: "Interest",
+  preference: "Preference",
+  strength: "Strength",
+  misconception: "Mix-up",
+  analogy_that_worked: "Comparison that clicked",
+};
 
 export default async function ChildPage(props: PageProps<"/parent/children/[childId]">) {
   await requireGrownup();
@@ -41,141 +50,132 @@ export default async function ChildPage(props: PageProps<"/parent/children/[chil
     : { data: [] };
   const topicsByCurriculum = new Map<string, string[]>();
   for (const t of (topics ?? []) as Pick<TopicRow, "id" | "curriculum_id">[]) topicsByCurriculum.set(t.curriculum_id, [...(topicsByCurriculum.get(t.curriculum_id) ?? []), t.id]);
-  const scopeLabel: Record<CurriculumRow["scope"], string> = { overview: "Quick overview", hobby: "For fun", exam: "Test prep", mastery: "Deep mastery" };
   const progressByTopic = new Map(progressRows.map((p) => [p.topic_id, p]));
-
-  const completed = progressRows.filter((p) => p.status === "completed").length;
   const needsReview = progressRows.filter((p) => p.status === "needs_review").length;
-  const meta = [age ? `Age ${age}` : "Age not set", c.reading_level ? `${c.reading_level.replace("_", " ")} reader` : null].filter(Boolean).join(" · ");
 
-  const enter = enterChildMode.bind(null, c.id);
   const saveBirth = setLearnerBirth.bind(null, c.id);
   const newCurriculum = createCurriculum.bind(null, c.id);
-  const memoryLabel: Record<MemoryRow["kind"], string> = {
-    interest: "Interest",
-    preference: "Preference",
-    strength: "Strength",
-    misconception: "Misconception",
-    analogy_that_worked: "Analogy",
-  };
+  const memoryCount = context.length + remembered.length;
 
   return (
     <>
       <BillingNotice code={billingCode(sp.billing)} audience="grownup" />
-      <PageHeader
-        eyebrow={isSelf ? "Your learning" : "Child"}
-        leading={<Avatar emoji={c.avatar} size="lg" className="mt-1" />}
-        title={c.display_name}
-        description={`${meta} · ${completed} topic${completed === 1 ? "" : "s"} completed${needsReview ? ` · ${needsReview} to review` : ""}`}
-        actions={
-          <>
-            <Link href={`/parent/children/${c.id}/report`} className="btn-secondary">
-              <Chart size={16} />
-              Daily summary
-            </Link>
-            {isSelf ? (
-              <Link href={`/learn/${c.id}`} className="btn-primary">
-                <Play size={14} />
-                Start learning
-              </Link>
-            ) : c.shared_device ? (
-              <form action={enter}>
-                <button type="submit" className="btn-primary">
-                  <Play size={14} />
-                  Open kid mode
-                </button>
-              </form>
-            ) : null}
-          </>
-        }
-      />
+      {isSelf ? null : <BackLink href="/parent">Family</BackLink>}
 
-      <div className="flex w-full flex-col gap-6">
-          <section>
-            <SectionTitle hint="Every goal becomes an ordered set of lessons.">Curricula</SectionTitle>
-            {curriculumRows.length === 0 ? (
-              <EmptyState icon={<Book size={22} />} title="No curriculum yet" body="Describe what you'd like them to learn and we'll turn it into an ordered set of lessons." />
-            ) : (
-              <ul className="space-y-3">
-                {curriculumRows.map((cur) => {
-                  const ids = topicsByCurriculum.get(cur.id) ?? [];
-                  const done = ids.filter((id) => lessonFinished(progressByTopic.get(id))).length;
-                  const pct = ids.length ? done / ids.length : 0;
-                  return (
-                    <li key={cur.id}>
-                      <Link href={`/parent/curricula/${cur.id}`} className="card card-hover flex items-center gap-4">
-                        <ProgressRing value={pct} size={52} stroke={5}>
-                          <span className="text-xs font-black tabular-nums text-brand-deep">{ids.length ? `${done}/${ids.length}` : "…"}</span>
-                        </ProgressRing>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-extrabold">{cur.title || "Preparing…"}</h3>
-                            <StatusBadge status={cur.status} />
-                          </div>
-                          <p className="mt-0.5 line-clamp-2 text-sm text-ink-soft">{cur.description || cur.goal_text}</p>
-                          <p className="mt-1 text-xs font-bold text-ink-faint">
-                            {scopeLabel[cur.scope]}
-                            {cur.interest ? ` · examples from ${cur.interest}` : ""}
-                          </p>
-                        </div>
-                        <ChevronRight size={18} className="text-ink-faint" />
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+      <header className="mb-8 flex items-center gap-4 sm:gap-5">
+        <Avatar emoji={c.avatar} id={c.id} size="xl" className="max-sm:h-20 max-sm:w-20 max-sm:text-5xl" />
+        <div className="min-w-0 flex-1">
+          <h1 className="display text-[2.5rem] break-words sm:text-6xl">{isSelf ? "Your progress" : c.display_name}</h1>
+          <p className="mt-1 text-ink-soft">
+            {age ? `${age} years old` : "Age not set"}
+            {needsReview ? `, ${needsReview} to review` : ""}
+          </p>
+        </div>
+      </header>
 
-          <GoalDialog action={newCurriculum} self={isSelf} />
+      <Link href={`/parent/children/${c.id}/report`} className="press mb-10 flex items-center gap-4 rounded-[1.5rem] bg-leaf-soft px-5 py-4 text-leaf-deep">
+        <Chart size={22} />
+        <span className="flex-1 font-semibold">{isSelf ? "Today's summary" : `How ${c.display_name} did today`}</span>
+        <ChevronRight size={18} />
+      </Link>
 
-          {isSelf ? null : <ChildAccess childId={c.id} sharedDevice={c.shared_device} username={(login?.username as string | undefined) ?? null} />}
-          <BirthdayCard action={saveBirth} birthMonth={c.birth_month} birthYear={c.birth_year} age={age} />
-          <section className="card">
-            <div className="mb-1 flex items-center gap-2">
-              <Sparkles size={16} className="text-brand" />
-              <h2 className="font-extrabold">Remembered</h2>
+      <section aria-labelledby="learning_title">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 id="learning_title" className="display text-2xl">Learning</h2>
+          {curriculumRows.length ? <GoalDialog action={newCurriculum} self={isSelf} triggerClassName="btn-primary btn-sm" /> : null}
+        </div>
+        {curriculumRows.length === 0 ? (
+          <div className="flex flex-col items-center rounded-[1.5rem] bg-mist px-6 py-10 text-center">
+            <p className="max-w-xs text-ink-soft">{isSelf ? "What do you want to learn?" : `What should ${c.display_name} learn? Any topic works.`}</p>
+            <div className="mt-5">
+              <GoalDialog action={newCurriculum} self={isSelf} triggerClassName="btn-primary btn-lg" />
             </div>
-            <p className="mb-4 text-sm text-ink-soft">
-              Background for planning lessons: things you told us earlier, plus notes Plus and Max keep after each lesson. They shape the next lesson, not ones already published. Learners never see this list.
-            </p>
-            <ul className="mb-1 space-y-2">
-              {remembered.length === 0 && context.length === 0 ? <li className="text-sm text-ink-faint">Nothing yet.</li> : null}
-              {context.map((item) => {
-                const remove = removeContext.bind(null, c.id, item.id);
-                return (
-                  <li key={item.id} className="flex items-start gap-2 rounded-xl bg-paper-deep px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold tracking-wide text-ink-faint uppercase">{item.kind === "interest" ? "You told us: likes" : "You told us"}</p>
-                      <p className="text-sm font-semibold">{item.value}</p>
-                    </div>
-                    <form action={remove}>
-                      <button type="submit" aria-label={`Remove ${item.value}`} className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-black/10">
-                        <X size={14} />
-                      </button>
-                    </form>
-                  </li>
-                );
-              })}
-              {remembered.map((item) => {
-                const remove = removeMemory.bind(null, c.id, item.id);
-                return (
-                  <li key={item.id} className="flex items-start gap-2 rounded-xl bg-paper-deep px-3 py-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold tracking-wide text-ink-faint uppercase">{memoryLabel[item.kind]}</p>
-                      <p className="text-sm font-semibold">{item.value}</p>
-                    </div>
-                    <form action={remove}>
-                      <button type="submit" aria-label={`Remove ${item.value}`} className="grid h-7 w-7 place-items-center rounded-full transition hover:bg-black/10">
-                        <X size={14} />
-                      </button>
-                    </form>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-      </div>
+          </div>
+        ) : (
+          <ul className="list-group">
+            {curriculumRows.map((cur) => {
+              const ids = topicsByCurriculum.get(cur.id) ?? [];
+              const done = ids.filter((id) => lessonFinished(progressByTopic.get(id))).length;
+              const settled = cur.status === "ready";
+              return (
+                <li key={cur.id}>
+                  <Link href={`/parent/curricula/${cur.id}`} className="list-row">
+                    <RowContent
+                      leading={<span className={`field ${fieldFor(cur.id)} h-10 w-2 shrink-0 rounded-full`} aria-hidden />}
+                      title={cur.status === "generating" || !cur.title ? cur.goal_text : cur.title}
+                      subtitle={
+                        ids.length && settled ? (
+                          <span className="mt-2 flex items-center gap-3 text-leaf">
+                            <ProgressLine value={done / ids.length} className="max-w-40" />
+                            <span className="shrink-0 text-ink-soft tabular-nums">{done} of {ids.length}</span>
+                          </span>
+                        ) : (
+                          <span className="mt-1 block">
+                            <StatusBadge status={cur.status} />
+                          </span>
+                        )
+                      }
+                    />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-10" aria-labelledby="about_title">
+        <h2 id="about_title" className="display mb-3 text-2xl">{isSelf ? "About you" : `About ${c.display_name}`}</h2>
+        <ul className="list-group">
+          <li>
+            <BirthdayCard action={saveBirth} birthMonth={c.birth_month} birthYear={c.birth_year} age={age} />
+          </li>
+          {isSelf ? null : (
+            <li>
+              <ChildAccess childId={c.id} sharedDevice={c.shared_device} username={(login?.username as string | undefined) ?? null} />
+            </li>
+          )}
+          <li>
+            <Sheet
+              triggerClassName="list-row w-full text-left"
+              trigger={<RowContent title="What Everprimer remembers" trailing={<span className="text-ink-soft tabular-nums">{memoryCount}</span>} />}
+              title="Remembered"
+            >
+              <p className="-mt-2 mb-5 text-ink-soft">
+                What shapes the next lessons: things you told us and notes from past lessons. {isSelf ? "" : "Children never see this."}
+              </p>
+              {memoryCount === 0 ? (
+                <p className="rounded-[1.25rem] bg-mist px-4 py-6 text-center text-ink-soft">Nothing yet.</p>
+              ) : (
+                <ul className="list-group">
+                  {context.map((item) => (
+                    <MemoryItem key={item.id} label={item.kind === "interest" ? "You said they like" : "You told us"} value={item.value} remove={removeContext.bind(null, c.id, item.id)} />
+                  ))}
+                  {remembered.map((item) => (
+                    <MemoryItem key={item.id} label={MEMORY_LABEL[item.kind]} value={item.value} remove={removeMemory.bind(null, c.id, item.id)} />
+                  ))}
+                </ul>
+              )}
+            </Sheet>
+          </li>
+        </ul>
+      </section>
     </>
+  );
+}
+
+function MemoryItem({ label, value, remove }: { label: string; value: string; remove: () => Promise<void> }) {
+  return (
+    <li className="list-row">
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold break-words">{value}</span>
+        <span className="block text-sm text-ink-soft">{label}</span>
+      </span>
+      <form action={remove}>
+        <button type="submit" aria-label={`Forget ${value}`} className="btn-ghost btn-icon -mr-2 text-ink-soft">
+          <X size={16} />
+        </button>
+      </form>
+    </li>
   );
 }

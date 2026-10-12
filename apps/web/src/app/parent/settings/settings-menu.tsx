@@ -1,8 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import type { FormState } from "@/app/actions";
-import { X } from "@/components/icons";
+import { signOut, type FormState } from "@/app/actions";
+import { Check, LogOut } from "@/components/icons";
+import { PinField } from "@/components/pin-field";
+import { SheetPanel, closeSheet, openSheet } from "@/components/sheet";
+import { FormFeedback, ListRow, RowContent } from "@/components/ui";
 import { PLANS, formatPrice, planFor, type PlanId } from "@/lib/plans";
 
 export type SettingsBilling = {
@@ -20,7 +23,7 @@ function periodLabel(billing: SettingsBilling): string | null {
   if (Number.isNaN(date.getTime())) return null;
   const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
   if (billing.cancelAtPeriodEnd || billing.subscriptionStatus === "canceled") return `Access through ${formatted}`;
-  if (billing.subscriptionStatus === "past_due") return `Payment past due · period ends ${formatted}`;
+  if (billing.subscriptionStatus === "past_due") return `Payment past due. Period ends ${formatted}`;
   return `Renews ${formatted}`;
 }
 
@@ -48,148 +51,111 @@ export function SettingsMenu({
   setPin: (prev: FormState, formData: FormData) => Promise<FormState>;
 }) {
   const plan = planFor(billing.tier);
-  const used = Math.max(0, plan.credits - billing.creditBalance);
   const when = periodLabel(billing);
   const open = isOpenSubscription(billing.subscriptionStatus);
-  const subscriptionRef = useRef<HTMLDialogElement>(null);
-  const pinRef = useRef<HTMLDialogElement>(null);
+  const plans = useRef<HTMLDialogElement>(null);
+  const pin = useRef<HTMLDialogElement>(null);
   const [pinState, pinAction, pinPending] = useActionState<FormState, FormData>(setPin, {});
-  const pinTitle = hasPin ? "Change PIN" : "Set a PIN";
 
   useEffect(() => {
-    if (pinState.message) pinRef.current?.close();
+    if (pinState.message) closeSheet(pin);
   }, [pinState]);
 
   return (
-    <div>
-      {pinState.message ? <p role="status" className="mb-4 rounded-xl border border-brand/25 bg-brand-soft px-3 py-2 text-sm font-bold text-brand-deep">{pinState.message}</p> : null}
+    <div className="space-y-8">
+      {pinState.message ? <FormFeedback message={pinState.message} /> : null}
 
-      <div className="flex w-full flex-col gap-4">
-        <section className="card">
-          <h2 className="text-lg font-extrabold">Profile</h2>
-          <p className="mt-1 text-sm break-all text-ink-soft">{email || "No email"}</p>
-        </section>
-        <section className="card">
-          <h2 className="text-lg font-extrabold">Usage</h2>
-          <p className="mt-1 text-sm text-ink-soft">{billing.creditBalance} left · {used} used</p>
-        </section>
-        <section className="card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-extrabold">Subscription</h2>
-              <p className="mt-1 text-sm text-ink-soft">
-                {plan.name}
-                {when ? ` · ${when}` : ""}
-              </p>
-            </div>
-            <button type="button" className="btn-secondary shrink-0" onClick={() => subscriptionRef.current?.showModal()}>
-              View plans
-            </button>
-          </div>
-        </section>
-        {showPin ? (
-          <section className="card">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg font-extrabold">PIN</h2>
-                <p className="mt-1 text-sm text-ink-soft">{hasPin ? "On. Used to leave kid mode on a shared device." : "Not set. Kid mode needs one to keep children out of this area."}</p>
-              </div>
-              <button type="button" className="btn-secondary shrink-0" onClick={() => pinRef.current?.showModal()}>
-                {hasPin ? "Change PIN" : "Set PIN"}
-              </button>
-            </div>
-          </section>
-        ) : null}
-      </div>
+      <ul className="list-group">
+        <li>
+          <ListRow title="Signed in as" subtitle={<span className="break-all">{email || "No email"}</span>} />
+        </li>
+      </ul>
 
-      <dialog
-        ref={subscriptionRef}
-        aria-labelledby="subscription_title"
-        className="card m-auto max-h-[calc(100%-2rem)] w-[calc(100%-1.5rem)] max-w-3xl overflow-y-auto text-ink backdrop:bg-ink/40 sm:w-[calc(100%-2rem)]"
-        onClick={(e) => {
-          if (e.target === subscriptionRef.current) subscriptionRef.current?.close();
-        }}
-      >
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 id="subscription_title" className="text-lg font-extrabold">{plan.name}</h2>
-            <p className="text-sm text-ink-soft">
-              {billing.creditBalance} of {plan.credits} lesson credits left
-              {when ? ` · ${when}` : ""}
-            </p>
-          </div>
-          <button type="button" className="btn-ghost shrink-0" aria-label="Close" onClick={() => subscriptionRef.current?.close()}>
-            <X size={18} />
+      <ul className="list-group">
+        <li>
+          <button type="button" className="list-row w-full text-left" onClick={() => openSheet(plans)}>
+            <RowContent
+              title="Plan"
+              subtitle={`${billing.creditBalance} of ${plan.credits} lessons left${when ? `. ${when}` : ""}`}
+              trailing={<span className="font-semibold text-ink-soft">{plan.name}</span>}
+            />
           </button>
-        </div>
-        {billing.hasCustomer && stripeReady ? (
-          <form action={portal} className="mb-4">
-            <button type="submit" className="btn-secondary w-full sm:w-auto">Manage billing</button>
-          </form>
+        </li>
+        {showPin ? (
+          <li>
+            <button type="button" className="list-row w-full text-left" onClick={() => openSheet(pin)}>
+              <RowContent
+                title="Grown-up PIN"
+                subtitle={hasPin ? "Needed to leave kid mode" : "Set one before using kid mode"}
+                trailing={<span className={`font-semibold ${hasPin ? "text-leaf" : "text-spark-deep"}`}>{hasPin ? "On" : "Off"}</span>}
+              />
+            </button>
+          </li>
         ) : null}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+      </ul>
+
+      <form action={signOut}>
+        <ul className="list-group">
+          <li>
+            <button type="submit" className="list-row w-full text-left font-semibold text-berry">
+              <LogOut size={18} />
+              Sign out
+            </button>
+          </li>
+        </ul>
+      </form>
+
+      <SheetPanel ref={plans} title="Plans" wide>
+        <p className="-mt-2 mb-5 text-ink-soft">
+          {billing.creditBalance} of {plan.credits} lessons left this month{when ? `. ${when}` : "."}
+        </p>
+        <ul className="grid gap-3 lg:grid-cols-3">
           {(Object.keys(PLANS) as PlanId[]).map((id) => {
             const item = PLANS[id];
             const current = item.id === plan.id;
             return (
-              <article key={id} className={`rounded-2xl border p-4 ${current ? "border-brand bg-brand-soft/40" : "border-line bg-paper"}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-lg font-black">{item.name}</h3>
-                  {current ? <span className="badge bg-brand text-white">Current</span> : null}
+              <li key={id} className={`flex flex-col rounded-[1.25rem] px-5 py-5 ${current ? "bg-leaf-soft text-leaf-deep" : "bg-mist"}`}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="display text-2xl">{item.name}</h3>
+                  <p className="font-semibold">{item.price === 0 ? formatPrice(0) : `${formatPrice(item.price)} a month`}</p>
                 </div>
-                <p className="mt-1 text-sm font-extrabold">{item.price === 0 ? formatPrice(0) : `${formatPrice(item.price)}/month`}</p>
-                <ul className="mt-3 space-y-1 text-sm text-ink-soft">
-                  <li>{item.credits} lesson credits a month</li>
-                  <li>Gemini lessons</li>
-                  <li>{item.regenerate ? "Regenerate a lesson" : "New lessons from your credits"}</li>
-                  <li>{item.childCap === 1 ? "1 child profile" : `Up to ${item.childCap} child profiles`}</li>
+                <ul className="mt-3 flex-1 space-y-1.5 text-sm">
+                  <li>{item.credits} lessons a month</li>
+                  <li>{item.childCap === 1 ? "1 child" : `Up to ${item.childCap} children`}</li>
+                  {item.regenerate ? <li>Rewrite any lesson</li> : null}
                 </ul>
-                {current || item.id === "free" || !stripeReady ? null : (
+                {current ? (
+                  <p className="mt-4 inline-flex items-center gap-1.5 font-semibold">
+                    <Check size={16} />
+                    Your plan
+                  </p>
+                ) : item.id === "free" || !stripeReady ? null : (
                   <form action={checkout.bind(null, item.id)} className="mt-4">
                     <button type="submit" className="btn-primary w-full">{open ? `Switch to ${item.name}` : `Get ${item.name}`}</button>
                   </form>
                 )}
-              </article>
+              </li>
             );
           })}
-        </div>
-        {stripeReady ? null : <p className="mt-4 text-sm text-ink-soft">Checkout turns on after the Stripe price and secret keys are set.</p>}
-      </dialog>
+        </ul>
+        {billing.hasCustomer && stripeReady ? (
+          <form action={portal} className="mt-5">
+            <button type="submit" className="btn-ghost w-full">Billing and invoices</button>
+          </form>
+        ) : null}
+        {stripeReady ? null : <p className="mt-5 text-sm text-ink-faint">Checkout turns on once the Stripe keys are set.</p>}
+      </SheetPanel>
 
       {showPin ? (
-        <dialog
-          ref={pinRef}
-          aria-labelledby="pin_title"
-          className="card m-auto w-[calc(100%-1.5rem)] max-w-md text-ink backdrop:bg-ink/40 sm:w-[calc(100%-2rem)]"
-          onClick={(e) => {
-            if (e.target === pinRef.current) pinRef.current?.close();
-          }}
-        >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 id="pin_title" className="text-lg font-extrabold">{pinTitle}</h2>
-            <button type="button" className="btn-ghost shrink-0" aria-label="Close" onClick={() => pinRef.current?.close()}>
-              <X size={18} />
-            </button>
-          </div>
-          <p className="mb-4 text-sm text-ink-soft">Needed to leave kid mode on a shared device. Forgot it? Sign out and sign back in with your password.</p>
-          <form action={pinAction} className="space-y-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="pin" className="label">{hasPin ? "New PIN" : "PIN"}</label>
-                <input id="pin" name="pin" type="password" inputMode="numeric" pattern="\d{4,6}" required className="input tracking-[0.3em]" placeholder="4–6 digits" />
-              </div>
-              <div>
-                <label htmlFor="confirm" className="label">Repeat PIN</label>
-                <input id="confirm" name="confirm" type="password" inputMode="numeric" pattern="\d{4,6}" required className="input tracking-[0.3em]" placeholder="Again" />
-              </div>
-            </div>
-            {pinState.error ? <p role="alert" className="rounded-xl border border-berry/25 bg-berry-soft px-3 py-2 text-sm font-bold text-berry">{pinState.error}</p> : null}
-            <div className="flex flex-wrap justify-end gap-2 pt-2">
-              <button type="button" className="btn-ghost" onClick={() => pinRef.current?.close()}>Cancel</button>
-              <button type="submit" disabled={pinPending} className="btn-primary">{hasPin ? "Change PIN" : "Save PIN"}</button>
-            </div>
+        <SheetPanel ref={pin} title={hasPin ? "Change PIN" : "Set a PIN"}>
+          <p className="-mt-2 mb-5 text-ink-soft">Kids need it to leave kid mode. Forgot it? Sign out and back in with your password.</p>
+          <form action={pinAction} className="space-y-4">
+            <PinField id="pin" name="pin" label={hasPin ? "New PIN" : "PIN"} autoComplete="new-password" showLabel />
+            <PinField id="confirm" name="confirm" label="Again" autoComplete="new-password" showLabel />
+            <FormFeedback error={pinState.error} />
+            <button type="submit" disabled={pinPending} className="btn-primary btn-lg w-full">{pinPending ? "Saving…" : "Save PIN"}</button>
           </form>
-        </dialog>
+        </SheetPanel>
       ) : null}
     </div>
   );

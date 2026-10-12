@@ -1,24 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { Star } from "@/components/icons";
 import { EverprimerMark, Wordmark } from "@/components/logo";
 import { PLANS, formatPrice } from "@/lib/plans";
-
-const STEPS = [
-  {
-    title: "Set a goal",
-    body: "Share their age, what they already know, and something they won’t stop talking about.",
-  },
-  {
-    title: "They play the lesson",
-    body: "Short bites, then a short test. They can stop after a session and pick it up later.",
-  },
-  {
-    title: "You see what stuck",
-    body: "Each objective gets a clear result. Replaying a lesson you already have is free.",
-  },
-] as const;
 
 const PLANS_LIST = [PLANS.free, PLANS.paid, PLANS.max] as const;
 
@@ -28,214 +14,263 @@ function loginHref(mode: "signin" | "signup", next?: string) {
   return `/login?${params}`;
 }
 
-function learnerLine(childCap: number) {
-  return childCap === 1 ? "1 learner" : `Up to ${childCap} learners`;
-}
-
 export function Landing({ next }: { next?: string }) {
   const signIn = loginHref("signin", next);
   const signUp = loginHref("signup", next);
 
   return (
-    <div className="kid-sky flex min-h-[100svh] flex-1 flex-col">
-      <a
-        href="#start"
-        className="absolute top-3 left-3 z-50 -translate-y-24 rounded-full bg-ink px-4 py-3 text-sm font-extrabold text-white focus-visible:translate-y-0"
-      >
+    <div className="flex min-h-svh flex-1 flex-col">
+      <a href="#start" className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-3 focus:text-white">
         Skip to content
       </a>
 
-      <header className="px-4 pt-[max(0.75rem,env(safe-area-inset-top,0px))] sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <Link href="/" className="flex min-h-11 min-w-0 items-center gap-2.5 rounded-full pr-2">
-            <EverprimerMark className="h-10 w-10" />
-            <Wordmark className="truncate text-xl sm:text-2xl" />
+      <header className="px-5 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between">
+          <Link href="/" className="press flex items-center gap-2 rounded-full pr-2">
+            <EverprimerMark className="h-9 w-9" />
+            <Wordmark className="text-xl" />
           </Link>
-          <nav aria-label="Page" className="flex items-center gap-1 sm:gap-2">
-            <a href="#how" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-extrabold text-ink-soft hover:text-ink md:inline-flex">
-              How it works
-            </a>
-            <a href="#plans" className="hidden min-h-11 items-center rounded-full px-3 text-sm font-extrabold text-ink-soft hover:text-ink md:inline-flex">
-              Plans
-            </a>
-            <Link href={signIn} className="btn-ghost min-h-11 px-3 text-sm">
-              Sign in
-            </Link>
-            <Link href={signUp} className="btn-primary hidden sm:inline-flex">
-              Create free account
-            </Link>
-          </nav>
+          <Link href={signIn} className="btn-ghost btn-sm -mr-2">
+            Sign in
+          </Link>
         </div>
       </header>
 
-      <main id="start" className="flex-1">
-        <section className="px-4 pt-8 pb-14 sm:px-6 sm:pt-12 md:pt-16 md:pb-20 lg:px-8 lg:pt-20 lg:pb-24">
-          <div className="mx-auto grid w-full max-w-6xl items-start gap-10 md:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] md:gap-8 lg:items-center lg:gap-16">
-            <div className="min-w-0 max-w-xl">
-              <h1 className="text-[2rem] leading-[1.08] font-black tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.02]">
-                Lessons that grow around your child.
-              </h1>
-              <p className="mt-4 max-w-[42rem] text-base leading-relaxed text-ink sm:text-lg">
-                Tell Everprimer their age, what they already know, and what they won’t stop talking about. It builds a lesson they can play, then shows you what stuck.
-              </p>
-              <div className="mt-7 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link href={signUp} className="btn-primary btn-lg w-full sm:w-auto">
-                  Create free account
-                </Link>
-                <Link href={signIn} className="btn-secondary btn-lg w-full sm:w-auto">
-                  I already have an account
-                </Link>
-              </div>
-              <p className="mt-4 max-w-[36rem] text-sm leading-relaxed text-ink-soft">
-                Free includes {PLANS.free.credits} lesson credits. A paid plan can be canceled any time. A real person answers if something goes wrong.
-              </p>
+      <main id="start" className="flex-1 px-5">
+        <section className="mx-auto grid w-full max-w-6xl items-center gap-10 pt-8 pb-16 md:grid-cols-[1fr_minmax(0,26rem)] md:gap-12 md:pt-16 md:pb-28 lg:gap-24">
+          <div className="max-w-xl">
+            <h1 className="display text-[3.25rem] sm:text-7xl lg:text-[5.5rem]">Learning, written for one child.</h1>
+            <p className="mt-5 max-w-md text-lg text-ink-soft sm:text-xl">Tell us what they love. Any topic becomes a lesson they play.</p>
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <Link href={signUp} className="btn-primary btn-lg">
+                Start free
+              </Link>
+              <span className="text-sm text-ink-soft">{PLANS.free.credits} free lessons every month</span>
             </div>
-            <ExampleLesson />
           </div>
+          <Demo />
         </section>
 
-        <section id="how" className="scroll-mt-8 px-4 py-14 sm:px-6 md:py-20 lg:px-8 lg:py-24">
-          <div className="mx-auto w-full max-w-6xl">
-            <h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl">How a lesson gets made</h2>
-            <p className="mt-3 max-w-[40rem] text-base leading-relaxed text-ink sm:text-lg">
-              A grown-up 13 or older can also make lessons for themselves. Parents add the children they look after.
-            </p>
-            <ol className="mt-8 grid gap-4 md:mt-10 md:grid-cols-3 md:gap-5">
-              {STEPS.map((step, index) => (
-                <li key={step.title} className="card flex gap-4 md:flex-col md:gap-5">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-soft text-lg font-black text-brand-deep tabular-nums">
-                    {index + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-black">{step.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-ink sm:text-base">{step.body}</p>
-                  </div>
+        <WhatStuck />
+
+        <section className="mx-auto w-full max-w-6xl pt-4 pb-20 md:pb-28">
+          <details className="group">
+            <summary className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-3">
+              <h2 className="display text-4xl sm:text-5xl">Free to start.</h2>
+              <span className="btn-secondary btn-sm">
+                <span className="group-open:hidden">See plans</span>
+                <span className="hidden group-open:inline">Hide plans</span>
+              </span>
+            </summary>
+            <ul className="animate-rise mt-8 grid gap-3 sm:grid-cols-3">
+              {PLANS_LIST.map((plan) => (
+                <li key={plan.id} className={`rounded-3xl p-6 ${plan.id === "paid" ? "bg-ink text-white" : "bg-mist"}`}>
+                  <p className="font-semibold">{plan.name}</p>
+                  <p className="display mt-3 text-5xl tabular-nums">
+                    {formatPrice(plan.price)}
+                    {plan.price > 0 ? <span className="ml-1 font-sans text-base font-medium tracking-normal opacity-70">a month</span> : null}
+                  </p>
+                  <p className="mt-4 opacity-80">{plan.credits} lessons a month</p>
+                  <p className="opacity-80">{plan.childCap === 1 ? "1 learner" : `Up to ${plan.childCap} learners`}</p>
                 </li>
               ))}
-            </ol>
-          </div>
-        </section>
-
-        <section id="plans" className="scroll-mt-8 px-4 py-14 sm:px-6 md:py-20 lg:px-8 lg:py-24">
-          <div className="mx-auto w-full max-w-6xl">
-            <h2 className="max-w-xl text-3xl font-black tracking-tight sm:text-4xl">Start free. Add credits when you need them.</h2>
-            <p className="mt-3 max-w-[42rem] text-base leading-relaxed text-ink sm:text-lg">
-              A credit is one new lesson, or one new set of topics. Credits refresh each month and do not roll over. Every account starts on Free, and you change plans in settings.
-            </p>
-            <div className="mt-8 grid items-stretch gap-4 md:mt-10 md:grid-cols-3 md:gap-5">
-              {PLANS_LIST.map((plan) => {
-                const featured = plan.id === "paid";
-                return (
-                  <article
-                    key={plan.id}
-                    className={`card flex h-full flex-col ${featured ? "ring-2 ring-brand" : ""}`}
-                  >
-                    <div className="min-h-7">
-                      {featured ? <p className="text-xs font-extrabold text-sun-deep">A good next step</p> : null}
-                    </div>
-                    <h3 className="text-xl font-black">{plan.name}</h3>
-                    <p className="mt-3 font-black tracking-tight text-ink tabular-nums">
-                      <span className="text-4xl">{formatPrice(plan.price)}</span>
-                      {plan.price > 0 ? <span className="ml-1 text-base font-bold text-ink-soft">/month</span> : null}
-                    </p>
-                    <ul className="mt-5 grid flex-1 content-start gap-2.5 text-sm leading-snug text-ink sm:text-base">
-                      <li>{plan.credits} credits each month</li>
-                      <li>{learnerLine(plan.childCap)}</li>
-                      <li>{plan.regenerate ? "Rebuild a published lesson" : "Replay published lessons"}</li>
-                    </ul>
-                    <Link href={signUp} className={`${featured ? "btn-primary" : "btn-secondary"} mt-6 w-full`}>
-                      Create free account
-                    </Link>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        <section className="px-4 pt-4 pb-[max(3.5rem,env(safe-area-inset-bottom,0px))] sm:px-6 md:pb-24 lg:px-8">
-          <div className="mx-auto grid w-full max-w-6xl gap-8 md:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] md:items-end lg:gap-16">
-            <div className="max-w-xl">
-              <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Try it with the free credits.</h2>
-              <p className="mt-3 text-base leading-relaxed text-ink sm:text-lg">
-                A 2024 study of 76 kindergarten children found that results depended on the teaching method and the child’s age. Interactive touchscreen learning beat video on some measures for the younger children.
-              </p>
-              <div className="mt-7 flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap">
-                <Link href={signUp} className="btn-primary btn-lg w-full sm:w-auto">
-                  Create free account
-                </Link>
-                <Link href={signIn} className="btn-secondary btn-lg w-full sm:w-auto">
-                  I already have an account
-                </Link>
-              </div>
-            </div>
-            <p className="text-sm leading-relaxed text-ink-soft md:pb-1">
-              If something goes wrong, a real person answers. Published lessons stay playable if a paid plan ends.
-            </p>
-          </div>
+            </ul>
+            <p className="mt-4 text-sm text-ink-soft">A credit makes one new lesson or one new set of topics. Lessons you already have replay for free.</p>
+          </details>
         </section>
       </main>
+
+      <footer className="px-5 pb-[max(2rem,env(safe-area-inset-bottom,0px))]">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 border-t border-line pt-6 text-sm text-ink-soft">
+          <span className="flex items-center gap-2">
+            <EverprimerMark className="h-6 w-6" />
+            Everprimer
+          </span>
+          <Link href={signUp} className="link">
+            Start free
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }
 
-const ANSWERS = [
-  { id: "magma", label: "Magma", correct: true },
-  { id: "lava", label: "Lava", correct: false },
-] as const;
+/* ---------- Live demo ---------- */
 
-type AnswerId = (typeof ANSWERS)[number]["id"];
+type InterestId = "dinosaurs" | "football" | "space";
+type Thing = "egg" | "pitch" | "pizza";
 
-function ExampleLesson() {
-  const [picked, setPicked] = useState<AnswerId | null>(null);
-  const feedback =
-    picked === "magma"
-      ? "That’s the one. Magma is melted rock still underground."
-      : picked === "lava"
-        ? "Lava is the name after it reaches the air. Underground, it is magma."
-        : "Tap an answer. The lesson checks it.";
+const INTERESTS: Record<InterestId, { label: string; emoji: string; field: string; thing: Thing; text: string }> = {
+  dinosaurs: {
+    label: "Dinosaurs",
+    emoji: "🦖",
+    field: "f-meadow",
+    thing: "egg",
+    text: "A T. rex shares one big egg with her baby. She cuts it into two equal parts. Each part is a half.",
+  },
+  football: {
+    label: "Football",
+    emoji: "⚽",
+    field: "f-sky",
+    thing: "pitch",
+    text: "Two teams share one pitch. The halfway line makes two equal parts. Each side is a half.",
+  },
+  space: {
+    label: "Space",
+    emoji: "🚀",
+    field: "f-lilac",
+    thing: "pizza",
+    text: "An astronaut shares one space pizza with a friend. Two equal slices. Each slice is a half.",
+  },
+};
+
+type Cut = "uneven" | "half" | "thirds";
+const CUTS: Cut[] = ["uneven", "half", "thirds"];
+const FEEDBACK: Record<Cut, string> = {
+  half: "Yes! Two equal parts.",
+  uneven: "Two parts, but one is bigger. Halves are the same size.",
+  thirds: "That makes three parts. A half is one of two.",
+};
+
+function Demo() {
+  const [interest, setInterest] = useState<InterestId>("dinosaurs");
+  const [picked, setPicked] = useState<Cut | null>(null);
+  const [stars, setStars] = useState<Set<InterestId>>(() => new Set());
+  const it = INTERESTS[interest];
+
+  const choose = (id: InterestId) => {
+    setInterest(id);
+    setPicked(null);
+  };
+  const answer = (cut: Cut) => {
+    setPicked(cut);
+    if (cut === "half") setStars((prev) => new Set(prev).add(interest));
+  };
 
   return (
-    <div className="animate-rise relative mx-auto w-full max-w-md md:max-w-none">
-      <div aria-hidden className="absolute inset-x-5 top-6 -bottom-3 rounded-[1.75rem] bg-sun-soft" />
-      <figure className="card relative p-5 shadow-lift sm:p-6">
-        <figcaption className="flex items-center justify-between gap-3 text-sm font-extrabold text-ink-soft">
-          <span>Example lesson</span>
-          <span className="tabular-nums">Age 7</span>
-        </figcaption>
-        <p className="mt-4 text-2xl font-black tracking-tight">Why a volcano erupts</p>
-        <p className="mt-3 text-base leading-relaxed text-ink">
-          Under the ground, rock gets so hot it melts. While it is still underground, that melted rock is called magma.
-        </p>
-        <fieldset className="mt-5 min-w-0 border-0 p-0">
-          <legend className="text-base font-extrabold text-ink">What is the melted rock called while it is still underground?</legend>
-          <div className="mt-3 grid gap-2.5">
-            {ANSWERS.map((answer) => {
-              const selected = picked === answer.id;
-              return (
-                <button
-                  key={answer.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => setPicked(answer.id)}
-                  className={`min-h-12 cursor-pointer rounded-2xl border px-4 text-left text-base font-extrabold transition-[transform,background-color,border-color,color] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] select-none active:scale-[0.98] ${
-                    selected
-                      ? answer.correct
-                        ? "border-brand bg-brand-soft text-brand-deep"
-                        : "border-sun-deep bg-sun-soft text-sun-deep"
-                      : "border-line-strong bg-paper text-ink hover:border-brand"
-                  }`}
-                >
-                  {answer.label}
-                </button>
-              );
-            })}
+    <div className={`${it.field} field -mx-5 px-5 pt-7 pb-10 transition-colors duration-500 md:mx-0 md:bg-transparent md:p-0 md:text-ink`}>
+      <div role="group" aria-label="What Maya loves" className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+        <span className="mb-1 w-full font-semibold opacity-75">Maya is 6 and loves</span>
+        {(Object.keys(INTERESTS) as InterestId[]).map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={interest === id}
+            onClick={() => choose(id)}
+            className={`press inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-[0.9375rem] font-semibold transition-colors sm:px-4 sm:text-base ${
+              interest === id ? "bg-(--field-ink) text-(--field)" : "bg-(--field-ink)/10 text-(--field-ink)"
+            }`}
+          >
+            <span aria-hidden>{INTERESTS[id].emoji}</span>
+            {INTERESTS[id].label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 md:mt-5 md:rounded-[3rem] md:bg-ink md:p-2.5 md:shadow-[0_40px_80px_-30px_rgb(20_61_39/0.55)]">
+        <figure className="field transition-colors duration-500 md:min-h-[38rem] md:rounded-[2.5rem] md:px-7 md:pt-7 md:pb-8" aria-label="Example lesson">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-1 gap-1.5" aria-hidden>
+              <span className="h-2 flex-1 rounded-full bg-current/50" />
+              <span className="h-2 flex-1 rounded-full bg-current" />
+              <span className="h-2 flex-1 rounded-full bg-current/15" />
+            </div>
+            <span className="inline-flex items-center gap-1 font-bold tabular-nums" aria-label={`${stars.size} stars`}>
+              <Star size={18} className="text-spark" />
+              <span key={stars.size} className="animate-pop">{stars.size}</span>
+            </span>
           </div>
-        </fieldset>
-        <p aria-live="polite" className="mt-3 min-h-12 text-sm leading-relaxed font-bold text-ink-soft">
-          {feedback}
-        </p>
-      </figure>
+
+          <div key={interest} className="mt-8">
+            <span className="animate-pop block text-7xl" aria-hidden>{it.emoji}</span>
+            <h2 className="display mt-5 text-[2.5rem]">Halves</h2>
+            <p className="animate-swap mt-3 text-lg leading-snug">{it.text}</p>
+          </div>
+
+          <fieldset className="mt-7 min-w-0">
+            <legend className="text-lg font-bold">Which {it.thing} is cut in half?</legend>
+            <div className="mt-3 grid grid-cols-3 gap-2.5">
+              {CUTS.map((cut) => {
+                const chosen = picked === cut;
+                return (
+                  <button
+                    key={cut}
+                    type="button"
+                    onClick={() => answer(cut)}
+                    aria-pressed={chosen}
+                    aria-label={cut === "half" ? "Two equal parts" : cut === "uneven" ? "Two different parts" : "Three parts"}
+                    className={`press grid aspect-square place-items-center rounded-3xl transition-colors ${
+                      chosen ? (cut === "half" ? "bg-(--field-ink) text-(--field)" : "bg-paper/80 ring-2 ring-(--field-ink)/40") : "bg-paper/55"
+                    }`}
+                  >
+                    <Shape thing={it.thing} cut={cut} />
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+          <p aria-live="polite" className="mt-4 min-h-14 text-lg leading-snug font-semibold">
+            {picked ? <span key={`${interest}-${picked}`} className="animate-swap block">{FEEDBACK[picked]}</span> : null}
+          </p>
+        </figure>
+      </div>
     </div>
+  );
+}
+
+function Shape({ thing, cut }: { thing: Thing; cut: Cut }) {
+  const id = useId();
+  const outline =
+    thing === "egg" ? <ellipse cx="50" cy="50" rx="31" ry="41" /> : thing === "pitch" ? <rect x="10" y="22" width="80" height="56" rx="6" /> : <circle cx="50" cy="50" r="40" />;
+  const lines =
+    cut === "half" ? (
+      <path d="M50 0V100" />
+    ) : cut === "uneven" ? (
+      <path d="M68 0V100" />
+    ) : (
+      <path d="M50 50V-10M50 50 112 86M50 50-12 86" />
+    );
+  return (
+    <svg viewBox="0 0 100 100" className="h-[72%] w-[72%]" aria-hidden>
+      <clipPath id={id}>{outline}</clipPath>
+      <g fill="currentColor" fillOpacity="0.16" stroke="none">{outline}</g>
+      <g clipPath={`url(#${id})`} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
+        {lines}
+      </g>
+      <g fill="none" stroke="currentColor" strokeWidth="4">{outline}</g>
+    </svg>
+  );
+}
+
+/* ---------- What stuck ---------- */
+
+function WhatStuck() {
+  return (
+    <section className="mx-auto grid w-full max-w-6xl items-center gap-10 py-16 md:grid-cols-2 md:gap-16 md:py-24">
+      <h2 className="display text-[3.25rem] sm:text-7xl">You see what stuck.</h2>
+      <figure className="rounded-[2rem] bg-mist p-6 sm:p-8" aria-label="Example summary for a grown-up">
+        <figcaption className="flex items-center gap-3">
+          <span className="field f-meadow grid h-11 w-11 place-items-center rounded-full text-2xl" aria-hidden>🦊</span>
+          <span className="font-semibold">Maya, today</span>
+        </figcaption>
+        <p className="mt-5 text-xl leading-snug font-medium">Maya finished Halves and got 7 of 8 right the first time.</p>
+        <ul className="mt-6 space-y-2.5">
+          <li className="flex items-center justify-between gap-4 rounded-2xl bg-paper px-4 py-3">
+            <span>Splits a shape into equal parts</span>
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-leaf">
+              <span className="h-2 w-2 rounded-full bg-leaf" aria-hidden />
+              Strong
+            </span>
+          </li>
+          <li className="flex items-center justify-between gap-4 rounded-2xl bg-paper px-4 py-3">
+            <span>Names one part as a half</span>
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold text-spark-deep">
+              <span className="h-2 w-2 rounded-full bg-spark" aria-hidden />
+              Growing
+            </span>
+          </li>
+        </ul>
+      </figure>
+    </section>
   );
 }

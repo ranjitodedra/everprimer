@@ -2,14 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { randomBytes } from "node:crypto";
+import type { ReactNode } from "react";
 import type { ArtifactBlueprint } from "@eco/contracts";
 import type { ChildRow, TopicRow } from "@eco/db";
 import { retryTopicGeneration } from "@/app/actions";
-import { withTouchGuards } from "@eco/learnkit";
+import { refreshPlayerHtml, withTouchGuards } from "@eco/learnkit";
 import { ArtifactPlayer } from "@/components/artifact-player";
-import { ArrowLeft } from "@/components/icons";
+import { ChevronRight, X } from "@/components/icons";
 import { BillingNotice, billingCode } from "@/components/billing-notice";
 import { GeneratingState } from "@/components/generating-state";
+import { fieldFor } from "@/components/ui";
 import { isKidMode, requireLearner } from "@/lib/auth";
 import { ensureArtifact, prewarmNextTopic } from "@/lib/jobs";
 import { createClient } from "@/lib/supabase/server";
@@ -32,69 +34,64 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
   const t = topic as TopicRow;
   const backHref = `/learn/${c.id}/curricula/${t.curriculum_id}`;
   const kid = account.kind === "child" || (await isKidMode());
+  const field = fieldFor(t.curriculum_id);
   const blocked = billingCode(sp.billing);
   if (blocked) {
     return (
-      <div className="py-4">
-        <TopicHeader title={t.title} backHref={backHref} />
+      <Immersive backHref={backHref} field={field}>
         <BillingNotice code={blocked} audience={kid ? "learner" : "grownup"} />
-      </div>
+      </Immersive>
     );
   }
 
   if (t.kind === "unit") {
-    const { data: parts } = await supabase.from("topics").select("id, title, description").eq("parent_topic_id", t.id).order("position");
+    const { data: parts } = await supabase.from("topics").select("id, title").eq("parent_topic_id", t.id).order("position");
     return (
-      <div className="py-4">
-        <TopicHeader title={t.title} backHref={backHref} />
-        <div className="card">
-          <p className="eyebrow mb-1">Big topic</p>
-          <h2 className="text-2xl font-black">{t.title}</h2>
-          <p className="mt-1 text-ink-soft">There is a lot to discover here, so it comes in parts. Start with the first one.</p>
-          <ol className="mt-5 space-y-3">
+      <Immersive backHref={backHref} field={field}>
+        <div className="w-full max-w-md">
+          <h1 className="display text-center text-5xl">{t.title}</h1>
+          <p className="mt-3 text-center opacity-75">This one comes in parts.</p>
+          <ol className="mt-8 space-y-2.5">
             {(parts ?? []).map((p, i) => (
               <li key={p.id as string}>
-                <Link href={`/learn/${c.id}/topics/${p.id as string}`} className="card card-hover flex items-center gap-4 border-2">
-                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-sm font-black text-white">{i + 1}</span>
-                  <span className="min-w-0">
-                    <span className="block font-extrabold">{p.title as string}</span>
-                    <span className="block text-sm text-ink-soft">{p.description as string}</span>
-                  </span>
+                <Link href={`/learn/${c.id}/topics/${p.id as string}`} className="press flex min-h-16 items-center gap-4 rounded-3xl bg-paper/60 px-4">
+                  <span className="display grid h-10 w-10 shrink-0 place-items-center rounded-full bg-(--field-ink) text-lg text-(--field)">{i + 1}</span>
+                  <span className="min-w-0 flex-1 font-semibold">{p.title as string}</span>
+                  <ChevronRight size={18} className="opacity-50" />
                 </Link>
               </li>
             ))}
           </ol>
         </div>
-      </div>
+      </Immersive>
     );
   }
 
   const artifact = await ensureArtifact(t.id);
   if (!artifact.ok) {
     return (
-      <div className="py-4">
-        <TopicHeader title={t.title} backHref={backHref} />
+      <Immersive backHref={backHref} field={field}>
         <BillingNotice code={artifact.error} audience={kid ? "learner" : "grownup"} />
-      </div>
+      </Immersive>
     );
   }
   const art = artifact.artifact;
-  const emoji = art?.blueprint ? (art.blueprint as ArtifactBlueprint).theme?.emoji : undefined;
+  const blueprint = art?.blueprint as ArtifactBlueprint | null | undefined;
+  const emoji = blueprint?.theme?.emoji;
 
   if (!art || art.status !== "published" || !art.html) {
     return (
-      <div className="py-4">
-        <TopicHeader title={t.title} backHref={backHref} />
+      <Immersive backHref={backHref} field={field}>
         <GeneratingState
           topicId={t.id}
-          emoji="✨"
+          emoji={emoji ?? "✨"}
           stage={art?.status === "generating" ? art.stage : null}
           stageAt={art?.status === "generating" ? art.stage_at : null}
           retrying={art?.status === "generating" && !!art.error}
           failed={art?.status === "failed" ? (art.error ?? "failed") : null}
           retry={retryTopicGeneration.bind(null, c.id, t.id)}
         />
-      </div>
+      </Immersive>
     );
   }
 
@@ -117,29 +114,41 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
     .maybeSingle();
   const startSession = Math.max(0, Number((progress as { sessions_completed?: number } | null)?.sessions_completed ?? 0));
 
+  const html = withTouchGuards(refreshPlayerHtml(art.html));
+  const background = blueprint?.theme?.background;
+
   return (
-    <div className="py-4">
-      <TopicHeader title={t.title} backHref={backHref} emoji={emoji} />
-      <ArtifactPlayer html={withTouchGuards(art.html)} sessionId={session.id as string} nonce={nonce} topicId={t.id} artifactId={art.id} title={t.title} backHref={backHref} startSession={startSession} />
+    <div className={`flex h-dvh flex-col overflow-hidden ${background && isDark(background) ? "text-white" : ""}`} style={background ? { background } : undefined}>
+      <div className="flex shrink-0 items-center px-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
+        <CloseLink href={backHref} />
+      </div>
+      <ArtifactPlayer html={html} sessionId={session.id as string} nonce={nonce} topicId={t.id} artifactId={art.id} title={t.title} backHref={backHref} startSession={startSession} />
     </div>
   );
 }
 
-function TopicHeader({ title, backHref, emoji }: { title: string; backHref: string; emoji?: string }) {
+function isDark(hex: string): boolean {
+  const n = hex.replace("#", "");
+  if (n.length !== 6) return false;
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16) / 255);
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b! < 0.45;
+}
+
+function CloseLink({ href }: { href: string }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <Link href={backHref} className="btn-secondary btn-sm">
-        <ArrowLeft size={15} />
-        Back to path
-      </Link>
-      <h1 className="flex min-w-0 items-center gap-2 text-base font-extrabold text-ink-soft">
-        {emoji ? (
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-card text-lg shadow-soft" aria-hidden>
-            {emoji}
-          </span>
-        ) : null}
-        <span className="truncate">{title}</span>
-      </h1>
+    <Link href={href} className="press grid h-11 w-11 place-items-center rounded-full bg-current/10" aria-label="Close lesson">
+      <X size={20} />
+    </Link>
+  );
+}
+
+function Immersive({ backHref, field, children }: { backHref: string; field: string; children: ReactNode }) {
+  return (
+    <div className={`field ${field} flex min-h-dvh flex-col`}>
+      <div className="flex shrink-0 items-center px-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
+        <CloseLink href={backHref} />
+      </div>
+      <main className="flex flex-1 flex-col items-center justify-center px-5 pb-[max(3rem,env(safe-area-inset-bottom,0px))]">{children}</main>
     </div>
   );
 }

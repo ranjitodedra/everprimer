@@ -45,7 +45,7 @@ export function GenerationProgress({
   return (
     <div className={`w-full ${className}`}>
       <div
-        className={`w-full overflow-hidden rounded-full bg-paper-deep ${compact ? "h-1.5" : "h-3"}`}
+        className={`w-full overflow-hidden rounded-full bg-current/15 ${compact ? "h-1" : "h-1.5"}`}
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -54,16 +54,13 @@ export function GenerationProgress({
         aria-label={kind === "curriculum" ? "Preparing lessons" : "Building lesson"}
       >
         <div
-          className={`h-full rounded-full transition-[width] duration-500 ease-out ${retrying ? "animate-pulse bg-sun" : "bg-gradient-to-r from-brand to-sun"}`}
+          className={`h-full rounded-full transition-[width] duration-500 ease-out ${retrying ? "animate-pulse bg-spark" : "bg-current"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className={`flex items-center justify-between gap-3 ${compact ? "mt-1 text-xs" : "mt-2 text-sm"}`}>
-        <span key={label} className={`animate-rise ${retrying ? "font-bold text-sun-deep" : "text-ink-soft"}`} aria-live="polite">
-          {label}
-        </span>
-        <span className="shrink-0 font-extrabold tabular-nums text-ink-faint">{pct}%</span>
-      </div>
+      <p key={label} className={`animate-swap ${compact ? "mt-1.5 text-xs" : "mt-3 text-sm"} ${retrying ? "font-semibold text-spark-deep" : "opacity-70"}`} aria-live="polite">
+        {label}
+      </p>
     </div>
   );
 }
