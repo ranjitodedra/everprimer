@@ -116,6 +116,23 @@ describe("playThroughLesson", () => {
   }, 40_000);
 });
 
+describe("library bite fallback", () => {
+  // The lesson model may pin a library artifact on an explore bite. In this
+  // test the host does not supply `library` to `renderBlueprintHtml`, so
+  // `collectLibraryRefs` yields the ref but `window.__LIBRARY__` is unset.
+  // The player's `tryLibraryBranch` must return null and fall through to the
+  // built-in parts visual, keeping the lesson finishable. A real-device test
+  // of the embedded path is listed in the Stage 4 completion notes.
+  it("falls back to the built-in visual when no library host options are supplied", async () => {
+    const libraryBp = JSON.parse(JSON.stringify(bp)) as typeof bp & { sections: Array<{ type: string; library?: unknown }> };
+    const explore = libraryBp.sections.find((s) => s.type === "explore")!;
+    explore.library = { artifactId: "solar-system", version: 1, params: {} };
+    const html = renderBlueprintHtml(libraryBp);
+    const result = await playThroughLesson(html, libraryBp);
+    expect(result.status, result.detail).toBe("passed");
+  }, 40_000);
+});
+
 describe("v3 game player", () => {
   it("plays a session lesson through to topic_completed", async () => {
     const { rockyGameBlueprint } = await import("../../contracts/src/testing");

@@ -196,3 +196,45 @@ describe("v3 game blueprint", () => {
     expect(lintBlueprint(bp).join("\n")).toMatch(/has no teaching bite/);
   });
 });
+
+describe("library reference on explore bites", () => {
+  function firstExplore(bp: ReturnType<typeof rockyGameBlueprint>): Record<string, unknown> {
+    const bite = bp.sessions[0]!.bites.find((b) => b.type === "explore");
+    if (!bite) throw new Error("fixture changed");
+    return bite as unknown as Record<string, unknown>;
+  }
+
+  it("blueprints without one still parse unchanged", () => {
+    for (const bp of [rockyGameBlueprint(), rockyPlanetsBlueprint()]) {
+      expect(parseBlueprint(structuredClone(bp))).toEqual(bp);
+    }
+  });
+
+  it("round-trips a pinned artifact and fills default params", () => {
+    const bp = rockyGameBlueprint();
+    firstExplore(bp).library = { artifactId: "solar-system-simulator", version: 3 };
+    const parsed = parseBlueprint(JSON.parse(JSON.stringify(bp)));
+    if (!isGameBlueprint(parsed)) throw new Error("expected game blueprint");
+    const bite = parsed.sessions[0]!.bites.find((b) => b.type === "explore");
+    expect(bite?.type === "explore" && bite.library).toEqual({ artifactId: "solar-system-simulator", version: 3, params: {} });
+    expect(lintBlueprint(parsed, { interests: ["dinosaurs"] })).toEqual([]);
+  });
+
+  it.each([
+    ["an id with capitals", { artifactId: "Solar", version: 1 }],
+    ["version 0", { artifactId: "solar-system-simulator", version: 0 }],
+    ["an object param value", { artifactId: "solar-system-simulator", version: 1, params: { planets: { a: 1 } } }],
+  ])("rejects %s", (_label, library) => {
+    const bp = rockyGameBlueprint();
+    firstExplore(bp).library = library;
+    expect(ArtifactBlueprint.safeParse(bp).success).toBe(false);
+  });
+
+  it("still requires the built-in visual as the fallback", () => {
+    const bp = rockyGameBlueprint();
+    const bite = firstExplore(bp);
+    bite.library = { artifactId: "solar-system-simulator", version: 3 };
+    delete bite.visual;
+    expect(ArtifactBlueprint.safeParse(bp).success).toBe(false);
+  });
+});

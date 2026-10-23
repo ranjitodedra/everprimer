@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { randomBytes } from "node:crypto";
 import type { ReactNode } from "react";
 import type { ArtifactBlueprint } from "@eco/contracts";
-import type { ChildRow, TopicRow } from "@eco/db";
+import type { ChildRow, LessonCharacterRow, ParentRow, TopicRow } from "@eco/db";
 import { retryTopicGeneration } from "@/app/actions";
 import { refreshPlayerHtml, withTouchGuards } from "@eco/learnkit";
 import { ArtifactPlayer } from "@/components/artifact-player";
@@ -14,7 +14,9 @@ import { GeneratingState } from "@/components/generating-state";
 import { fieldFor } from "@/components/ui";
 import { isKidMode, requireLearner } from "@/lib/auth";
 import { ensureArtifact, prewarmNextTopic } from "@/lib/jobs";
-import { createClient } from "@/lib/supabase/server";
+import { characterStatusOf, ensureCharacter } from "@/lib/lesson-art";
+import { liveTutorEntitled } from "@/lib/live-tutor";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -106,24 +108,42 @@ export default async function TopicPlayerPage(props: PageProps<"/learn/[childId]
 
   after(() => prewarmNextTopic(t.id));
 
-  const { data: progress } = await supabase
-    .from("topic_progress")
-    .select("sessions_completed")
-    .eq("child_id", c.id)
-    .eq("topic_id", t.id)
-    .maybeSingle();
+  const [{ data: progress }, characterResult, { data: owner }] = await Promise.all([
+    supabase.from("topic_progress").select("sessions_completed").eq("child_id", c.id).eq("topic_id", t.id).maybeSingle(),
+    supabase.from("lesson_characters").select("status, ready_at, seed, cutout").eq("topic_id", t.id).maybeSingle(),
+    // Child logins cannot read the parent row; access to the child was proven above.
+    createServiceClient().from("parents").select("tutor_enabled, live_tutor_allowed").eq("id", c.parent_id).maybeSingle(),
+  ]);
+  // Before migration 0010 the cutout column is missing; still show the stored poses.
+  let characterRow = characterResult.data;
+  if (characterResult.error) {
+    const fallback = await supabase.from("lesson_characters").select("status, ready_at, seed").eq("topic_id", t.id).maybeSingle();
+    characterRow = fallback.data ? { ...fallback.data, cutout: false } : null;
+  }
+  const liveTutor = liveTutorEntitled(owner as Pick<ParentRow, "tutor_enabled" | "live_tutor_allowed"> | null) === null;
+  // Lessons published before characters existed get one the first time they open; a due retry runs on open too.
+  if (!characterRow || characterRow.status === "queued") after(() => ensureCharacter(t.id));
+  const character = characterStatusOf(characterRow as Pick<LessonCharacterRow, "status" | "ready_at" | "seed" | "cutout"> | null);
   const startSession = Math.max(0, Number((progress as { sessions_completed?: number } | null)?.sessions_completed ?? 0));
 
   const html = withTouchGuards(refreshPlayerHtml(art.html));
   const background = blueprint?.theme?.background;
 
   return (
-    <div className={`flex h-dvh flex-col overflow-hidden ${background && isDark(background) ? "text-white" : ""}`} style={background ? { background } : undefined}>
-      <div className="flex shrink-0 items-center px-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
-        <CloseLink href={backHref} />
-      </div>
-      <ArtifactPlayer html={html} sessionId={session.id as string} nonce={nonce} topicId={t.id} artifactId={art.id} title={t.title} backHref={backHref} startSession={startSession} />
-    </div>
+    <ArtifactPlayer
+      html={html}
+      sessionId={session.id as string}
+      nonce={nonce}
+      topicId={t.id}
+      artifactId={art.id}
+      title={t.title}
+      backHref={backHref}
+      startSession={startSession}
+      background={background}
+      dark={background ? isDark(background) : false}
+      character={character}
+      liveTutor={liveTutor}
+    />
   );
 }
 

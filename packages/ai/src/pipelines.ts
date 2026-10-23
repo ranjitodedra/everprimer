@@ -31,7 +31,7 @@ import {
   type RecallCandidate,
 } from "./prompts";
 import { resolveModel, type AiTask, type Tier, type UsageRecord } from "./provider";
-import { dropBlank, modelSchema, schemaProblems } from "./schema";
+import { SERVER_OWNED_BLUEPRINT_FIELDS, coercePlanFields, dropBlank, modelSchema, schemaProblems, shortenChoiceIds } from "./schema";
 
 export interface PipelineMeta {
   provider: string;
@@ -239,7 +239,7 @@ export async function generateLessonPlan(input: LessonPlanInput): Promise<Lesson
       problems = [`the response could not be read: ${(err as Error).message}`];
       continue;
     }
-    const parsed = LessonPlan.safeParse(output);
+    const parsed = LessonPlan.safeParse(coercePlanFields(output));
     if (!parsed.success) {
       problems = schemaProblems(parsed.error);
       continue;
@@ -323,12 +323,25 @@ function framingInterests(learner: LearnerContext, plan: LessonPlan): string[] {
   return out;
 }
 
-function forceBlueprintFields(bp: GameBlueprint, input: BlueprintInput): GameBlueprint {
+/** Library artifacts are attached after search, never taken from the model. */
+function withoutLibraryRefs(sessions: GameBlueprint["sessions"]): GameBlueprint["sessions"] {
+  return sessions.map((s) => ({
+    ...s,
+    bites: s.bites.map((b) => {
+      if (b.type !== "explore" || !b.library) return b;
+      const { library: _dropped, ...rest } = b;
+      return rest;
+    }),
+  }));
+}
+
+export function forceBlueprintFields(bp: GameBlueprint, input: Pick<BlueprintInput, "topic" | "learner">): GameBlueprint {
   return {
     ...bp,
     schemaVersion: 3,
     topicSlug: input.topic.slug,
     audience: { age: input.learner.age, readingLevel: input.learner.readingLevel },
+    sessions: withoutLibraryRefs(bp.sessions),
   };
 }
 
@@ -366,10 +379,11 @@ export async function generateBlueprint(input: BlueprintInput): Promise<Blueprin
     });
 
   const usage: UsageRecord[] = [];
-  const schema = modelSchema(GameBlueprint);
+  const schema = modelSchema(GameBlueprint, { omit: SERVER_OWNED_BLUEPRINT_FIELDS });
   let problems: string[] = [];
   let blueprint: ArtifactBlueprint | null = null;
   let bestEffort: ArtifactBlueprint | null = null;
+  let bestEffortLint: string[] = [];
 
   for (let attempt = 0; attempt < 3 && !blueprint; attempt++) {
     const { system, prompt } = promptFor(problems);
@@ -381,7 +395,8 @@ export async function generateBlueprint(input: BlueprintInput): Promise<Blueprin
       continue;
     }
     // Shape-only schema for the model; bounds and patterns are enforced here.
-    const parsed = GameBlueprint.safeParse(dropBlank(output));
+    // Long choice ids are rewritten so a verbose Gemini reply still parses.
+    const parsed = GameBlueprint.safeParse(shortenChoiceIds(dropBlank(output)));
     if (!parsed.success) {
       problems = schemaProblems(parsed.error);
       continue;
@@ -389,10 +404,15 @@ export async function generateBlueprint(input: BlueprintInput): Promise<Blueprin
     const candidate = forceBlueprintFields(parsed.data, input);
     bestEffort = candidate;
     problems = lintBlueprintForPlan(candidate, plan, input.learner);
+    bestEffortLint = problems;
     if (problems.length === 0) blueprint = candidate;
   }
-  // Keep the last structurally valid attempt; its lint problems are recorded.
-  blueprint = blueprint ?? bestEffort;
+  // Keep the last structurally valid attempt; report *its* lint, not a later
+  // failed repair's schema errors.
+  if (!blueprint) {
+    blueprint = bestEffort;
+    problems = bestEffort ? bestEffortLint : problems;
+  }
   if (!blueprint) throw new Error(`blueprint did not match the schema: ${problems.join("; ")}`);
 
   // Independent review. Content-level critical or unsafe issues get one repair
@@ -409,7 +429,7 @@ export async function generateBlueprint(input: BlueprintInput): Promise<Blueprin
     } catch {
       output = null;
     }
-    const parsed = GameBlueprint.safeParse(dropBlank(output));
+    const parsed = GameBlueprint.safeParse(shortenChoiceIds(dropBlank(output)));
     if (parsed.success) {
       const repaired = forceBlueprintFields(parsed.data, input);
       // A repair that breaks the plan is not a repair.

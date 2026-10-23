@@ -1,0 +1,61 @@
+{
+  "$comment": "ADR-003 allowlist. See Docs/artifact-library/decisions/ADR-003-vendored-libraries.md. The actual files are not committed; `pnpm --filter @eco/library vendor:sync` downloads each tarball into packages/library/vendor/files/ and checks the integrity hash before writing.",
+  "lockVersion": 1,
+  "packages": [
+    {
+      "name": "three",
+      "version": "0.160.0",
+      "license": "MIT",
+      "tarball": "https://registry.npmjs.org/three/-/three-0.160.0.tgz",
+      "tarballIntegrity": null,
+      "files": ["build/three.module.js", "build/three.core.js", "examples/jsm/"]
+    },
+    {
+      "name": "three",
+      "version": "0.170.0",
+      "license": "MIT",
+      "tarball": "https://registry.npmjs.org/three/-/three-0.170.0.tgz",
+      "tarballIntegrity": null,
+      "files": ["build/three.module.js", "build/three.core.js", "examples/jsm/"]
+    },
+    {
+      "name": "matter-js",
+      "version": "0.19.0",
+      "license": "MIT",
+      "tarball": "https://registry.npmjs.org/matter-js/-/matter-js-0.19.0.tgz",
+      "tarballIntegrity": null,
+      "files": ["build/matter.min.js", "build/matter.js"]
+    },
+    {
+      "name": "gsap",
+      "version": "3.12.5",
+      "license": "Standard No Charge (not MIT)",
+      "licenseNotes": "Flagged in ADR-003 for Stage 13 (public API) legal review before any commercial redistribution.",
+      "tarball": "https://registry.npmjs.org/gsap/-/gsap-3.12.5.tgz",
+      "tarballIntegrity": null,
+      "files": ["dist/gsap.min.js", "dist/gsap.js"]
+    },
+    {
+      "name": "canvas-confetti",
+      "version": "1.9.2",
+      "license": "ISC",
+      "tarball": "https://registry.npmjs.org/canvas-confetti/-/canvas-confetti-1.9.2.tgz",
+      "tarballIntegrity": null,
+      "files": ["dist/confetti.browser.js", "dist/confetti.browser.min.js"],
+      "minifyAliases": {
+        "dist/confetti.browser.min.js": "dist/confetti.browser.js"
+      }
+    }
+  ],
+  "cdnjsFileMap": {
+    "$comment": "cdnjs flattens files, so each library needs its own file map back to the npm layout.",
+    "matter-js": {
+      "matter.min.js": "build/matter.min.js",
+      "matter.js": "build/matter.js"
+    },
+    "gsap": {
+      "gsap.min.js": "dist/gsap.min.js",
+      "gsap.js": "dist/gsap.js"
+    }
+  }
+}

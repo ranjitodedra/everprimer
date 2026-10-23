@@ -1,0 +1,621 @@
+[
+ {
+  "browser": "chromium",
+  "fa": "absent",
+  "cors": "cors",
+  "ready": true,
+  "akReadyOrigin": "null",
+  "timeout": false,
+  "akErrors": [],
+  "events": [
+   "probe_results",
+   "frame_tick"
+  ],
+  "ticks": 4,
+  "lastTick": {
+   "fps": 60,
+   "frames": 231,
+   "paused": false,
+   "heapMB": 17
+  },
+  "hostDropped": [
+   "wrong source window",
+   "wrong source window"
+  ],
+  "lessonDropped": [
+   "dropped: wrong source window {\"source\":\"artifactkit\",\"v\":1,\"kind\":\"ak-event\",\"nonce\":\"guess\",\"name\":\"planet_s"
+  ],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError",
+   "localStorage": "blocked:SecurityError",
+   "parentDocument": "blocked:SecurityError",
+   "topHref": "blocked:SecurityError",
+   "fetchSelf": "ok",
+   "fetchExternal": "blocked:TypeError",
+   "webgl2": true,
+   "windowOpen": "null"
+  },
+  "afterManualPause": [
+   {
+    "fps": 0,
+    "frames": 291,
+    "paused": true,
+    "heapMB": 17
+   },
+   {
+    "fps": 0,
+    "frames": 291,
+    "paused": true,
+    "heapMB": 17
+   }
+  ],
+  "afterResume": [
+   {
+    "fps": 60,
+    "frames": 372,
+    "paused": false,
+    "heapMB": 17
+   }
+  ],
+  "afterScrollAway": [
+   {
+    "fps": 0,
+    "frames": 423,
+    "paused": true,
+    "heapMB": 17
+   },
+   {
+    "fps": 0,
+    "frames": 423,
+    "paused": true,
+    "heapMB": 17
+   }
+  ],
+  "afterScrollBack": [
+   {
+    "fps": 60,
+    "frames": 516,
+    "paused": false,
+    "heapMB": 17
+   }
+  ],
+  "clickEvents": [
+   {
+    "planet": "none"
+   }
+  ],
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "three.module.js cookie=- origin=null site=cross-site dest=script mode=cors",
+   "data.json cookie=- origin=null site=cross-site dest=empty mode=cors"
+  ],
+  "consoleErrors": [
+   "Connecting to 'https://example.com/' violates the following Content Security Policy directive: \"connect-src 'self'\". The action has been blocked.",
+   "Fetch API cannot load https://example.com/. Refused to connect because it violates the document's Content Security Policy.",
+   "Blocked opening 'https://example.com/' in a new window because the request was made in a sandboxed frame whose 'allow-popups' permission is not set."
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "absent",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window",
+   "wrong source window"
+  ],
+  "lessonDropped": [
+   "dropped: wrong source window {\"source\":\"artifactkit\",\"v\":1,\"kind\":\"ak-event\",\"nonce\":\"guess\",\"name\":\"planet_s"
+  ],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "three.module.js cookie=- origin=null site=cross-site dest=script mode=cors"
+  ],
+  "consoleErrors": [
+   "Access to script at 'http://127.0.0.1:3100/spike-artifact/absent/nocors/three.module.js' from origin 'null' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the r",
+   "Failed to load resource: net::ERR_FAILED"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "none",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors 'none'\". The request has been blocked.\n",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors 'none'\". The request has been blocked.\n"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "none",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors 'none'\". The request has been blocked.\n",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors 'none'\". The request has been blocked.\n"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "app",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors http://localhost:3100\". The request has been blocked.\n",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors http://localhost:3100\". The request has been blocked.\n"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "app",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors http://localhost:3100\". The request has been blocked.\n",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors http://localhost:3100\". The request has been blocked.\n"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "star",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors *\". The request has been blocked. Note that '*' matches only URLs with network schemes ('htt",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors *\". The request has been blocked. Note that '*' matches only URLs with network schemes ('htt"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "fa": "star",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError"
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors *\". The request has been blocked. Note that '*' matches only URLs with network schemes ('htt",
+   "Framing 'http://127.0.0.1:3100/' violates the following Content Security Policy directive: \"frame-ancestors *\". The request has been blocked. Note that '*' matches only URLs with network schemes ('htt"
+  ]
+ },
+ {
+  "browser": "chromium",
+  "mode": "overlay",
+  "overlayMessages": [
+   "ak-ready"
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "absent",
+  "cors": "cors",
+  "ready": true,
+  "akReadyOrigin": "null",
+  "timeout": false,
+  "akErrors": [],
+  "events": [
+   "probe_results",
+   "frame_tick"
+  ],
+  "ticks": 4,
+  "lastTick": {
+   "fps": 30,
+   "frames": 113,
+   "paused": false,
+   "heapMB": null
+  },
+  "hostDropped": [
+   "wrong source window",
+   "wrong source window"
+  ],
+  "lessonDropped": [
+   "dropped: wrong source window {\"source\":\"artifactkit\",\"v\":1,\"kind\":\"ak-event\",\"nonce\":\"guess\",\"name\":\"planet_s"
+  ],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": {
+   "origin": "null",
+   "cookie": "blocked:SecurityError",
+   "localStorage": "blocked:SecurityError",
+   "parentDocument": "blocked:SecurityError",
+   "topHref": "blocked:SecurityError",
+   "fetchSelf": "blocked:TypeError",
+   "fetchExternal": "blocked:TypeError",
+   "webgl2": true,
+   "windowOpen": "null"
+  },
+  "afterManualPause": [
+   {
+    "fps": 0,
+    "frames": 142,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 142,
+    "paused": true,
+    "heapMB": null
+   }
+  ],
+  "afterResume": [
+   {
+    "fps": 31,
+    "frames": 185,
+    "paused": false,
+    "heapMB": null
+   }
+  ],
+  "afterScrollAway": [
+   {
+    "fps": 24,
+    "frames": 209,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 209,
+    "paused": true,
+    "heapMB": null
+   }
+  ],
+  "afterScrollBack": [
+   {
+    "fps": 31,
+    "frames": 265,
+    "paused": false,
+    "heapMB": null
+   }
+  ],
+  "clickEvents": [
+   {
+    "planet": "none"
+   }
+  ],
+  "artifactRequests": [
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "three.module.js cookie=- origin=null site=cross-site dest=script mode=cors"
+  ],
+  "consoleErrors": [
+   "Refused to connect to http://127.0.0.1:3100/spike-artifact/absent/cors/data.json because it does not appear in the connect-src directive of the Content Security Policy.",
+   "Blocked by Content Security Policy.",
+   "Failed to load resource: Blocked by Content Security Policy.",
+   "Refused to connect to https://example.com/ because it does not appear in the connect-src directive of the Content Security Policy.",
+   "Blocked opening 'https://example.com/' in a new window because the request was made in a sandboxed frame whose 'allow-popups' permission is not set."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "absent",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window",
+   "wrong source window"
+  ],
+  "lessonDropped": [
+   "dropped: wrong source window {\"source\":\"artifactkit\",\"v\":1,\"kind\":\"ak-event\",\"nonce\":\"guess\",\"name\":\"planet_s"
+  ],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "three.module.js cookie=- origin=null site=cross-site dest=script mode=cors"
+  ],
+  "consoleErrors": [
+   "Origin null is not allowed by Access-Control-Allow-Origin. Status code: 200",
+   "Failed to load resource: Origin null is not allowed by Access-Control-Allow-Origin. Status code: 200"
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "none",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/none/cors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/none/cors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "none",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/none/nocors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/none/nocors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "app",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/app/cors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/app/cors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "app",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/app/nocors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/app/nocors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "star",
+  "cors": "cors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/star/cors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/star/cors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "fa": "star",
+  "cors": "nocors",
+  "ready": false,
+  "timeout": false,
+  "akErrors": [],
+  "events": [],
+  "ticks": 0,
+  "lastTick": null,
+  "hostDropped": [
+   "wrong source window"
+  ],
+  "lessonDropped": [],
+  "lessonProbes": {
+   "origin": "null",
+   "cookie": ""
+  },
+  "probes": null,
+  "artifactRequests": [
+   "index.html cookie=- origin=- site=cross-site dest=iframe mode=navigate",
+   "rogue.html cookie=- origin=- site=cross-site dest=iframe mode=navigate"
+  ],
+  "consoleErrors": [
+   "Refused to load http://127.0.0.1:3100/spike-artifact/star/nocors/index.html because it does not appear in the frame-ancestors directive of the Content Security Policy.",
+   "Refused to load http://127.0.0.1:3100/spike-artifact/star/nocors/rogue.html because it does not appear in the frame-ancestors directive of the Content Security Policy."
+  ]
+ },
+ {
+  "browser": "webkit",
+  "mode": "overlay",
+  "overlayMessages": [
+   "ak-ready"
+  ]
+ }
+]

@@ -10,7 +10,7 @@ export type ChildAccount = { kind: "child"; user: User; childId: string };
 export type AdultAccount = { kind: ParentRow["kind"]; user: User; parent: ParentRow; selfChildId: string | null };
 export type Account = ChildAccount | AdultAccount;
 
-const PARENT_COLUMNS = "id, email, tier, timezone, kind, tutor_enabled, credit_balance, created_at";
+const PARENT_COLUMNS = "id, email, tier, timezone, kind, tutor_enabled, live_tutor_allowed, credit_balance, created_at";
 
 export async function getUser(): Promise<User | null> {
   const supabase = await createClient();
@@ -37,7 +37,7 @@ export async function getParent(userId: string): Promise<ParentRow> {
   const { data } = await supabase.from("parents").select(PARENT_COLUMNS).eq("id", userId).maybeSingle();
   if (data) return data as ParentRow;
   // The trigger creates this row on signup; tolerate a race on first request.
-  return { id: userId, email: null, tier: "free", timezone: "UTC", kind: "parent", tutor_enabled: false, credit_balance: 0, created_at: new Date().toISOString() };
+  return { id: userId, email: null, tier: "free", timezone: "UTC", kind: "parent", tutor_enabled: false, live_tutor_allowed: true, credit_balance: 0, created_at: new Date().toISOString() };
 }
 
 export const getAccount = cache(async (): Promise<Account | null> => {

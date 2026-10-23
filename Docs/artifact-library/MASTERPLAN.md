@@ -79,7 +79,7 @@ plan must respect them.
 | Lesson player | `packages/learnkit/src/player.ts` (`renderVisual`), `html.ts` (`renderBlueprintHtml`, `ARTIFACT_CSP`) | The lesson is one `srcdoc` document. Its CSP is `default-src 'none'; frame-src 'none'; connect-src 'none'`, so it cannot embed or load anything external today. |
 | Stored lesson HTML | `artifacts.html`; `refreshPlayerHtml` swaps only the player script/CSS | The CSP is baked into each stored lesson. Old lessons keep the old CSP, which is fine because they never reference library artifacts. |
 | Host iframe | `apps/web/src/components/artifact-player.tsx` | `sandbox="allow-scripts"` (opaque origin), checks the message source window and a per-session nonce, batches events to `POST /api/events`. |
-| Event contract | `packages/contracts/src/events.ts` | `LearningEventType` enum plus the `LearnKitMessage` envelope (protocol v1). Library artifacts need their own namespaced event type and a protocol bump. |
+| Event contract | `packages/contracts/src/events.ts` | `LearningEventType` enum plus the `LearnKitMessage` envelope (protocol v1). Library artifacts need their own namespaced event type. They speak a separate ArtifactKit envelope, so LearnKit stays at v1. |
 | Event ingestion | `apps/web/src/app/api/events/route.ts`, `apps/web/src/lib/progress.ts` | The server re-grades answers. Artifact interaction events are evidence for the tutor and analytics, not grades. |
 | Static HTML validator | `validateArtifactHtml` in `packages/learnkit/src/html.ts` | Good starting rules (no external `src`, no `fetch`/XHR/WebSocket, no `window.top`, JS syntax check). Its lesson-specific rules (`question_answered`, `topic_completed`) do not apply to library artifacts. |
 | Assets | `artifact_assets` table (base64 images, ≤3MB, per lesson) | Not suitable for library bundles (textures, GLTF, fonts, JS). Library files go to Supabase Storage. |
@@ -88,7 +88,7 @@ plan must respect them.
 | App headers | `apps/web/next.config.ts` sets `X-Frame-Options: DENY` on `/(.*)` | Artifact-serving routes must be excluded and given their own frame policy. |
 | Routing / auth gate | `apps/web/src/proxy.ts` | Can route the artifact hostname to artifact routes only, and gate `/studio` to staff. |
 | Mobile | `apps/mobile/capacitor.config.ts` (`server.url` → hosted app) | The same web code runs in WKWebView and Android WebView. WebGL in nested iframes and memory on low-end Android must be tested. |
-| Tutor | `parents.tutor_enabled` flag only; the live tutor is a `todo.md` item | Stage 10 defines the tutor data and event stream. Building the voice tutor itself is a separate project. |
+| Tutor | A live voice tutor now exists (`apps/web/src/lib/live-tutor.ts`, `packages/ai/src/tutor.ts`), and `TutorContext` already lives in `events.ts` | Stage 10 defines the artifact tutor data and event stream and feeds it into the existing tutor. Its builder must use a different name, such as `ArtifactTutorContext`. |
 | Tests | Vitest in each package; no browser test runner | Playwright gets added in Stage 6 as a dev dependency for the Studio and CI only. |
 | Billing | `apps/web/src/lib/credits.ts`, `0004_billing.sql`, Stripe webhook | Unchanged by stages 1–12. Pricing for the API is designed separately in Stage 14. |
 
@@ -148,7 +148,13 @@ The lesson CSP adds only that origin to `frame-src`.
   `Cross-Origin-*` headers on every file. Storage stays private, and our route
   streams files with our own headers.
 
-**D2. Artifact host headers.** Every served file gets
+> Stage 0 confirmed the nested iframe on web, iOS, and Android. See
+> [ADR-002](decisions/ADR-002-embedding.md).
+
+**D2. Artifact host headers.** (Revised by
+[ADR-001](decisions/ADR-001-artifact-origin.md): name the artifact origin
+instead of `'self'`, send `Access-Control-Allow-Origin: *`, and drop
+`frame-ancestors`. The original sketch follows.) Every served file gets
 `Content-Security-Policy: sandbox allow-scripts; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; form-action 'none'; base-uri 'none'`,
 `frame-ancestors` limited to the app and lesson contexts (Stage 0 verifies how
 opaque-origin `srcdoc` parents interact with `frame-ancestors`),
@@ -163,7 +169,8 @@ importer rewrites known CDN URLs to pinned, vendored copies served from the
 artifact origin (an allowlist: `three` plus addons, `gsap`, `d3`, `p5`,
 `matter-js`, `chart.js`, and so on, each with an exact version). Anything not on
 the allowlist is rejected with a clear message. No `npm install` and no build
-scripts ever run on uploaded projects.
+scripts ever run on uploaded projects. The rewrite rules and the first
+allowlist are in [ADR-003](decisions/ADR-003-vendored-libraries.md).
 
 **D4. A tiny artifact SDK ("ArtifactKit").** This is a small runtime, like
 today's LearnKit runtime, that the host injects into every library artifact. It
@@ -335,8 +342,10 @@ storage or UI.
   referenced by success criteria exists, params have defaults, license present,
   and so on).
 - `ArtifactKit` message protocol: `ak-ready`, `ak-init {params, reducedMotion, nonce}`,
-  `ak-event {name, data}`, `ak-pause`, `ak-resume`, `ak-error`. Add a new
-  `LEARNKIT_PROTOCOL_VERSION` 2 path that keeps v1 lessons working.
+  `ak-event {name, data}`, `ak-pause`, `ak-resume`, `ak-error`. It is its own
+  envelope (`source: "artifactkit"` / `"artifactkit-host"`, its own v1), so
+  `LEARNKIT_PROTOCOL_VERSION` stays 1 and existing lessons are untouched. The
+  lesson relays artifact events to the app as LearnKit v1 `event` messages.
 - A new `LearningEventType` value, `artifact_interaction`, with payload
   `{ libraryArtifactId, version, name, data }`. Ingestion stores it but does not
   grade it.
@@ -365,10 +374,11 @@ blueprints and events are unchanged in behaviour.
 control, behind a service API.
 
 **Scope**
-- Migration `0009_artifact_library.sql`: the tables in D6, generated
+- Migration `0011_artifact_library.sql`: the tables in D6, generated
   `search_tsv`, indexes, an immutability trigger on published versions, RLS
-  (learners can read only published manifests; writes only by service role and
-  staff), and the staff role.
+  (learners can read published and retired manifests; writes only by service
+  role), and the staff role. 0009 and 0010 were taken by the live tutor and
+  metered credits.
 - Private Storage bucket `library` with policies. Paths are content-addressed
   per version.
 - New package `packages/library` (`@eco/library`): `registerDraft`,
@@ -673,7 +683,8 @@ reacts to what the child actually does instead of narrating the screen.
 - A host-side live event stream (in-page, from `artifact-player.tsx`) that a
   tutor component can subscribe to. It is read-only and contains no learner PII
   beyond the session.
-- A tutor context builder: given the current bite, it returns the manifest
+- A tutor context builder (`ArtifactTutorContext`, because `TutorContext` is
+  already taken by the live tutor): given the current bite, it returns the manifest
   tutor guide, lesson objectives, and recent events. This is what the voice
   tutor will consume.
 - Parent report hook (optional): "explored the solar system simulation;
@@ -837,8 +848,9 @@ catalog-browsing pages for developers.
 
 Blocking (need an answer before the stage starts):
 
-1. Artifact hostname and DNS: a subdomain of the production domain or a fully
-   separate domain? Decide in Stage 0, needed by Stage 4.
+1. ~~Artifact hostname and DNS: a subdomain of the production domain or a fully
+   separate domain?~~ Decided in ADR-001: a separate registrable domain. The
+   name still has to be registered before Stage 4 deploys.
 2. Who besides me gets Studio access? (Affects the staff-role design in
    Stage 2.)
 3. Does a lesson that uses library artifacts cost the parent the same credit as
@@ -884,9 +896,9 @@ So that nobody re-introduces dropped ideas:
 
 | Stage | Status |
 | --- | --- |
-| 0 Spikes | not started |
-| 1 Contracts | not started |
-| 2 Storage + catalog | not started |
+| 0 Spikes | done (2026-10-21); physical-device checks still open, see ADR-002 |
+| 1 Contracts | done (2026-10-21), see section 12 |
+| 2 Storage + catalog | done (2026-10-22), see section 13 |
 | 3 Import + static validation | not started |
 | 4 Artifact host + player | not started |
 | 5 Artifact Studio | not started |
@@ -899,3 +911,98 @@ So that nobody re-introduces dropped ideas:
 | 12 Semantic search | not started |
 | 13 Public API beta | not started |
 | 14 Commercial launch | not started |
+
+## 11. Stage 0 findings (2026-10-21)
+
+Spike code lives on the unmerged branch `spike/artifact-library`. Decisions
+are in [decisions/](decisions/), and screenshots, raw results, and the five AI
+samples are in [decisions/evidence/stage-0/](decisions/evidence/stage-0/).
+
+- **The nested iframe works everywhere tested.** That covers Chromium 156,
+  WebKit 27.2, iOS 27 Safari, the iOS Capacitor app, and the Android 16
+  Capacitor app (simulators and emulator). The lesson CSP changes only
+  `frame-src 'none'`, which becomes `frame-src {artifact origin}`. The host
+  overlay also works and stays as a fallback.
+- **`frame-ancestors` cannot be used.** With an opaque-origin `srcdoc` parent,
+  every value blocks the frame, including `*` and the app origin.
+- **WebKit doesn't match `'self'` for opaque-origin documents.** An artifact
+  `fetch` of its own files failed on iOS until the CSP named the artifact
+  origin explicitly.
+- **Every artifact file needs `Access-Control-Allow-Origin: *`.** Module
+  scripts and `fetch` from the sandboxed frame are CORS requests with `Origin: null`.
+- **Isolation holds.** The artifact had no cookies, storage, parent or top
+  access, external network, or popups. Forged messages from a rogue frame
+  were dropped at both relay hops.
+- **Pause works.** `ak-pause` from the lesson, whether from a button or an
+  `IntersectionObserver` inside the sandboxed lesson, stopped
+  `requestAnimationFrame` completely on every platform.
+- **Real AI output follows one pattern.** Opus 5.5 and Gemini 4 Argon load
+  libraries from jsDelivr or cdnjs at exact versions, through import maps or
+  classic script tags, and 4 of 5 load Google Fonts. After rewriting to
+  vendored copies, all five ran inside the sandbox with zero errors.
+- **None of the samples call an SDK (they are L0).** So the injected
+  ArtifactKit must send `ready` itself (D4), or every one of them hits the
+  load timeout and falls back.
+- **Licensing:** `gsap@3.12.5` is not MIT. Review it before Stage 13.
+- **Still open, needs Ranjit:** memory and FPS on a low-end physical Android
+  phone, one physical iPhone, Firefox desktop, and registering the production
+  artifact domain.
+
+## 12. Stage 1 findings (2026-10-21)
+
+The contracts live in `packages/contracts/src/library.ts`, plus small edits to
+`blueprint.ts` and `events.ts`. The fixture is `solarSystemManifest()` in
+`testing.ts`.
+
+- **The lesson model never sees `library`.** `modelSchema()` marks every
+  property required, so an optional `library` would have forced the model to
+  invent artifact ids. `modelSchema` now takes an `omit` list
+  (`SERVER_OWNED_BLUEPRINT_FIELDS`), and `forceBlueprintFields` strips any
+  `library` the model returns anyway. The JSON schema sent to the model is
+  byte-identical to before Stage 1. Stage 9 attaches `library` after
+  generation, on the server.
+- **`visual` stays required next to `library`.** It is the fallback for a
+  lesson whose artifact fails to load.
+- **ArtifactKit is a separate envelope.** The artifact speaks
+  `source: "artifactkit"` v1, and the lesson relays to the app with the existing
+  LearnKit v1 `event` message, using type `artifact_interaction`. `ak-event`
+  always carries the nonce. `ak-error` may omit it, because a fatal error can
+  happen before `ak-init`.
+- **The built-in event is `interacted`.** The injected SDK may send it for
+  L0 and L1 artifacts. It carries no data, and success criteria may name it,
+  but it does not count toward L3. L3 needs criteria backed by declared events.
+- **Event data limits:** at most 16 keys and 2 KB per event. Declared fields
+  are optional, while undeclared fields and type mismatches are rejected
+  (`checkDeclaredEvent`). Stage 4 applies this check in the lesson relay and
+  Stage 10 applies it on ingestion.
+- **`artifactNeedFromBite`** derives interaction hints from the visual kind,
+  the objective intents, and the bite prompt (for example, "drag" and "sort").
+  Stage 8 should treat those hints as soft signals, not filters.
+
+## 13. Stage 2 findings (2026-10-22)
+
+The catalog lives in `packages/db/supabase/migrations/0011_artifact_library.sql`
+and `packages/library` (`@eco/library`). The pgTAP file is
+`packages/db/supabase/tests/artifact_library.test.sql`.
+
+- **The artifact id is the manifest id.** There is no separate slug.
+  `library_artifacts.id` is the kebab-case string a lesson stores as
+  `LibraryRef.artifactId`.
+- **Retired versions stay readable.** Lessons already pinned to a version keep
+  playing it after retirement. Learners never see `draft` or `testing`.
+  `current_version` is the newest published version, or null.
+- **Staff are a table, not a JWT claim.** `staff_users` plus `is_staff()` is
+  how Studio access is decided. Staff still cannot write catalog rows; Stage 5
+  will check `is_staff()` in server code and then use the service role.
+- **The validation-report gate is deferred.** Publishing re-checks the stored
+  manifest (`parseManifest` / `lintManifest`) but does not require a passing
+  `validation_report`. Stages 3 and 6 fill that in.
+- **Allowed status moves:** draft to testing, testing to draft, testing to
+  published, published to retired. The TypeScript table in `status.ts` is
+  checked against the trigger SQL in tests.
+- **Branching was not available** (Supabase Pro plan). 0011 was applied to
+  `startup-eco-learning`; the 42 pgTAP assertions ran in a rolled-back
+  transaction and passed. Security advisors did not flag the new tables. They
+  did flag `is_staff()` as a security-definer function callable by
+  `authenticated`, which is the same pattern as `owns_child` and is required
+  for the RLS policies.

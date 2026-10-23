@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Everprimer uses the microphone only while you talk with the live tutor. Nothing is recorded.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Everprimer connects to your Mac on the local network during development.</string>
 	<key>NSAppTransportSecurity</key>

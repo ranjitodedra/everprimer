@@ -17,7 +17,7 @@ import {
  */
 export const PROMPT_VERSION = "2026-10-11.3";
 
-const SAFETY = `SAFETY AND VOICE (non-negotiable):
+export const SAFETY = `SAFETY AND VOICE (non-negotiable):
 - Content is for a learner aged 4 to 18. Keep it easy for their age. No sexual content, graphic violence, dangerous instructions, or risky real-world behaviour.
 - Never ask for personal information.
 - You are a friendly game guide. Talk straight to the learner in second person ("you"). Warm and playful.

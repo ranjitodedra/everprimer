@@ -41,7 +41,8 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[events] ingest failed", err);
+    const detail = err instanceof Error ? err.message : ((err as { code?: string; message?: string } | null)?.message ?? String(err));
+    console.error("[events] ingest failed", (err as { code?: string } | null)?.code ?? "", detail);
     return NextResponse.json({ error: "ingest failed" }, { status: 500 });
   }
 }

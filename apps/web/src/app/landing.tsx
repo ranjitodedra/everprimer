@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useState } from "react";
 import { Star } from "@/components/icons";
 import { EverprimerMark, Wordmark } from "@/components/logo";
-import { PLANS, formatPrice } from "@/lib/plans";
+import { PLANS, formatCredits, formatPrice } from "@/lib/plans";
 
 const PLANS_LIST = [PLANS.free, PLANS.paid, PLANS.max] as const;
 
@@ -39,13 +39,13 @@ export function Landing({ next }: { next?: string }) {
       <main id="start" className="flex-1 px-5">
         <section className="mx-auto grid w-full max-w-6xl items-center gap-10 pt-8 pb-16 md:grid-cols-[1fr_minmax(0,26rem)] md:gap-12 md:pt-16 md:pb-28 lg:gap-24">
           <div className="max-w-xl">
-            <h1 className="display text-[3.25rem] sm:text-7xl lg:text-[5.5rem]">Learning, written for one child.</h1>
+            <h1 className="display text-[3.25rem] sm:text-7xl lg:text-[5.5rem]">Learning tailored to every child.</h1>
             <p className="mt-5 max-w-md text-lg text-ink-soft sm:text-xl">Tell us what they love. Any topic becomes a lesson they play.</p>
             <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
               <Link href={signUp} className="btn-primary btn-lg">
                 Start free
               </Link>
-              <span className="text-sm text-ink-soft">{PLANS.free.credits} free lessons every month</span>
+              <span className="text-sm text-ink-soft">About {PLANS.free.lessons} free lessons every month</span>
             </div>
           </div>
           <Demo />
@@ -70,12 +70,14 @@ export function Landing({ next }: { next?: string }) {
                     {formatPrice(plan.price)}
                     {plan.price > 0 ? <span className="ml-1 font-sans text-base font-medium tracking-normal opacity-70">a month</span> : null}
                   </p>
-                  <p className="mt-4 opacity-80">{plan.credits} lessons a month</p>
+                  <p className="mt-4 opacity-80">
+                    {formatCredits(plan.credits)} credits a month (about {plan.lessons} lessons)
+                  </p>
                   <p className="opacity-80">{plan.childCap === 1 ? "1 learner" : `Up to ${plan.childCap} learners`}</p>
                 </li>
               ))}
             </ul>
-            <p className="mt-4 text-sm text-ink-soft">A credit makes one new lesson or one new set of topics. Lessons you already have replay for free.</p>
+            <p className="mt-4 text-sm text-ink-soft">Credits pay for what we make for you: new lessons with their pictures, and time with the live voice tutor on Max. Lessons you already have replay for free.</p>
           </details>
         </section>
       </main>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { refreshBillingPeriods } from "@/lib/credits";
 import { runQueuedJobs } from "@/lib/jobs";
+import { runQueuedCharacters } from "@/lib/lesson-art";
 import { refreshLearnerMaintenance } from "@/lib/memory";
 
 export const runtime = "nodejs";
@@ -30,7 +31,13 @@ async function handle(req: Request) {
     console.error("[memory] maintenance failed:", err instanceof Error ? err.message : err);
   }
   const ran = await runQueuedJobs(5);
-  return NextResponse.json({ ran, billing, memory });
+  let characters = 0;
+  try {
+    characters = await runQueuedCharacters(3);
+  } catch (err) {
+    console.error("[lesson-art] sweep failed:", err instanceof Error ? err.message : err);
+  }
+  return NextResponse.json({ ran, characters, billing, memory });
 }
 
 export const GET = handle;

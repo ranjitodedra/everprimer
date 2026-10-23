@@ -3,7 +3,9 @@ import { setGrownupPin } from "@/app/actions";
 import { Notice, PageHeader } from "@/components/ui";
 import { hasGrownupPin, requireGrownup } from "@/lib/auth";
 import { getBilling } from "@/lib/billing";
-import { startCheckout, startPortal } from "./actions";
+import { liveTutorEnv } from "@/lib/env";
+import { getUsage } from "@/lib/usage";
+import { setLiveTutorAllowed, startCheckout, startPortal } from "./actions";
 import { SettingsMenu } from "./settings-menu";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -24,6 +26,12 @@ export default async function SettingsPage(props: PageProps<"/parent/settings">)
     cancel_at_period_end: false,
   };
   const stripeReady = Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_PLUS && process.env.STRIPE_PRICE_MAX);
+  const usage = await getUsage(account.user.id, billing.credits_period_start, billing.credit_balance).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    // Hosted DB before 0010_metered_credits.sql has no usage category yet.
+    if (!/does not exist|42703/.test(message)) console.error("[settings] usage failed:", message);
+    return null;
+  });
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -41,14 +49,18 @@ export default async function SettingsPage(props: PageProps<"/parent/settings">)
         billing={{
           tier: billing.tier,
           creditBalance: billing.credit_balance,
+          periodStart: billing.credits_period_start,
           periodEnd: billing.stripe_period_end,
           subscriptionStatus: billing.subscription_status,
           cancelAtPeriodEnd: billing.cancel_at_period_end,
           hasCustomer: Boolean(billing.stripe_customer_id),
         }}
+        usage={usage}
         checkout={startCheckout}
         portal={startPortal}
         setPin={setGrownupPin}
+        liveTutor={billing.tutor_enabled && liveTutorEnv.enabled ? { allowed: account.parent.live_tutor_allowed } : null}
+        setLiveTutor={setLiveTutorAllowed}
       />
     </div>
   );

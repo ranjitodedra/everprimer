@@ -38,7 +38,7 @@ export function BillingNotice({ code, audience }: { code?: string; audience: Bil
     return code === "plan" ? (
       <Box title="Rebuilding a lesson is on Plus and Max" body="Playing it again is always free." action={plans} />
     ) : (
-      <Box title="Out of lesson credits" body="Lessons you already have still play. Credits refresh each month." action={plans} />
+      <Box title="Out of credits" body="Lessons you already have still play. Credits refresh each month." action={plans} />
     );
   }
   if (code === "concurrency") return <Box title="Two lessons are already being made" body={`Up to ${MAX_CONCURRENT_JOBS} at a time. Try again when one is ready.`} />;

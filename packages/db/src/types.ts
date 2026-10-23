@@ -16,6 +16,8 @@ export interface ParentRow {
   kind: AccountKind;
   /** Service-role writes only. Readable so the settings page can show it. */
   tutor_enabled: boolean;
+  /** Grown-up switch for the live voice tutor. Readable; written by a server action. */
+  live_tutor_allowed: boolean;
   /** Lesson credits still available to reserve. Readable; not client-writable. */
   credit_balance: number;
   created_at: string;
@@ -142,6 +144,65 @@ export interface ArtifactAssetRow {
   created_at: string;
 }
 
+export type CharacterPose = "talk" | "teach";
+
+/** One tutor character per topic, two poses in the private `lesson-art` bucket. */
+export interface LessonCharacterRow {
+  topic_id: string;
+  parent_id: string | null;
+  status: "queued" | "running" | "ready" | "failed";
+  concept: string | null;
+  seed: number | null;
+  model: string | null;
+  talk_path: string | null;
+  teach_path: string | null;
+  attempts: number;
+  error: string | null;
+  run_after: string;
+  started_at: string | null;
+  ready_at: string | null;
+  /** Both poses are stored with a transparent background. */
+  cutout: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UsageCategory = "lesson" | "live";
+
+/** Service role only. Amounts are credits; negative moves take from the balance. */
+export interface CreditLedgerRow {
+  id: string;
+  parent_id: string;
+  amount: number;
+  kind: "grant" | "reserve" | "spend" | "refund" | "expire" | "charge";
+  job_id: string | null;
+  reason: string | null;
+  period_start: string | null;
+  category: UsageCategory | null;
+  tutor_session_id: string | null;
+  topic_id: string | null;
+  created_at: string;
+}
+
+/** Usage metadata for one live voice session. No audio or transcript is kept. */
+export interface TutorSessionRow {
+  id: string;
+  child_id: string;
+  parent_id: string;
+  topic_id: string;
+  artifact_session_id: string | null;
+  model: string;
+  status: "issued" | "ended";
+  started_at: string;
+  expires_at: string;
+  ended_at: string | null;
+  seconds_used: number | null;
+  last_seen_at: string | null;
+  credits_used: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export interface SessionRow {
   id: string;
   child_id: string;
@@ -247,5 +308,76 @@ export interface DailyReportRow {
   report_date: string;
   stats: Record<string, unknown>;
   summary: string;
+  created_at: string;
+}
+
+/** Studio access. Readable by the user themselves; written by the service role. */
+export interface StaffUserRow {
+  user_id: string;
+  created_at: string;
+}
+
+export interface LibraryArtifactRow {
+  /** The manifest id (kebab-case); lessons store it as LibraryRef.artifactId. */
+  id: string;
+  title: string;
+  owner: string | null;
+  /** Newest published version. Null until something is published. */
+  current_version: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type LibraryVersionStatus = "draft" | "testing" | "published" | "retired";
+
+export interface LibraryFileEntry {
+  path: string;
+  size: number;
+  sha256: string;
+  mime: string;
+}
+
+/** Published rows only ever move to retired; retired rows never change. */
+export interface LibraryArtifactVersionRow {
+  artifact_id: string;
+  version: number;
+  /** An ArtifactManifest whose id and version match the row. */
+  manifest: Record<string, unknown>;
+  entry_file: string;
+  files: LibraryFileEntry[];
+  bundle_sha256: string;
+  status: LibraryVersionStatus;
+  validation_report: Record<string, unknown> | null;
+  compliance_level: 0 | 1 | 2 | 3;
+  created_by: string | null;
+  created_at: string;
+  published_at: string | null;
+  published_by: string | null;
+  retired_at: string | null;
+}
+
+export type LibrarySearchDecision = "accepted" | "rejected_all" | "no_candidates";
+
+export interface LibrarySearchLogRow {
+  id: number;
+  topic_id: string | null;
+  artifact_id: string | null;
+  bite_id: string | null;
+  request: Record<string, unknown>;
+  candidates: unknown[];
+  decision: LibrarySearchDecision;
+  chosen_artifact_id: string | null;
+  chosen_version: number | null;
+  created_at: string;
+}
+
+export interface LibraryUsageRow {
+  id: number;
+  /** The lesson artifact (artifacts.id) that pinned this library version. */
+  artifact_id: string;
+  bite_id: string;
+  library_artifact_id: string;
+  library_version: number;
+  plays: number;
   created_at: string;
 }

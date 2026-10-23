@@ -1,4 +1,5 @@
 import type { Bite, ClassicBlueprint, GameBlueprint, Question } from "./blueprint";
+import type { ArtifactManifest } from "./library";
 import type { LessonPlan, PlanLintContext, PlanSession } from "./plan";
 
 /**
@@ -236,6 +237,52 @@ function rockyPlanetsPlanSessions(codes: string[]): PlanSession[] {
     biteKinds: [...KINDS],
     taskCount: 3,
   }));
+}
+
+/** A complete L3 manifest, shaped like the D7 example in the masterplan. */
+export function solarSystemManifest(): ArtifactManifest {
+  return {
+    manifestVersion: 1,
+    id: "solar-system-simulator",
+    version: 3,
+    title: "Solar System Simulator",
+    description: "3D solar system with adjustable orbit speed and selectable planets.",
+    format: "bundle",
+    entry: "index.html",
+    rendering: { dimension: "3d", tech: ["three@0.170.0"], webgl: true },
+    layout: { aspectRatio: "16:9" },
+    subjects: ["science"],
+    topics: ["astronomy", "solar system"],
+    concepts: ["planetary orbit", "orbital period"],
+    prerequisites: ["planets orbit the sun"],
+    learningObjectives: ["Explain why planets farther from the sun take longer to orbit"],
+    objectiveIntents: ["explain_process", "compare", "predict"],
+    visualKinds: ["orbit", "simulation"],
+    interactionTypes: ["select", "simulate", "compare", "predict"],
+    ageRange: [8, 12],
+    difficulty: 2,
+    durationSec: [60, 240],
+    params: [
+      { key: "planets", type: "string[]", default: ["mercury", "venus", "earth", "mars"], options: ["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"], description: "Which planets to show, inner first." },
+      { key: "orbitSpeed", type: "number", default: 1, min: 0.1, max: 5, description: "Starting speed multiplier for every orbit." },
+    ],
+    events: [
+      { name: "planet_selected", data: { planet: "string" }, description: "The child tapped a planet." },
+      { name: "orbit_comparison_completed", data: { inner: "string", outer: "string", seconds: "number" }, description: "The child watched two planets complete an orbit side by side." },
+    ],
+    tutorGuide: {
+      intro: "Let's watch the planets race around the Sun.",
+      steps: ["Tap Earth and Mars.", "Speed up the orbits and watch which one finishes first."],
+      observationPrompts: ["Which planet finished its lap first?"],
+      misconceptions: [{ belief: "All planets take one year to go around the Sun.", response: "Only Earth takes one Earth year; farther planets have longer paths." }],
+      hints: ["Look at how long each path is.", "Farther planets have a longer path to travel.", "Mars is farther out than Earth, so its lap is longer."],
+      successCriteria: [{ description: "Compared an inner and an outer planet's orbit", evidence: ["orbit_comparison_completed"] }],
+    },
+    accessibility: { reducedMotion: true, keyboard: true, screenReaderSummary: "Planets circle the Sun; closer planets finish their laps sooner.", colorSafe: true },
+    performance: { maxBundleKB: 4000, targetFps: 30, mobileTested: true },
+    provenance: { createdWith: ["claude-opus-5.5"], createdAt: "2026-10-21T12:00:00.000Z" },
+    license: { artifact: "proprietary", thirdParty: [{ name: "three", version: "0.170.0", license: "MIT" }], attributions: [] },
+  };
 }
 
 export function ctxFor(plan: LessonPlan, over: Partial<PlanLintContext> = {}): PlanLintContext {

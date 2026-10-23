@@ -89,14 +89,14 @@ cp apps/web/.env.example apps/web/.env.local   # fill in Supabase URL, anon key,
 ```
 
 Create a Supabase project and apply the SQL in `packages/db/supabase/migrations/`
-in order (`0001_core.sql` through `0006_lesson_planner.sql`),
+in order (`0001_core.sql` through `0009_lesson_tutor.sql`),
 or `supabase db push` after `supabase link`. RLS and credit checks live in
 `packages/db/supabase/tests/` (`supabase test db` with a linked local stack). In Auth settings, disable "Confirm email" for local
 development if you want password sign-up to log in immediately.
 
 ```bash
 pnpm dev            # http://localhost:3000
-pnpm test           # unit tests (contracts, mastery, learnkit, ai)
+pnpm test           # unit tests (contracts, mastery, learnkit, ai, web)
 pnpm typecheck
 pnpm build
 ```
@@ -108,7 +108,7 @@ system gets hand-checked seed content; other goals get a structurally complete d
 `AI_PROVIDER=mock` to force the mock even when keys are present.
 
 Every task on every tier uses Gemini (`gemini-3.8-flash`). Paid plans differ only by how many
-lesson credits they get. A missing Gemini key, or `AI_PROVIDER=mock`, runs the mock.
+credits they get. A missing Gemini key, or `AI_PROVIDER=mock`, runs the mock.
 
 #### Setup guide: Gemini
 
@@ -124,17 +124,76 @@ All keys go in `apps/web/.env.local` (and in the deployment's environment variab
 Costs: one lesson makes a planner call (up to 3 on lint failure), a blueprint call (plus repairs)
 and a fact-check call. Check Gemini pricing before launch.
 
+### Interactive tutor
+
+Each lesson has a cartoon guide that speaks the lesson's lines in speech bubbles, and Max accounts
+can open a live voice tutor from inside the lesson.
+
+**Character art (all plans, charged as lesson usage).** After a lesson publishes, a separate
+queue (`lesson_characters`) draws one character in two poses with fal.ai FLUX.2 Klein 9B: talking
+(`fal-ai/flux-2/klein/9b`), then teaching with a raised finger (`fal-ai/flux-2/klein/9b/edit`, from
+the talking image so it stays the same character). Each pose is then cut out of its white background
+(`fal-ai/birefnet/v2`), so the character stands on the lesson page with a halo at its feet that lights
+up while the live tutor listens, thinks or talks. Both images are stored in the private `lesson-art`
+Storage bucket and reused on every slide. Lessons published before this existed get a character the
+first time they are opened, and older characters are cut out by the job sweep. If a cutout fails, the
+white-background poses are kept and the player blends the white away until the sweep retries. The
+player shows plain text until both images load, and stays plain text if generation fails; nothing
+about the lesson waits on art. Failed runs retry up to three times; content-filter hits, bad keys and
+bad requests do not retry. The pictures are charged to the account's credits; art waits while the
+balance is empty.
+
+1. Create a key at [fal.ai](https://fal.ai/dashboard/keys) and set `FAL_KEY=...`.
+2. Optional: `LESSON_ART_DAILY_LIMIT` (per account per UTC day), `LESSON_ART_CUTOUT_MODEL`,
+   `LESSON_ART_ENABLED=false` to turn it off.
+
+**Live voice tutor (Max only, paid with credits).** The "Live tutor" button in the lesson's top bar
+opens a voice session with Gemini Live (`gemini-3.8-live`). `POST /api/tutor/live` checks the learner
+owns the lesson session, the plan (`parents.tutor_enabled`), the grown-up switch
+(`parents.live_tutor_allowed`, in Settings), that credits are left, and that no other session is open.
+It then mints an ephemeral token with the model, voice, system instruction and context-window
+compression locked in. The browser connects to Gemini with that token, never with the API key.
+
+There is no time cap. Gemini moves long conversations to a new connection every few minutes; the
+browser fetches a fresh token (`/renew`) and resumes with the latest session handle, or starts fresh
+and re-sends the screen if the handle no longer works. Once a minute the browser reports Gemini's
+token counts (`/tick`); the server holds that cost between a per-minute floor and ceiling for the
+time actually spent and charges the difference as `live` usage. A conversation ends when the learner
+ends it, after two quiet minutes, when credits run out, when the app is hidden, or when the learner
+leaves the lesson (`/end` makes the final charge). A session that stops ticking is closed after two
+minutes. The tutor is told the lesson, goals, age, reading level and progress, plus what is on screen,
+but never the child's name. It does not get a question's explanation until the learner has answered.
+Audio and transcripts are not stored; only times, token counts and credits are (`tutor_sessions`).
+
+1. Set `GEMINI_API_KEY=...` (falls back to `GOOGLE_GENERATIVE_AI_API_KEY`). Use a billed project:
+   Google's terms for unpaid usage allow it to use content to improve its products. Also check the
+   [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) before launch: they bar use in
+   services "directed towards or likely to be accessed by individuals under the age of 18". Get a
+   legal review, or move to an offering whose terms cover children's services, before turning this on
+   for real learners.
+2. Optional: `TUTOR_LIVE_VOICE`, `TUTOR_LIVE_MODEL`, and `TUTOR_LIVE_API_VERSION` (ephemeral tokens
+   are v1alpha in `@google/genai`).
+3. Native apps need a new build for the microphone permission (`NSMicrophoneUsageDescription` on iOS,
+   `RECORD_AUDIO` on Android).
+
 ### Billing
 
-Free, Plus, and Max are monthly lesson-credit plans on `parents`. A credit is one published lesson.
-Creating a curriculum also costs one credit. Opening a topic that has no lesson costs one. Pre-warming
-the next lesson costs one only when the balance is above zero; otherwise it is skipped. Regenerating a
-published lesson costs one and is Plus/Max only. Replaying a published lesson and daily reports are free.
+Free, Plus, and Max are monthly credit plans on `parents`. A credit is a fixed slice of real API
+spend (`USD_PER_CREDIT` in `packages/ai/src/pricing.ts`), the same for every feature: lesson text and
+page code are charged by their Gemini tokens, pictures per image, and the live tutor by its audio and
+text tokens. A typical lesson with its pictures is about 100 credits. Pre-warming the next lesson
+only happens while the balance is above zero. Regenerating a published lesson is Plus/Max only.
+Replaying a published lesson and daily reports are free.
 
-Credits are reserved when the job is enqueued, spent when it publishes, and refunded after a hard failure.
-The same job cannot reserve twice. An account can have two generation jobs in flight, and can start five
-curricula an hour. Free includes 10 credits and 1 child. Plus is $12 for 50 credits. Max is $29 for 150
-credits. Plus and Max allow 8 children. Grants do not roll over. Child logins cannot buy.
+Generation jobs hold an estimate when enqueued (5 credits for an outline, 80 for a lesson), then
+settle to the measured cost when they finish: unused credits go back, extra cost is taken only down
+to zero. A hard failure refunds the whole hold. The same job cannot hold twice. Art and the live tutor
+are charged as they happen. Every usage row in `credit_ledger` is tagged `lesson` or `live`, and
+Settings shows the balance and both parts for the month, with live minutes and recent conversations.
+An account can have two generation jobs in flight, and can start five curricula an hour. Free
+includes 1,000 credits a month and 1 child. Plus is $12 for 5,000 credits. Max is $29 for 15,000
+credits and the live tutor. Plus and Max allow 8 children. Grants do not roll over. Child logins
+cannot buy.
 
 Stripe Checkout and the Customer Portal are hosted redirects. The webhook
 (`POST /api/stripe/webhook`) is the only writer of `tier`, Stripe ids, and credit grants. Set:
@@ -193,7 +252,7 @@ iOS uses Swift Package Manager (no CocoaPods). Building the iOS app needs the Xc
 
 ## Not in this MVP
 
-- Tutor chat and voice. Max sets `parents.tutor_enabled` for a later task.
+- Typed tutor chat. Voice is in; see "Interactive tutor".
 - Separate sandbox origin — the iframe uses `srcdoc` + `sandbox` + CSP, which gives an opaque
   origin today; a dedicated domain is a deployment step, not a code change.
 - Parent Q&A agent, a standalone review session (recall only happens inside new lessons), headless

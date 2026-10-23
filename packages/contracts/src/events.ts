@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { LibraryArtifactId } from "./blueprint";
+import { ArtifactEventData, ArtifactEventName } from "./library";
 
 /**
  * Learning events are the only channel from an artifact back to the platform.
@@ -26,6 +28,7 @@ export const LearningEventType = z.enum([
   "final_test_completed",
   "topic_completed",
   "review_completed",
+  "artifact_interaction",
 ]);
 export type LearningEventType = z.infer<typeof LearningEventType>;
 
@@ -60,6 +63,18 @@ export const ItemExploredPayload = z.object({
   itemId: z.string(),
 });
 
+/**
+ * An event a library artifact sent, relayed by the lesson player. Stored as
+ * tutor and analytics evidence; never graded.
+ */
+export const ArtifactInteractionPayload = z.object({
+  libraryArtifactId: LibraryArtifactId,
+  version: z.number().int().min(1),
+  name: ArtifactEventName,
+  data: ArtifactEventData.default({}),
+});
+export type ArtifactInteractionPayload = z.infer<typeof ArtifactInteractionPayload>;
+
 export const LearningEvent = z.object({
   clientEventId: z.string().uuid(),
   type: LearningEventType,
@@ -80,6 +95,36 @@ export type EventBatch = z.infer<typeof EventBatch>;
 export const LEARNKIT_SOURCE = "learnkit" as const;
 export const LEARNKIT_PROTOCOL_VERSION = 1 as const;
 
+/**
+ * What the learner is looking at, sent by the artifact so the live tutor can
+ * talk about the current screen. Explanations are only included once the
+ * learner has answered, so the tutor cannot give answers away early.
+ */
+export const TutorContext = z.object({
+  screen: z.enum(["section", "map", "bite", "session_done", "final", "score"]),
+  title: z.string().max(200).optional(),
+  sessionTitle: z.string().max(200).optional(),
+  biteType: z.string().max(40).optional(),
+  text: z.string().max(1500).optional(),
+  question: z
+    .object({
+      prompt: z.string().max(600),
+      options: z.array(z.string().max(200)).max(12).optional(),
+      hint: z.string().max(300).optional(),
+    })
+    .optional(),
+  answered: z.boolean().optional(),
+  correct: z.boolean().optional(),
+  explanation: z.string().max(600).optional(),
+  progress: z
+    .object({
+      round: z.number().int().min(0).max(50),
+      rounds: z.number().int().min(0).max(50),
+    })
+    .optional(),
+});
+export type TutorContext = z.infer<typeof TutorContext>;
+
 export const LearnKitMessage = z.discriminatedUnion("kind", [
   z.object({
     source: z.literal(LEARNKIT_SOURCE),
@@ -99,8 +144,45 @@ export const LearnKitMessage = z.discriminatedUnion("kind", [
     kind: z.literal("resize"),
     height: z.number(),
   }),
+  z.object({
+    source: z.literal(LEARNKIT_SOURCE),
+    v: z.literal(LEARNKIT_PROTOCOL_VERSION),
+    kind: z.literal("context"),
+    nonce: z.string(),
+    context: TutorContext,
+  }),
 ]);
 export type LearnKitMessage = z.infer<typeof LearnKitMessage>;
+
+/** Inline image the sandbox can show under its `img-src data:` policy. */
+export const TutorImageDataUri = z
+  .string()
+  .max(8_000_000)
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/);
+
+/** Sent host -> artifact once both character poses have loaded. */
+export const HostTutorArtMessage = z.object({
+  source: z.literal("learnkit-host"),
+  v: z.literal(LEARNKIT_PROTOCOL_VERSION),
+  kind: z.literal("tutor_art"),
+  talk: TutorImageDataUri,
+  teach: TutorImageDataUri,
+  /** Transparent poses stand on the page; without it the player blends the white background away. */
+  cutout: z.boolean().default(false),
+});
+export type HostTutorArtMessage = z.infer<typeof HostTutorArtMessage>;
+
+export const TutorVoiceState = z.enum(["idle", "listening", "thinking", "speaking"]);
+export type TutorVoiceState = z.infer<typeof TutorVoiceState>;
+
+/** Sent host -> artifact while a live voice session runs; drives the character's glow. */
+export const HostTutorStateMessage = z.object({
+  source: z.literal("learnkit-host"),
+  v: z.literal(LEARNKIT_PROTOCOL_VERSION),
+  kind: z.literal("tutor_state"),
+  state: TutorVoiceState,
+});
+export type HostTutorStateMessage = z.infer<typeof HostTutorStateMessage>;
 
 /** Sent host -> artifact once the iframe has loaded. */
 export const HostInitMessage = z.object({
