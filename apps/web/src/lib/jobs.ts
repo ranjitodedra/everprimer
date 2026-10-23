@@ -4,17 +4,23 @@ import { ArtifactBlueprint, type ArtifactStage, type CurriculumStage, type Lesso
 import {
   blockingIssues,
   compactLearnerMemory,
+  creditsFor,
   generateCurriculum,
   generateLesson,
   isPermanentAiError,
   type PipelineMeta,
   type RecallCandidate,
   type Tier,
+  type UsageRecord,
 } from "@eco/ai";
-import { renderBlueprintHtml } from "@eco/learnkit";
+import { collectLibraryRefs, renderBlueprintHtml, type RenderBlueprintOptions } from "@eco/learnkit";
+import type { ArtifactManifest } from "@eco/contracts";
+import { getArtifact } from "@eco/library";
+import { getArtifactOrigin } from "@/lib/artifact-host";
 import type { ArtifactRow, ChildRow, CurriculumRow, GenerationJobRow, JobKind, MemoryRow, ObjectiveRow, PersonalizationRow, TopicRow } from "@eco/db";
-import { refundCredit, spendCredit, startArtifactJob, type CreditError } from "@/lib/credits";
+import { refundCredit, settleCredit, startArtifactJob, type CreditError } from "@/lib/credits";
 import { learnerContextFrom } from "@/lib/learner";
+import { ensureCharacter } from "@/lib/lesson-art";
 import { applyMemoryUpdate, lessonMasterySummary } from "@/lib/memory";
 import { buildDailyReport } from "@/lib/report";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -24,9 +30,10 @@ import { createServiceClient } from "@/lib/supabase/server";
  *
  * Jobs are enqueued by server actions, kicked immediately with `after()` by
  * the caller, and swept by /api/jobs/run for anything that was missed.
- * Billable jobs reserve a lesson credit in the same transaction as the insert.
- * Every handler is idempotent enough to be retried: a retry spends the same
- * reserve and does not take another credit.
+ * Billable jobs reserve an estimate in the same transaction as the insert and
+ * settle it to the measured model cost when they finish. Every handler is
+ * idempotent enough to be retried: a retry settles the same reserve and does
+ * not take another hold.
  */
 
 export type JobPayload =
@@ -60,12 +67,21 @@ export function kickJob(jobId: string): void {
   }
 }
 
-function refundOnSkip(result: unknown): boolean {
-  return !!result && typeof result === "object" && (result as { skipped?: boolean }).skipped === true;
+/** Model calls a handler reports; a skipped job reports none or only what it already spent deciding. */
+function usageRecords(result: unknown): UsageRecord[] {
+  const usage = result && typeof result === "object" ? (result as { usage?: unknown }).usage : undefined;
+  if (!Array.isArray(usage)) return [];
+  return usage.filter(
+    (r): r is UsageRecord => !!r && typeof r === "object" && typeof (r as UsageRecord).inputTokens === "number" && typeof (r as UsageRecord).outputTokens === "number",
+  );
 }
 
 function isSplit(result: unknown): boolean {
   return !!result && typeof result === "object" && (result as { split?: boolean }).split === true;
+}
+
+function skipped(result: unknown): boolean {
+  return !!result && typeof result === "object" && (result as { skipped?: boolean }).skipped === true;
 }
 
 /** Claim and run one job. Safe to call concurrently; the claim is atomic. */
@@ -84,8 +100,10 @@ export async function runJob(jobId: string): Promise<void> {
   try {
     const usage = await dispatch(job);
     if (job.kind !== "memory") {
-      if (refundOnSkip(usage)) await refundCredit(job.id);
-      else await spendCredit(job.id);
+      // Skipped work (already published, a unit, or a split into parts) returns the hold.
+      // Finished jobs settle to the tokens they actually used.
+      if (skipped(usage)) await refundCredit(job.id);
+      else await settleCredit(job.id, creditsFor(usageRecords(usage)));
     }
     await db
       .from("generation_jobs")
@@ -319,7 +337,7 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
     const { data } = await db.from("artifacts").select("*").eq("id", artifactId).maybeSingle();
     if (!data) throw new Error(`artifact ${artifactId} not found`);
     target = data as ArtifactRow;
-    if (target.status === "published") return { artifactId: target.id, alreadyDone: true };
+    if (target.status === "published") return { skipped: true, artifactId: target.id, alreadyDone: true };
     if (target.status === "split") return { skipped: true, artifactId: target.id };
     if (target.status === "failed") {
       await db.from("artifacts").update({ status: "generating", error: null }).eq("id", target.id);
@@ -397,7 +415,8 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
   }
 
   await setStage("artifacts", target.id, "building");
-  const html = lesson.html ?? renderBlueprintHtml(blueprint);
+  const libraryOptions = await resolveLibraryOptions(db, blueprint);
+  const html = lesson.html ?? renderBlueprintHtml(blueprint, [], libraryOptions);
 
   await db
     .from("artifacts")
@@ -421,7 +440,34 @@ async function runArtifactJob(topicId: string, artifactId?: string): Promise<unk
     })
     .eq("id", target.id);
 
+  await ensureCharacter(topicId);
   return { artifactId: target.id, usage: lesson.meta.usage };
+}
+
+/**
+ * Builds the `library` option passed to `renderBlueprintHtml`. We only widen
+ * the CSP when the blueprint actually embeds a library artifact AND the
+ * artifact origin is configured; otherwise the lesson keeps the strict
+ * `frame-src 'none'` policy. A missing manifest row silently drops that pin
+ * from the embedded map, which forces the player to fall back to the built-in
+ * visual rather than render a stale frame.
+ */
+async function resolveLibraryOptions(
+  db: ReturnType<typeof createServiceClient>,
+  bp: ArtifactBlueprint,
+): Promise<RenderBlueprintOptions> {
+  const refs = collectLibraryRefs(bp);
+  if (refs.length === 0) return {};
+  const origin = getArtifactOrigin();
+  if (!origin) return {};
+  const manifests: Record<string, ArtifactManifest> = {};
+  for (const ref of refs) {
+    const loaded = await getArtifact(db, ref.artifactId, ref.version);
+    if (!loaded.ok) continue;
+    const parsed = loaded.version.manifest as unknown as ArtifactManifest;
+    manifests[`${ref.artifactId}@${ref.version}`] = parsed;
+  }
+  return { library: { origin, manifests } };
 }
 
 function slugify(s: string): string {

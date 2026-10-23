@@ -1,4 +1,5 @@
 import "server-only";
+import type { UsageCategory } from "@eco/db";
 import { createServiceClient } from "@/lib/supabase/server";
 
 /** Why a billable enqueue did not start. `credits` is the paywall. */
@@ -45,10 +46,40 @@ export function startArtifactJob(topicId: string, reason: "initial" | "prewarm" 
   return rpc("start_artifact_job", { p_topic_id: topicId, p_reason: reason });
 }
 
-export async function spendCredit(jobId: string): Promise<void> {
+/** Charge a finished job its measured cost in credits; the rest of its hold goes back. */
+export async function settleCredit(jobId: string, actual: number): Promise<void> {
   const db = createServiceClient();
-  const { error } = await db.rpc("spend_credit", { p_job_id: jobId });
+  const { error } = await db.rpc("settle_credit", { p_job_id: jobId, p_actual: Math.max(0, Math.ceil(actual)) });
   if (error) throw new Error(error.message);
+}
+
+export interface UsageCharge {
+  parentId: string;
+  category: UsageCategory;
+  credits: number;
+  reason: string;
+  tutorSessionId?: string | null;
+  topicId?: string | null;
+}
+
+/** Charge usage outside the job queue. Takes at most what is left; returns the balance afterwards. */
+export async function chargeUsage(c: UsageCharge): Promise<number> {
+  const db = createServiceClient();
+  const { data, error } = await db.rpc("charge_usage", {
+    p_parent_id: c.parentId,
+    p_category: c.category,
+    p_amount: Math.max(0, Math.ceil(c.credits)),
+    p_reason: c.reason,
+    p_tutor_session_id: c.tutorSessionId ?? null,
+    p_topic_id: c.topicId ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return typeof data === "number" ? data : 0;
+}
+
+export async function creditBalance(parentId: string): Promise<number> {
+  const { data } = await createServiceClient().from("parents").select("credit_balance").eq("id", parentId).maybeSingle();
+  return (data as { credit_balance?: number } | null)?.credit_balance ?? 0;
 }
 
 export async function refundCredit(jobId: string): Promise<void> {

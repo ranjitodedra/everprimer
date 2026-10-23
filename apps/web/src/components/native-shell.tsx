@@ -26,6 +26,11 @@ export function NativeShell() {
       if (Capacitor.getPlatform() === "android") {
         await StatusBar.setBackgroundColor({ color: "#ffffff" });
       }
+      if (Capacitor.getPlatform() === "ios") {
+        // The bar's Done button is the only way to dismiss the keyboard from a field with no return action.
+        const { Keyboard } = await import("@capacitor/keyboard");
+        await Keyboard.setAccessoryBarVisible({ isVisible: true });
+      }
       await SplashScreen.hide();
 
       const handle = await App.addListener("backButton", ({ canGoBack }) => {

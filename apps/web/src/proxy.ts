@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isArtifactHost, isArtifactRoutePath } from "@/lib/artifact-host";
 import { KID_MODE_COOKIE } from "@/lib/kid-mode";
 
 const PROTECTED_PREFIXES = ["/parent", "/learn", "/unlock"];
@@ -13,8 +14,25 @@ function under(path: string, prefix: string) {
  * and child surfaces behind sign-in, keeps child logins inside their own
  * learn pages, and puts the grown-up area behind the PIN while a shared
  * device is in kid mode.
+ *
+ * Host-based routing (ADR-001): the artifact origin is a disjoint hostname that
+ * answers only on `/a/*` and never touches Supabase cookies. On the app host,
+ * requests to `/a/*` 404 so a stray request there cannot borrow app cookies to
+ * fetch artifact bytes.
  */
 export async function proxy(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const onArtifactHost = isArtifactHost(request);
+  const onArtifactPath = isArtifactRoutePath(path);
+
+  if (onArtifactHost) {
+    if (!onArtifactPath) return new NextResponse(null, { status: 404 });
+    return NextResponse.next({ request });
+  }
+  if (onArtifactPath) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,7 +56,6 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
   const redirectTo = (pathname: string, search = "") => {
     const target = request.nextUrl.clone();
     target.pathname = pathname;

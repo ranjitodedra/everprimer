@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -87,6 +88,14 @@ export async function startCheckout(tierInput: string) {
   });
   if (!session.url) throw new Error("Stripe did not return a checkout URL");
   redirect(session.url);
+}
+
+/** Grown-up switch for the live voice tutor. Clients cannot write parents, so this runs with the service role. */
+export async function setLiveTutorAllowed(enabled: boolean) {
+  const account = await requireGrownup();
+  const { error } = await createServiceClient().from("parents").update({ live_tutor_allowed: z.boolean().parse(enabled) }).eq("id", account.user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/parent/settings");
 }
 
 export async function startPortal() {

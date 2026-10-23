@@ -1,6 +1,14 @@
-import { collectQuestions, isGameBlueprint, type ArtifactBlueprint } from "@eco/contracts";
+import {
+  collectQuestions,
+  gameBites,
+  isGameBlueprint,
+  type ArtifactBlueprint,
+  type ArtifactManifest,
+  type LibraryRef,
+} from "@eco/contracts";
 import { LEARNKIT_RUNTIME_SOURCE } from "./runtime";
 import { PLAYER_CSS, PLAYER_SOURCE } from "./player";
+import { checkInlineScriptSyntax, checkSandboxBasics, extractInlineScripts } from "./sandbox-validate";
 
 /**
  * Content Security Policy baked into every artifact document. Combined with
@@ -9,6 +17,42 @@ import { PLAYER_CSS, PLAYER_SOURCE } from "./player";
  */
 export const ARTIFACT_CSP =
   "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
+
+/**
+ * CSP for a lesson that embeds library artifacts: identical to `ARTIFACT_CSP`
+ * except `frame-src` is widened to the artifact origin so the nested iframe
+ * can load. We never widen `connect-src` or `script-src`: lesson code still
+ * cannot talk to the artifact origin itself, and all cross-frame communication
+ * goes through `postMessage`.
+ */
+export function libraryArtifactCsp(artifactOrigin: string): string {
+  return ARTIFACT_CSP.replace("frame-src 'none'", `frame-src ${artifactOrigin}`);
+}
+
+/** Every library pin a blueprint references, deduped by (artifactId, version). */
+export function collectLibraryRefs(bp: ArtifactBlueprint): LibraryRef[] {
+  const bites = isGameBlueprint(bp) ? gameBites(bp) : bp.sections;
+  const out: LibraryRef[] = [];
+  const seen = new Set<string>();
+  for (const s of bites) {
+    if (s.type !== "explore" || !s.library) continue;
+    const key = `${s.library.artifactId}@${s.library.version}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s.library);
+  }
+  return out;
+}
+
+/** Options the host supplies for lessons that may embed library artifacts. */
+export interface RenderBlueprintOptions {
+  library?: {
+    /** The artifact origin, e.g. `https://everprimer-artifacts.app`. */
+    origin: string;
+    /** Manifests for every library ref in the blueprint, keyed `${artifactId}@${version}`. */
+    manifests: Record<string, ArtifactManifest>;
+  };
+}
 
 /** Safely embed JSON inside a <script> block. */
 export function jsonForScript(value: unknown): string {
@@ -37,28 +81,7 @@ function themeSurface(bp: ArtifactBlueprint): { ink: string; muted: string; card
 
 /** Pull inline <script> bodies, skipping the injected LearnKit runtime. */
 export function authoredScripts(html: string): string[] {
-  const authored = html.replace(LEARNKIT_RUNTIME_SOURCE, "");
-  const out: string[] = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(authored))) {
-    if (/\bsrc\s*=/i.test(m[1] ?? "")) continue;
-    const body = (m[2] ?? "").trim();
-    if (body) out.push(body);
-  }
-  return out;
-}
-
-function scriptSyntaxError(source: string): string | null {
-  try {
-    // Parses as a function body. Catches the Gemini failure mode: CSS var()
-    // interpolated into a JS template literal (`stroke="${var(--x)}"`).
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    new Function(source);
-    return null;
-  } catch (err) {
-    return (err as Error).message;
-  }
+  return extractInlineScripts(html, [LEARNKIT_RUNTIME_SOURCE]);
 }
 
 const VIEWPORT_META = `<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">`;
@@ -113,14 +136,29 @@ export function inlineAssets(html: string, assets: LessonAsset[]): string {
 }
 
 /** Deterministic, complete lesson document driven purely by the blueprint. */
-export function renderBlueprintHtml(bp: ArtifactBlueprint, assets: LessonAsset[] = []): string {
+export function renderBlueprintHtml(
+  bp: ArtifactBlueprint,
+  assets: LessonAsset[] = [],
+  options: RenderBlueprintOptions = {},
+): string {
   const surface = themeSurface(bp);
   const themeVars = `:root{--lk-primary:${bp.theme.primary};--lk-accent:${bp.theme.accent};--lk-bg:${bp.theme.background};--lk-ink:${surface.ink};--lk-muted:${surface.muted};--lk-card:${surface.card};--lk-line:${surface.line};}`;
+
+  // Only widen the CSP when the blueprint actually embeds library artifacts
+  // AND the host supplied a library origin. Lessons without library bites
+  // keep the strict `frame-src 'none'` policy.
+  const refs = collectLibraryRefs(bp);
+  const needsLibrary = refs.length > 0 && !!options.library;
+  const csp = needsLibrary ? libraryArtifactCsp(options.library!.origin) : ARTIFACT_CSP;
+  const libraryScript = needsLibrary
+    ? `<script>window.__LIBRARY__=${jsonForScript({ origin: options.library!.origin, manifests: options.library!.manifests })};</script>\n`
+    : "";
+
   return withTouchGuards(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>${escapeHtml(bp.title)}</title>
 <style>${PLAYER_CSS}${themeVars}</style>
 </head>
@@ -128,16 +166,17 @@ export function renderBlueprintHtml(bp: ArtifactBlueprint, assets: LessonAsset[]
 <div id="app" aria-live="off"></div>
 <script>${LEARNKIT_RUNTIME_SOURCE}</script>
 <script>window.__BLUEPRINT__=${jsonForScript(bp)};window.__ASSETS__=${jsonForScript(assetMap(assets))};</script>
-<script>${PLAYER_SOURCE}</script>
+${libraryScript}<script>${PLAYER_SOURCE}</script>
 </body>
 </html>`);
 }
 
 /**
- * Swap the player stylesheet and script in a stored blueprint document for the
- * current ones, keeping its blueprint, assets and theme. Lessons are stored at
- * generation time, so this is how older lessons pick up player changes.
- * Documents not produced by `renderBlueprintHtml` are returned unchanged.
+ * Swap the runtime, player stylesheet and player script in a stored blueprint
+ * document for the current ones, keeping its blueprint, assets and theme.
+ * Lessons are stored at generation time, so this is how older lessons pick up
+ * player changes. Documents not produced by `renderBlueprintHtml` are returned
+ * unchanged.
  */
 export function refreshPlayerHtml(html: string): string {
   const data = html.indexOf("window.__BLUEPRINT__=");
@@ -147,6 +186,12 @@ export function refreshPlayerHtml(html: string): string {
   const close = open < 0 ? -1 : html.indexOf("</script>", open);
   if (dataEnd < 0 || close < 0) return html;
   let out = `${html.slice(0, open)}<script>${PLAYER_SOURCE}${html.slice(close)}`;
+  const dataOpen = out.lastIndexOf("<script>", data);
+  const runtimeClose = dataOpen < 0 ? -1 : out.lastIndexOf("</script>", dataOpen);
+  const runtimeOpen = runtimeClose < 0 ? -1 : out.lastIndexOf("<script>", runtimeClose);
+  if (runtimeOpen >= 0 && out.slice(runtimeOpen, runtimeClose).includes("window.LearnKit = {")) {
+    out = `${out.slice(0, runtimeOpen)}<script>${LEARNKIT_RUNTIME_SOURCE}${out.slice(runtimeClose)}`;
+  }
   out = out.replace(/<style>[\s\S]*?(:root\{--lk-primary:[^}]*\})<\/style>/, (_whole, vars: string) => `<style>${PLAYER_CSS}${vars}</style>`);
   return out;
 }
@@ -198,29 +243,22 @@ export function validateArtifactHtml(html: string): HtmlValidationResult {
   // Author code = everything except the injected runtime.
   const authored = html.replace(LEARNKIT_RUNTIME_SOURCE, "");
 
-  if (!/<html[\s>]/i.test(html) || !/<\/html>/i.test(html)) errors.push("document is not a complete <html> document");
+  checkSandboxBasics(html, errors);
   if (!hasRuntime) errors.push("LearnKit runtime missing");
   if (!/\bLearnKit\b/.test(authored) || !/\.emit\(/.test(authored)) errors.push("artifact never emits LearnKit events");
   if (!/["']question_answered["']/.test(authored)) errors.push("artifact never emits question_answered (no knowledge check)");
   if (!/["']topic_completed["']/.test(authored)) errors.push("artifact never emits topic_completed");
 
-  const externalSrc = html.match(/<(script|link|img|iframe|video|audio|source|object|embed)[^>]+(src|href)=["'](https?:)?\/\//gi);
-  if (externalSrc) errors.push(`external resources are not allowed (${externalSrc.length} found)`);
-  if (/<iframe[\s>]/i.test(html)) errors.push("nested iframes are not allowed");
   if (/\bfetch\s*\(/.test(html) || /XMLHttpRequest/.test(html) || /WebSocket\s*\(/.test(html) || /navigator\.sendBeacon/.test(html)) {
     errors.push("network calls (fetch/XHR/WebSocket/sendBeacon) are not allowed");
   }
   if (/\bimport\s*\(/.test(html) || /<script[^>]+type=["']module["']/i.test(html)) warnings.push("ES module syntax found; make sure nothing is imported from the network");
   if (/document\.cookie|localStorage|sessionStorage|indexedDB/.test(html)) warnings.push("storage APIs are unavailable in the sandbox and will throw");
-  if (/window\.top|window\.parent\.document|parent\.location/.test(html)) errors.push("artifact must not touch the host window");
   if (!lower.includes("prefers-reduced-motion") && !lower.includes("reducedmotion")) warnings.push("no reduced-motion handling found");
   if (!/<meta[^>]+name=["']viewport["']/i.test(html)) warnings.push("missing viewport meta");
   if (html.length > 400_000) warnings.push("document is very large (>400KB)");
 
-  for (const [i, source] of authoredScripts(html).entries()) {
-    const syntax = scriptSyntaxError(source);
-    if (syntax) errors.push(`authored script ${i + 1} has a JavaScript syntax error (${syntax})`);
-  }
+  checkInlineScriptSyntax(html, errors, [LEARNKIT_RUNTIME_SOURCE]);
   const unresolved = html.match(/["'(]asset:[^"')\s]*/g);
   if (unresolved) errors.push(`image placeholders with no generated image: ${[...new Set(unresolved.map((m) => m.slice(1)))].join(", ")}`);
 

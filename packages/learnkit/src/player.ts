@@ -40,6 +40,19 @@ export const PLAYER_SOURCE = String.raw`
     return node;
   }
 
+  // Phones get no automatic focus, and any tap outside a field or button closes
+  // the keyboard. Buttons are skipped so the layout doesn't jump mid-tap.
+  var finePointer = !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches);
+  function dismissKeyboard() {
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) a.blur();
+  }
+  document.addEventListener("pointerdown", function (e) {
+    var t = e.target;
+    if (t && t.closest && t.closest("input, textarea, select, button, label")) return;
+    dismissKeyboard();
+  }, true);
+
   function seeded(seed) {
     var h = 2166136261;
     for (var i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -81,6 +94,97 @@ export const PLAYER_SOURCE = String.raw`
     return "";
   }
   function assetUri(id) { var A = window.__ASSETS__ || {}; return id && typeof A[id] === "string" ? A[id] : null; }
+
+  /* ---------- tutor character ---------- */
+  // Every line the guide says is wrapped in a tutor line. Until the host sends
+  // both poses (and they decode) the wrapper is a plain block, so the lesson
+  // reads exactly as it always has. Art arrives later and upgrades the page in
+  // place: no re-render, so answers and open feedback are untouched.
+  function tutorLine(pose) {
+    var text = el("div", { class: "lk-tutor-text" });
+    for (var i = 1; i < arguments.length; i++) if (arguments[i]) text.appendChild(arguments[i]);
+    return el("div", { class: "lk-tutor", "data-pose": pose }, el("span", { class: "lk-tutor-figure", "aria-hidden": "true" }), text);
+  }
+  /* Marks the line that should get the character on its screen, ahead of an opener. */
+  function primaryLine(line) { line.setAttribute("data-primary", ""); return line; }
+  /* One character per screen: the primary line (or the first) speaks; every other line is plain text. */
+  function settleTutors() {
+    var list = root.querySelectorAll(".lk-tutor");
+    var pick = root.querySelector(".lk-tutor[data-primary]") || list[0] || null;
+    for (var i = 0; i < list.length; i++) list[i].classList.toggle("lk-tutor-plain", list[i] !== pick);
+  }
+  var TUTOR_URI = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/]+=*$/;
+  function applyTutorArt(d) {
+    if (!d || typeof d.talk !== "string" || typeof d.teach !== "string" || !TUTOR_URI.test(d.talk) || !TUTOR_URI.test(d.teach)) return;
+    var pending = 2, ok = true;
+    function settle(success) {
+      ok = ok && success;
+      if (--pending > 0 || !ok) return;
+      var rs = document.documentElement.style;
+      rs.setProperty("--lk-tutor-talk", 'url("' + d.talk + '")');
+      rs.setProperty("--lk-tutor-teach", 'url("' + d.teach + '")');
+      document.body.classList.toggle("lk-tutor-blend", d.cutout !== true);
+      document.body.classList.add("lk-has-tutor");
+    }
+    [d.talk, d.teach].forEach(function (src) {
+      var img = new Image();
+      img.onload = function () { settle(img.naturalWidth > 0); };
+      img.onerror = function () { settle(false); };
+      img.src = src;
+    });
+  }
+  function applyTutorState(d) {
+    var s = d && d.state;
+    if (s === "listening" || s === "thinking" || s === "speaking") document.body.setAttribute("data-tutor", s);
+    else document.body.removeAttribute("data-tutor");
+  }
+  if (LK.onHost) {
+    LK.onHost("tutor_art", applyTutorArt);
+    LK.onHost("tutor_state", applyTutorState);
+  }
+
+  /* What is on screen, for the live tutor. Answers stay out until the learner has had their go. */
+  function clip(s, n) { s = String(s == null ? "" : s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  function sendContext(c) { if (LK.tutorContext) LK.tutorContext(c); }
+  function sectionText(s) {
+    var parts = [];
+    if (s.type === "intro") parts = [s.body, s.hook];
+    else if (s.type === "explain") parts = s.paragraphs.concat([s.analogy]);
+    else if (s.type === "simple_explain") parts = [s.simple, s.term + ": " + s.definition];
+    else if (s.type === "analogy") parts = [s.familiar, s.bridge, s.limit];
+    else if (s.type === "mnemonic") parts = [s.phrase].concat(s.lines.map(function (l) { return l.cue + " = " + l.text; }), [s.tip]);
+    else if (s.type === "key_points") parts = [s.lead].concat(s.points);
+    else if (s.type === "explore") parts = [s.lead, s.prompt].concat(s.visual.items.map(function (it) { return it.label + ": " + it.description; }));
+    else if (s.type === "review") parts = s.bullets.concat([s.nextStep]);
+    else if (s.type === "image") parts = [s.alt, s.caption];
+    else if (s.type === "apply") parts = [s.scenario];
+    else if (s.type === "quiz") parts = [s.intro];
+    return clip(parts.filter(function (p) { return p; }).join(" "), 1400);
+  }
+  function questionOptions(q) {
+    var list = q.kind === "mcq" || q.kind === "fill_blank" ? q.options : q.kind === "ordering" ? q.items : q.kind === "matching" ? q.left.concat(q.right) : null;
+    if (q.kind === "true_false") return ["True", "False"];
+    return list ? list.slice(0, 12).map(function (o) { return clip(o.text, 200); }) : undefined;
+  }
+  function roundProgress() { return BP.schemaVersion === 3 ? { round: Math.min(currentSessionIndex(), 50), rounds: Math.min(BP.sessions.length, 50) } : undefined; }
+  function baseContext(screen, s) {
+    var sess = BP.schemaVersion === 3 && (screen === "bite" || screen === "session_done") ? BP.sessions[state.si] : null;
+    return { screen: screen, title: clip(s ? s.title : BP.title, 200), sessionTitle: sess ? clip(sess.title, 200) : undefined, biteType: s ? s.type : undefined, progress: roundProgress() };
+  }
+  function sectionContext(s) {
+    var c = baseContext(BP.schemaVersion === 3 ? "bite" : "section", s);
+    c.text = sectionText(s);
+    return c;
+  }
+  function questionContext(s, q, status) {
+    var c = baseContext(BP.schemaVersion === 3 ? "bite" : "section", s);
+    c.text = clip((sectionText(s) + (status === "retry" ? " The first try was not right; the learner is trying again." : "")).trim(), 1400);
+    c.question = { prompt: clip(q.prompt, 600), options: questionOptions(q), hint: q.hint ? clip(q.hint, 300) : undefined };
+    c.answered = status === "correct" || status === "revealed";
+    if (status) c.correct = status === "correct";
+    if (c.answered) c.explanation = clip(q.explanation, 600);
+    return c;
+  }
 
   /* ---------- shell ---------- */
 
@@ -127,6 +231,8 @@ export const PLAYER_SOURCE = String.raw`
     var isLast = state.i === sections.length - 1;
     root.appendChild(nav(view.canContinue, isLast ? "See how I did" : view.label));
     LK.emit("section_viewed", { index: state.i, type: s.type, stage: s.stage }, { sectionId: s.id });
+    if (s.type !== "quiz" && s.type !== "apply") sendContext(sectionContext(s));
+    settleTutors();
     var heading = main.querySelector("h2");
     if (heading) { heading.setAttribute("tabindex", "-1"); heading.focus({ preventScroll: true }); }
     window.scrollTo(0, 0);
@@ -149,7 +255,7 @@ export const PLAYER_SOURCE = String.raw`
   /* ---------- teaching blocks ---------- */
   function renderKeyPoints(s) {
     var node = el("section", { class: "lk-section lk-points" }, stageTag(s), el("h2", { text: s.title }));
-    if (s.lead) node.appendChild(el("p", { class: "lk-lead", text: s.lead }));
+    if (s.lead) node.appendChild(tutorLine("teach", el("p", { class: "lk-lead", text: s.lead })));
     var ol = el("ol", { class: "lk-point-list" });
     s.points.forEach(function (p, idx) { ol.appendChild(el("li", {}, el("span", { class: "lk-step-n", "aria-hidden": "true", text: String(idx + 1) }), el("span", { text: p }))); });
     node.appendChild(ol);
@@ -169,7 +275,7 @@ export const PLAYER_SOURCE = String.raw`
 
   function renderMnemonic(s) {
     var node = el("section", { class: "lk-section lk-mnemonic" }, stageTag(s), el("h2", { text: s.title }));
-    node.appendChild(el("p", { class: "lk-mnemonic-phrase", text: s.phrase }));
+    node.appendChild(tutorLine("teach", el("p", { class: "lk-mnemonic-phrase", text: s.phrase })));
     var ul = el("ul", { class: "lk-mnemonic-lines" });
     s.lines.forEach(function (l) { ul.appendChild(el("li", {}, el("span", { class: "lk-cue", text: l.cue }), el("span", { text: l.text }))); });
     node.appendChild(ul);
@@ -180,14 +286,14 @@ export const PLAYER_SOURCE = String.raw`
   function renderAnalogy(s) {
     var node = el("section", { class: "lk-section lk-analogy" }, stageTag(s), el("h2", { text: s.title }));
     node.appendChild(el("div", { class: "lk-callout analogy" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "💡" }), el("div", {}, el("strong", { text: "You know this from " + s.interest }), el("p", { text: s.familiar }))));
-    node.appendChild(el("p", { class: "lk-lead", text: s.bridge }));
+    node.appendChild(tutorLine("teach", el("p", { class: "lk-lead", text: s.bridge })));
     if (s.limit) node.appendChild(el("div", { class: "lk-callout limit" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "✋" }), el("div", {}, el("strong", { text: "Where the comparison stops" }), el("p", { text: s.limit }))));
     return { node: node, canContinue: true };
   }
 
   function renderSimpleExplain(s) {
     var node = el("section", { class: "lk-section lk-simple" }, stageTag(s), el("h2", { text: s.title }));
-    node.appendChild(el("p", { class: "lk-lead", text: s.simple }));
+    node.appendChild(tutorLine("teach", el("p", { class: "lk-lead", text: s.simple })));
     node.appendChild(el("div", { class: "lk-term-card" }, el("span", { class: "lk-term-label", text: "The real word" }), el("strong", { class: "lk-term", text: s.term }), el("p", { text: s.definition })));
     return { node: node, canContinue: true };
   }
@@ -200,7 +306,7 @@ export const PLAYER_SOURCE = String.raw`
   /* ---------- intro ---------- */
   function renderIntro(s) {
     var node = el("section", { class: "lk-section lk-intro" },
-      stageTag(s), el("h2", { text: s.title }), el("p", { class: "lk-lead", text: s.body }),
+      stageTag(s), el("h2", { text: s.title }), tutorLine("talk", el("p", { class: "lk-lead", text: s.body })),
       el("div", { class: "lk-callout hook" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "🤔" }), el("p", { text: s.hook }))
     );
     return { node: node, canContinue: true, label: "Let's go" };
@@ -209,7 +315,7 @@ export const PLAYER_SOURCE = String.raw`
   /* ---------- explain ---------- */
   function renderExplain(s) {
     var node = el("section", { class: "lk-section lk-explain" }, stageTag(s), el("h2", { text: s.title }));
-    s.paragraphs.forEach(function (p) { node.appendChild(el("p", { text: p })); });
+    node.appendChild(tutorLine.apply(null, ["teach"].concat(s.paragraphs.map(function (p) { return el("p", { text: p }); }))));
     if (s.visual) node.appendChild(renderVisual(s.visual, s.id));
     if (s.analogy) node.appendChild(el("div", { class: "lk-callout analogy" }, el("span", { class: "lk-callout-icon", "aria-hidden": "true", text: "💡" }), el("p", { text: s.analogy })));
     return { node: node, canContinue: true };
@@ -293,14 +399,166 @@ export const PLAYER_SOURCE = String.raw`
     return ol;
   }
 
+  /* ---------- library artifact embedding ---------- */
+  // Nonce fresh per session: 128 random bits hex. We can't use process.env or
+  // import crypto here because this runs in a sandboxed document.
+  function randomNonce() {
+    var out = "";
+    if (window.crypto && window.crypto.getRandomValues) {
+      var buf = new Uint8Array(16);
+      window.crypto.getRandomValues(buf);
+      for (var i = 0; i < buf.length; i++) { var h = buf[i].toString(16); if (h.length < 2) h = "0" + h; out += h; }
+      return out;
+    }
+    return "n" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+
+  // Minimal event validator: name must be declared or the built-in 'interacted',
+  // and every data field must be in the manifest's declared field map. Loose on
+  // types since the artifact-side runtime already coerced non-object data to {}.
+  function validateArtifactEvent(manifest, name, data) {
+    if (typeof name !== "string" || !name) return false;
+    if (name === "interacted") return !data || typeof data !== "object" || Object.keys(data).length === 0;
+    var events = (manifest && manifest.events) || [];
+    var decl = null;
+    for (var i = 0; i < events.length; i++) if (events[i].name === name) decl = events[i];
+    if (!decl) return false;
+    if (data == null) data = {};
+    if (typeof data !== "object" || Array.isArray(data)) return false;
+    for (var k in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, k)) continue;
+      if (!decl.data || !decl.data[k]) return false;
+    }
+    return true;
+  }
+
+  function hasWebGL() {
+    try {
+      var c = document.createElement("canvas");
+      return !!(c.getContext && (c.getContext("webgl2") || c.getContext("webgl")));
+    } catch (e) { return false; }
+  }
+
+  // Returns an { node, canContinue } for the library branch, or null when we
+  // should fall through to the built-in visual (no origin, no manifest, no
+  // WebGL, load timeout, bad event — anything that would hurt the lesson).
+  function tryLibraryBranch(s) {
+    var ref = s.library;
+    var lib = window.__LIBRARY__;
+    if (!ref || !lib || !lib.origin) return null;
+    var key = ref.artifactId + "@" + ref.version;
+    var manifest = lib.manifests ? lib.manifests[key] : null;
+    if (!manifest) return null;
+    if (!hasWebGL()) {
+      LK.emit("artifact_fallback", { libraryArtifactId: ref.artifactId, version: ref.version, reason: "no_webgl" }, { sectionId: s.id, activityId: s.id });
+      return null;
+    }
+
+    var a = state.act[s.id] || (state.act[s.id] = { seen: {}, started: false, done: false, anim: false });
+    var nonce = randomNonce();
+    var ready = false;
+    var pausedByObserver = false;
+
+    var node = el("section", { class: "lk-section lk-explore lk-explore-library" },
+      el("h2", { text: s.title }),
+      tutorLine("talk", el("p", { class: "lk-lead", text: s.lead }))
+    );
+    var stage = el("div", { class: "lk-explore-stage lk-library-stage" });
+    var iframe = el("iframe", {
+      class: "lk-library-frame",
+      title: s.title,
+      sandbox: "allow-scripts",
+      referrerpolicy: "no-referrer",
+      allow: "",
+      src: lib.origin + "/a/" + encodeURIComponent(ref.artifactId) + "/" + ref.version + "/" + manifest.entry
+    });
+    iframe.style.width = "100%";
+    iframe.style.height = "min(60vh, 480px)";
+    iframe.style.border = "0";
+    iframe.style.borderRadius = "20px";
+    iframe.style.background = "var(--lk-tile)";
+    stage.appendChild(iframe);
+    node.appendChild(stage);
+    if (s.prompt) node.appendChild(el("p", { class: "lk-muted center", text: s.prompt }));
+
+    function post(msg) { try { iframe.contentWindow && iframe.contentWindow.postMessage(msg, "*"); } catch (e) {} }
+    function sendInit() {
+      post({ source: "artifactkit-host", v: 1, kind: "ak-init", nonce: nonce, params: ref.params || {}, reducedMotion: !!LK.reducedMotion });
+    }
+    function setPaused(next) {
+      if (pausedByObserver === next) return;
+      pausedByObserver = next;
+      if (!ready) return;
+      post({ source: "artifactkit-host", v: 1, kind: next ? "ak-pause" : "ak-resume" });
+    }
+
+    var onMessage = function (e) {
+      // Origin check is useless here: both the artifact (sandboxed) and this
+      // document are opaque origins. We rely on source-window identity plus
+      // the per-session nonce. Mimics the LearnKit host guard.
+      if (!e || !e.data || e.source !== iframe.contentWindow) return;
+      var d = e.data;
+      if (d.source !== "artifactkit" || d.v !== 1) return;
+      if (d.kind === "ak-ready") {
+        if (ready) return;
+        ready = true;
+        clearTimeout(timeoutId);
+        sendInit();
+        if (!a.started) { a.started = true; LK.emit("activity_started", { kind: "library", artifactId: ref.artifactId, version: ref.version }, { sectionId: s.id, activityId: s.id }); }
+        if (pausedByObserver) post({ source: "artifactkit-host", v: 1, kind: "ak-pause" });
+      } else if (d.kind === "ak-event") {
+        if (!ready || d.nonce !== nonce) return;
+        if (!validateArtifactEvent(manifest, d.name, d.data)) return;
+        LK.emit("artifact_interaction", {
+          libraryArtifactId: ref.artifactId,
+          version: ref.version,
+          name: d.name,
+          data: d.data || {}
+        }, { sectionId: s.id, activityId: s.id });
+        if (!a.done) { a.done = true; enableContinue(); }
+      } else if (d.kind === "ak-error") {
+        LK.emit("artifact_error", { libraryArtifactId: ref.artifactId, version: ref.version, message: String(d.message || "").slice(0, 500), fatal: !!d.fatal }, { sectionId: s.id, activityId: s.id });
+      }
+    };
+    window.addEventListener("message", onMessage);
+
+    // 8s timeout: ADR-002. Falls back to the built-in visual by re-rendering
+    // the section. We leave the iframe in place; subsequent messages are a
+    // no-op because 'ready' never flips true.
+    var timeoutId = setTimeout(function () {
+      if (ready) return;
+      window.removeEventListener("message", onMessage);
+      LK.emit("artifact_fallback", { libraryArtifactId: ref.artifactId, version: ref.version, reason: "load_timeout" }, { sectionId: s.id, activityId: s.id });
+      s.library = null; // one-shot: avoid an infinite re-render loop
+      go(state.i);
+    }, 8000);
+
+    // Pause when the lesson tab is hidden or the frame scrolls off-screen.
+    var onVisibility = function () { setPaused(document.hidden); };
+    document.addEventListener("visibilitychange", onVisibility);
+    var observer = null;
+    try {
+      if (typeof IntersectionObserver === "function") {
+        observer = new IntersectionObserver(function (entries) {
+          for (var i = 0; i < entries.length; i++) setPaused(!entries[i].isIntersecting);
+        }, { threshold: 0.01 });
+        observer.observe(iframe);
+      }
+    } catch (e) {}
+
+    return { node: node, canContinue: a.done, label: "Next" };
+  }
+
   /* ---------- explore ---------- */
   function renderExplore(s) {
+    var lib = tryLibraryBranch(s);
+    if (lib) return lib;
     var a = state.act[s.id] || (state.act[s.id] = { seen: {}, started: false, done: false, anim: false });
     var items = s.visual.items;
     var need = Math.max(2, Math.ceil(items.length / 2));
     var node = el("section", { class: "lk-section lk-explore" },
       el("h2", { text: s.title }),
-      el("p", { class: "lk-lead", text: s.lead })
+      tutorLine("talk", el("p", { class: "lk-lead", text: s.lead }))
     );
     var reveal = el("div", { class: "lk-reveal", "aria-live": "polite" });
     var hint = el("p", { class: "lk-muted center", text: s.prompt });
@@ -435,7 +693,7 @@ export const PLAYER_SOURCE = String.raw`
       var attempt = (a.attempts[q.id] || 0) + 1;
       var qWrap = el("div", { class: "lk-question", "data-kind": q.kind });
       qWrap.appendChild(el("p", { class: "lk-counter", text: "Question " + (a.qi + 1) + " of " + s.questions.length + (attempt > 1 ? " · try " + attempt : "") }));
-      qWrap.appendChild(el("p", { class: "lk-prompt", text: q.prompt }));
+      qWrap.appendChild(primaryLine(tutorLine("talk", el("p", { class: "lk-prompt", text: q.prompt }))));
       var answerBox = el("div", { class: "lk-answer" });
       qWrap.appendChild(answerBox);
       var getAnswer = renderInput(q, answerBox, submit);
@@ -453,11 +711,14 @@ export const PLAYER_SOURCE = String.raw`
       var fb = el("div", { class: "lk-feedback-slot" });
       qWrap.appendChild(fb);
       holder.appendChild(qWrap);
+      sendContext(questionContext(s, q, attempt > 1 ? "retry" : null));
+      settleTutors();
 
       function feedback(elm) { fb.innerHTML = ""; fb.appendChild(elm); }
 
       function submit(answer) {
         if (answer === null || answer === undefined || answer === "" ) { live.textContent = "Choose or type an answer first."; return; }
+        dismissKeyboard();
         var ok = grade(q, answer);
         a.attempts[q.id] = attempt;
         LK.emit("question_answered", { activityId: s.id, questionId: q.id, answer: answer, attempt: attempt, hintsUsed: a.hints[q.id] || 0, clientCorrect: ok }, { sectionId: s.id, activityId: s.id });
@@ -469,11 +730,13 @@ export const PLAYER_SOURCE = String.raw`
           live.textContent = "Correct. " + q.explanation;
           feedback(el("div", { class: "lk-feedback ok" }, el("strong", { text: BP.schemaVersion === 3 ? "Nice!" : "Yes! That's right." }), el("p", { text: q.explanation }), nextBtn()));
           disableInputs();
+          sendContext(questionContext(s, q, "correct"));
         } else if (attempt < 2) {
           if (BP.schemaVersion === 3) state.streak = 0;
           live.textContent = "Not quite. Try again.";
           feedback(el("div", { class: "lk-feedback retry" }, el("strong", { text: "Not quite." }), el("p", { text: q.hint ? q.hint : "Have another look and try again." }), el("button", { class: "lk-btn soft", type: "button", onClick: function () { draw(); } }, "Try again")));
           disableInputs();
+          sendContext(questionContext(s, q, "retry"));
         } else {
           a.results[q.id] = false;
           state.qres[q.id] = { ok: false, first: false };
@@ -483,6 +746,7 @@ export const PLAYER_SOURCE = String.raw`
           live.textContent = "The answer is " + correctAnswerText(q) + ". " + q.explanation;
           feedback(el("div", { class: "lk-feedback reveal" }, el("strong", { text: "Here's the answer: " + correctAnswerText(q) }), el("p", { text: q.explanation }), nextBtn()));
           disableInputs();
+          sendContext(questionContext(s, q, "revealed"));
         }
       }
       function disableInputs() { var ctrls = answerBox.querySelectorAll("button, input, select"); for (var i = 0; i < ctrls.length; i++) ctrls[i].disabled = true; var acts = actions.querySelectorAll("button"); for (var j = 0; j < acts.length; j++) acts[j].disabled = true; }
@@ -513,8 +777,8 @@ export const PLAYER_SOURCE = String.raw`
     if (q.kind === "mcq") {
       var chosen = null;
       var list = el("div", { class: "lk-options", role: "radiogroup", "aria-label": "Answer options" });
-      q.options.forEach(function (o) {
-        var b = el("button", { class: "lk-option", type: "button", role: "radio", "aria-checked": "false" }, el("span", { class: "lk-option-key", "aria-hidden": "true", text: o.id.toUpperCase() }), el("span", { text: o.text }));
+      q.options.forEach(function (o, idx) {
+        var b = el("button", { class: "lk-option", type: "button", role: "radio", "aria-checked": "false" }, el("span", { class: "lk-option-key", "aria-hidden": "true", text: String.fromCharCode(65 + idx) }), el("span", { text: o.text }));
         b.addEventListener("click", function () {
           chosen = o.id;
           var all = list.querySelectorAll(".lk-option");
@@ -533,10 +797,10 @@ export const PLAYER_SOURCE = String.raw`
       return function () { return null; };
     }
     if (q.kind === "short_answer") {
-      var input = el("input", { class: "lk-input", type: "text", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "Your answer", placeholder: "Type your answer" });
-      input.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(input.value); });
+      var input = el("input", { class: "lk-input", type: "text", autocomplete: "off", autocapitalize: "off", spellcheck: "false", enterkeyhint: "done", "aria-label": "Your answer", placeholder: "Type your answer" });
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); input.blur(); submit(input.value); } });
       box.appendChild(input);
-      setTimeout(function () { input.focus(); }, 50);
+      if (finePointer) setTimeout(function () { input.focus(); }, 50);
       return function () { return input.value; };
     }
     if (q.kind === "ordering") {
@@ -623,8 +887,7 @@ export const PLAYER_SOURCE = String.raw`
     root.appendChild(header());
     var done = el("section", { class: "lk-section lk-done" },
       el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: BP.theme.emoji || "🎉" }),
-      el("h2", { text: "Lesson complete" }),
-      el("p", { class: "lk-lead", text: "Here is how you did in " + BP.title + "." }));
+      tutorLine("talk", el("h2", { text: "Lesson complete" }), el("p", { class: "lk-lead", text: "Here is how you did in " + BP.title + "." })));
     var fb = feedbackRows();
     if (fb.rows.length) {
       var list = el("ul", { class: "lk-feedback-list" });
@@ -639,6 +902,8 @@ export const PLAYER_SOURCE = String.raw`
     done.appendChild(el("p", { class: "lk-muted", text: fb.practise ? "Anything marked to practise will come back in a later lesson. Your grown-up can see this summary too." : "Your grown-up can see this summary too." }));
     done.appendChild(el("button", { class: "lk-btn ghost", type: "button", onClick: function () { state.i = 0; render(); } }, "Start over"));
     root.appendChild(el("main", { class: "lk-main" }, done));
+    settleTutors();
+    sendContext({ screen: "score", title: clip(BP.title, 200), text: "The learner reached the end of the lesson: " + state.totals.correct + " of " + state.totals.answered + " answers right." });
   }
 
   /* Per-objective summary from this session's answers. The server keeps the authoritative record. */
@@ -753,6 +1018,9 @@ export const PLAYER_SOURCE = String.raw`
       el("h2", { text: BP.title }),
       nodeList
     )));
+    var c = baseContext("map", null);
+    c.text = cur >= BP.sessions.length ? "All rounds are done; the big challenge is unlocked." : "Next round: " + clip(BP.sessions[cur].title, 120) + ".";
+    sendContext(c);
   }
   function drawBite() {
     var sess = BP.sessions[state.si];
@@ -762,12 +1030,17 @@ export const PLAYER_SOURCE = String.raw`
     }
     root.appendChild(gameHud(sess));
     var main = el("main", { class: "lk-main", id: "lk-main" });
-    if (state.bi === 0) main.appendChild(el("p", { class: "lk-lead", text: sess.opener }));
+    if (state.bi === 0) main.appendChild(tutorLine("talk", el("p", { class: "lk-lead", text: sess.opener })));
     var view = renderSection(bite);
     main.appendChild(view.node);
     root.appendChild(main);
     root.appendChild(gameNav(view.canContinue, "Next", nextBite));
     LK.emit("section_viewed", { index: state.bi, type: bite.type, stage: bite.stage, sessionId: sess.id }, { sectionId: bite.id });
+    if (bite.type !== "quiz" && bite.type !== "apply") {
+      var c = sectionContext(bite);
+      if (state.bi === 0) c.text = clip(sess.opener + " " + c.text, 1400);
+      sendContext(c);
+    }
   }
   function drawSessionDone() {
     var sess = BP.sessions[state.si];
@@ -778,10 +1051,12 @@ export const PLAYER_SOURCE = String.raw`
     root.appendChild(gameHud(sess));
     root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section lk-done" },
       el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: sess.emoji || "🌟" }),
-      el("h2", { text: "Nice work" }),
-      el("p", { class: "lk-lead", text: "★ " + state.sessionStars })
+      tutorLine("talk", el("h2", { text: "Nice work" }), el("p", { class: "lk-lead", text: "★ " + state.sessionStars }))
     )));
     root.appendChild(gameNav(true, "Next", function () { state.screen = "map"; drawGame(); }));
+    var c = baseContext("session_done", null);
+    c.text = "The learner just finished the round " + clip(sess.title, 120) + " with " + state.sessionStars + " stars.";
+    sendContext(c);
   }
   function drawFinal() {
     var qs = BP.finalTest.questions;
@@ -789,15 +1064,22 @@ export const PLAYER_SOURCE = String.raw`
     root.appendChild(gameHud(null));
     var main = el("main", { class: "lk-main" });
     var node = el("section", { class: "lk-section lk-quiz", "data-id": "final_test" });
-    if (state.finalQi === 0) node.appendChild(el("p", { class: "lk-lead", text: BP.finalTest.intro }));
+    if (state.finalQi === 0) node.appendChild(tutorLine("talk", el("p", { class: "lk-lead", text: BP.finalTest.intro })));
     node.appendChild(el("p", { class: "lk-counter", text: (state.finalQi + 1) + " / " + qs.length }));
-    node.appendChild(el("p", { class: "lk-prompt", text: q.prompt }));
+    node.appendChild(primaryLine(tutorLine("talk", el("p", { class: "lk-prompt", text: q.prompt }))));
+    var fc = baseContext("final", null);
+    fc.title = "Big challenge";
+    fc.text = "This is the final challenge, question " + (state.finalQi + 1) + " of " + qs.length + ". It is a test: do not give hints or answers, only encourage.";
+    fc.question = { prompt: clip(q.prompt, 600), options: questionOptions(q) };
+    fc.answered = false;
+    sendContext(fc);
     var answerBox = el("div", { class: "lk-answer" });
     node.appendChild(answerBox);
     var locked = false;
     function submit(answer) {
       if (locked) return;
       if (answer === null || answer === undefined || answer === "") return;
+      dismissKeyboard();
       locked = true;
       var ok = grade(q, answer);
       state.finalResults[q.id] = ok;
@@ -837,10 +1119,12 @@ export const PLAYER_SOURCE = String.raw`
     } }, "Try again");
     root.appendChild(el("main", { class: "lk-main" }, el("section", { class: "lk-section lk-done" },
       el("div", { class: "lk-done-emoji", "aria-hidden": "true", text: pass ? "🎉" : "💪" }),
-      el("h2", { text: pass ? "You did it" : "Almost" }),
-      el("p", { class: "lk-lead", text: correct + " / " + qs.length }),
+      tutorLine("talk", el("h2", { text: pass ? "You did it" : "Almost" }), el("p", { class: "lk-lead", text: correct + " / " + qs.length })),
       pass ? null : again
     )));
+    var c = baseContext("score", null);
+    c.text = "Final challenge finished: " + correct + " of " + qs.length + " right. " + (pass ? "The lesson is complete." : "Not passed yet; the learner can try again.");
+    sendContext(c);
   }
   function drawGame() {
     root.innerHTML = "";
@@ -850,6 +1134,7 @@ export const PLAYER_SOURCE = String.raw`
     else if (state.screen === "final") drawFinal();
     else if (state.screen === "score") drawScore();
     else drawMap();
+    settleTutors();
     window.scrollTo(0, 0);
   }
   function playGame() {
@@ -900,7 +1185,8 @@ body:has(.lk-feedback) #app { padding-bottom: 60vh; }
 /* Page */
 .lk-main { background: transparent; border: 0; padding: 0; box-shadow: none; }
 /* Opacity only: a transform here would trap the fixed action bar and feedback panel. */
-.lk-section { animation: lk-fade 320ms var(--lk-ease) both; }
+/* backwards, not both: a filling animation keeps a stacking context that would stop the tutor art blending. */
+.lk-section { animation: lk-fade 320ms var(--lk-ease) backwards; }
 @keyframes lk-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lk-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .lk-section h2 { font-size: 30px; margin: 6px 0 16px; letter-spacing: -0.025em; line-height: 1.1; outline: none; font-weight: 800; text-wrap: balance; }
@@ -1062,7 +1348,37 @@ body:has(.lk-question):not(:has(.lk-feedback)) .lk-nav:has(#lk-next:disabled) { 
 .lk-node-final .lk-node-emoji { background: color-mix(in srgb, var(--lk-accent) 22%, var(--lk-card)); }
 @keyframes lk-pulse { 50% { transform: scale(1.05); } }
 
+/* Tutor character. Without art a tutor line is a plain block. With art, one line per screen becomes
+   the character and a speech bubble; the others (.lk-tutor-plain) stay plain text. */
+.lk-tutor-figure { --lk-glow: color-mix(in srgb, var(--lk-ink) 22%, transparent); display: none; }
+.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) { display: flex; align-items: center; gap: 14px; margin: 0 0 20px; }
+/* No z-index or isolation here: older art without a cutout must blend with the page so its white background drops out. */
+.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-figure { display: block; position: relative; flex: none; width: 128px; height: 128px; }
+.lk-has-tutor .lk-tutor-figure::before { content: ""; position: absolute; inset: 0; z-index: 1; background: center / contain no-repeat; }
+.lk-has-tutor .lk-tutor[data-pose="talk"] .lk-tutor-figure::before { background-image: var(--lk-tutor-talk); }
+.lk-has-tutor .lk-tutor[data-pose="teach"] .lk-tutor-figure::before { background-image: var(--lk-tutor-teach); }
+.lk-tutor-blend .lk-tutor-figure::before { mix-blend-mode: multiply; }
+.lk-dark.lk-tutor-blend .lk-tutor-figure::before { mix-blend-mode: normal; border-radius: 28px; background-color: color-mix(in srgb, #fff 92%, var(--lk-bg)); }
+/* The halo the character stands on: a soft floor shadow at rest, the live tutor's colour while it talks. */
+.lk-has-tutor .lk-tutor-figure::after { content: ""; position: absolute; left: 14%; right: 14%; bottom: 4%; height: 16px; border-radius: 50%; background: radial-gradient(closest-side, var(--lk-glow), transparent); transition: background 240ms var(--lk-ease), opacity 240ms var(--lk-ease); }
+.lk-tutor-blend .lk-tutor-figure::after { bottom: 2px; }
+.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text { position: relative; flex: 1 1 auto; min-width: 0; padding: 14px 18px; border-radius: 22px; background: #fff; box-shadow: 0 0 0 1px var(--lk-line), 0 8px 20px -14px color-mix(in srgb, var(--lk-ink) 40%, transparent); animation: lk-rise 320ms var(--lk-ease) both; }
+.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text::before { content: ""; position: absolute; left: -7px; top: 50%; width: 14px; height: 14px; margin-top: -7px; background: inherit; transform: rotate(45deg); box-shadow: -1px 1px 0 0 var(--lk-line); }
+.lk-dark.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text { background: var(--lk-card); }
+.lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text > :last-child { margin-bottom: 0 !important; }
+.lk-has-tutor .lk-done .lk-tutor:not(.lk-tutor-plain) { justify-content: center; text-align: left; }
+.lk-has-tutor .lk-done .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text { flex: 0 1 auto; }
+.lk-has-tutor .lk-done .lk-tutor-text h2 { margin: 0 0 4px; }
+body[data-tutor="listening"] .lk-tutor-figure { --lk-glow: var(--lk-primary); }
+body[data-tutor="thinking"] .lk-tutor-figure { --lk-glow: #8b7cf6; }
+body[data-tutor="speaking"] .lk-tutor-figure { --lk-glow: var(--lk-accent); }
+body[data-tutor] .lk-tutor-figure::after { left: 6%; right: 6%; height: 22px; bottom: calc(4% - 3px); background: radial-gradient(closest-side, color-mix(in srgb, var(--lk-glow) 85%, transparent), color-mix(in srgb, var(--lk-glow) 30%, transparent) 60%, transparent); }
+body[data-tutor="thinking"] .lk-tutor-figure::after { animation: lk-halo 1.6s ease-in-out infinite; }
+body[data-tutor="speaking"] .lk-tutor-figure::after { animation: lk-halo 1s ease-in-out infinite; }
+@keyframes lk-halo { 50% { transform: scaleX(0.8); opacity: 0.6; } }
+
 :focus-visible { outline: 3px solid var(--lk-primary); outline-offset: 3px; }
+@media (max-width: 420px) { .lk-has-tutor .lk-tutor:not(.lk-tutor-plain) { gap: 12px; } .lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-figure { width: 104px; height: 104px; } .lk-has-tutor .lk-tutor:not(.lk-tutor-plain) .lk-tutor-text { padding: 12px 15px; } }
 @media (max-width: 420px) { #app { padding-left: 16px; padding-right: 16px; } .lk-section h2 { font-size: 26px; } .lk-lead { font-size: 19px; } .lk-prompt { font-size: 22px; } .lk-option { min-height: 58px; font-size: 17px; } .lk-match-row { grid-template-columns: 1fr; gap: 4px; } .lk-match-arrow { display: none; } .lk-map > li:nth-child(4n + 2) { transform: translateX(40px); } .lk-map > li:nth-child(4n) { transform: translateX(-40px); } }
 @media (min-width: 640px) { body { font-size: 19px; } #app { padding-top: 16px; } .lk-section h2 { font-size: 36px; } .lk-prompt { font-size: 28px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; } }

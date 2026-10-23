@@ -1,0 +1,20 @@
+link "Skip to content"
+link "Everprimer"
+link "Sign in"
+heading "Learning tailored to every child."
+link "Start free"
+group "What Maya loves"
+button "🦖 Dinosaurs" pressed=true
+button "⚽ Football" pressed=false
+button "🚀 Space" pressed=false
+label "Example lesson"
+label "0 stars"
+heading "Halves"
+button "Two different parts" pressed=false
+button "Two equal parts" pressed=false
+button "Three parts" pressed=false
+heading "You see what stuck."
+label "Example summary for a grown-up"
+summary "Free to start. See plans"
+heading "Free to start."
+link "Start free"

@@ -44,6 +44,18 @@ export const Check = (p: IconProps) => (
     <path d="m5 12 5 5L20 7" />
   </svg>
 );
+export const Mic = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+  </svg>
+);
+export const MicOff = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M15 9.5V6a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 4.6 2.5" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 10.4 5.2M18.4 12.5c.07-.5.1-1 .1-1.5M12 17.5V21M4 4l16 16" />
+  </svg>
+);
 export const Play = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M7 4.5v15l12-7.5Z" fill="currentColor" stroke="none" />

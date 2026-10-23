@@ -1,0 +1,3519 @@
+{
+ "ios-safari": {
+  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1",
+  "href": "http://localhost:3100/spike/lesson?fa=absent&cors=corsx&rogue=1&auto=1&id=ios-safari",
+  "steps": [
+   "dropped: bad nonce",
+   "diag: lesson probes",
+   "diag: auto pause",
+   "dropped: wrong source window",
+   "diag: dropped: wrong source window",
+   "diag: load timeout",
+   "diag: auto resume",
+   "diag: auto scroll away",
+   "diag: auto scroll back"
+  ],
+  "fps": [
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   },
+   {
+    "fps": 0,
+    "frames": 2379,
+    "paused": true,
+    "heapMB": null
+   }
+  ]
+ },
+ "ios-capacitor": {
+  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+  "href": "http://localhost:3100/spike/lesson?fa=absent&cors=corsx&rogue=1&auto=1&id=ios-capacitor",
+  "steps": [
+   "dropped: bad nonce",
+   "dropped: wrong source window"
+  ],
+  "fps": [
+   {
+    "fps": 31,
+    "frames": 28062,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28092,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28123,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28154,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28184,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28215,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28245,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28276,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28307,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28337,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28368,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28398,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28429,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28460,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28490,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28521,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28551,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28582,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28613,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28643,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28674,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28704,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28735,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28766,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28796,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28827,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28857,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28888,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28918,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 28949,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 28979,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29010,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29041,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29071,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29102,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29132,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29163,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29194,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29224,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29255,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29285,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29316,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29347,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29377,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29408,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29438,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29469,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29500,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29530,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29561,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29591,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29622,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29653,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29683,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29714,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29744,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29775,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29806,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29836,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29867,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29897,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29928,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 29959,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 29989,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30020,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30050,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30081,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30112,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30142,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30173,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30203,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30234,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30265,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30295,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30326,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30356,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30387,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30418,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30448,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30479,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30509,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30540,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30571,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30601,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30632,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30662,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30693,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30724,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30754,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30785,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30815,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30846,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30877,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30907,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30938,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 30968,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 30999,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31030,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31060,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31091,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31121,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31152,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31183,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31213,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31244,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31274,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31305,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31336,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31366,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31397,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31427,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31458,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31489,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31519,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31550,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31580,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31611,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31642,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31672,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31703,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31733,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31764,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31795,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31825,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31856,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31886,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31917,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 31948,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 31978,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32009,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32039,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32070,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32101,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32131,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32162,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32192,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32223,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32254,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32284,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32315,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32345,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32376,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32407,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32437,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32468,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32498,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32529,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32560,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32590,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32621,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32651,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32682,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32713,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32743,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32774,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32804,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 29,
+    "frames": 32833,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32864,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 17,
+    "frames": 32881,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 22,
+    "frames": 32903,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32934,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 32964,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 32995,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33026,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33056,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33087,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33117,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33148,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33179,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33209,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33240,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33270,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33301,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33332,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33362,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33393,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33423,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33454,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33484,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33515,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33545,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33576,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33607,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 31,
+    "frames": 33638,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 29,
+    "frames": 33667,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33697,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33727,
+    "paused": false,
+    "heapMB": null
+   },
+   {
+    "fps": 30,
+    "frames": 33757,
+    "paused": false,
+    "heapMB": null
+   }
+  ]
+ },
+ "android-capacitor": {
+  "ua": "Mozilla/5.0 (Linux; Android 16; sdk_gphone64_arm64 Build/BP22.250325.006; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/133.0.6943.137 Mobile Safari/537.36",
+  "href": "http://localhost:3100/spike/lesson?fa=absent&cors=corsx&rogue=1&auto=1&id=android-capacitor",
+  "steps": [],
+  "fps": [
+   {
+    "fps": 42,
+    "frames": 3333,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 3372,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 37,
+    "frames": 3409,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 3450,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 3491,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 3532,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 3572,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 3611,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 3653,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 3695,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 3734,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 3774,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 3815,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 3857,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 3899,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 3942,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 3981,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 4024,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4065,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 4104,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4145,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4186,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4227,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 4267,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4308,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 4350,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 4389,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4430,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 4468,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4509,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 4549,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 4587,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 4625,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4666,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 4708,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 4750,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 4788,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 4830,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 4871,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 4914,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 4956,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 44,
+    "frames": 5000,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5040,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 5083,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 5122,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 5163,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 36,
+    "frames": 5199,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 37,
+    "frames": 5236,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 5275,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 5314,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 5355,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 5398,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5438,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5478,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 5517,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 5560,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5600,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 5641,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 5682,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5722,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 5765,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 5806,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 5845,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 5888,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 5928,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 5970,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 6009,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6050,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6090,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 6129,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6170,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 6208,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 6247,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 6289,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 6328,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6369,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 6412,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6452,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6493,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6533,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6573,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6613,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 6655,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 6694,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 44,
+    "frames": 6738,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 6780,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 6823,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6863,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6904,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 6944,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 6985,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 7024,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7064,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7102,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7142,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7180,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7220,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 36,
+    "frames": 7256,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 37,
+    "frames": 7293,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7331,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 36,
+    "frames": 7367,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7407,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7447,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 7486,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 7527,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7565,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7605,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 7644,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7682,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 7723,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7761,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7801,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7841,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 7881,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 7923,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 7961,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8002,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8042,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8082,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 8120,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 8158,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8198,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8239,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8280,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8321,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8361,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 8399,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8440,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 8479,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 8521,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 37,
+    "frames": 8558,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8599,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8639,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8679,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8719,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8760,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 8798,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8839,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 8877,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8918,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 8958,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 8999,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 9037,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 9078,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 9117,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 9158,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 37,
+    "frames": 9195,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 9233,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 33,
+    "frames": 9266,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 9304,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9344,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 9382,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 9424,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9464,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 9502,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 9543,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9583,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 9622,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 9664,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9704,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 9743,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9783,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9823,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 9863,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 9902,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 9944,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 9986,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10026,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10066,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 10108,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10147,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10187,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10227,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 10269,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10308,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10349,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10389,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10428,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 10470,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10509,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10550,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10590,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10631,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10672,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10713,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 43,
+    "frames": 10756,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10795,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10834,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10874,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 10914,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 10953,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 10994,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 11033,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 11074,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 41,
+    "frames": 11115,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 11155,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 40,
+    "frames": 11195,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 42,
+    "frames": 11237,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 38,
+    "frames": 11275,
+    "paused": false,
+    "heapMB": 21
+   },
+   {
+    "fps": 39,
+    "frames": 11314,
+    "paused": false,
+    "heapMB": 21
+   }
+  ]
+ },
+ "run": {
+  "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.2 Safari/605.1.15",
+  "href": "http://localhost:3100/spike/lesson?cors=corsx&entry=samples/opus-circuit-multi/index.html",
+  "steps": [
+   "diag: lesson probes",
+   "diag: io visible"
+  ],
+  "fps": []
+ }
+}

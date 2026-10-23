@@ -58,6 +58,35 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
   const fresh = batch.events.filter((e) => insertedIds.has(e.clientEventId));
   if (fresh.length === 0) return { inserted: 0 };
 
+  // A retried batch is deduped on client_event_id, so if processing fails the
+  // events must not stay behind looking handled. Undo this batch's rows so the
+  // client's retry processes it again.
+  const responseIds: string[] = [];
+  try {
+    await processEvents(session, blueprint, fresh, responseIds);
+  } catch (err) {
+    const { error: evErr } = await db
+      .from("learning_events")
+      .delete()
+      .eq("session_id", session.id)
+      .in("client_event_id", fresh.map((e) => e.clientEventId));
+    if (evErr) console.error("[events] rollback of events failed", evErr.message);
+    if (responseIds.length) {
+      const { error: rErr } = await db.from("responses").delete().in("id", responseIds);
+      if (rErr) console.error("[events] rollback of responses failed", rErr.message);
+    }
+    throw err;
+  }
+  return { inserted: fresh.length };
+}
+
+async function processEvents(
+  session: SessionRow,
+  blueprint: ReturnType<typeof parseBlueprint> | null,
+  fresh: LearningEvent[],
+  responseIds: string[],
+): Promise<void> {
+  const db = createServiceClient();
   await db.from("artifact_sessions").update({ last_event_at: new Date().toISOString() }).eq("id", session.id);
 
   // 2. Turn educationally meaningful events into graded responses and evidence.
@@ -77,8 +106,7 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
   // Recall questions revisit an earlier lesson's objective, keyed by objective id.
   const recallEvidence = new Map<string, ObjectiveEvidence[]>();
   const responses: Array<Record<string, unknown>> = [];
-  let reachedEnd = false;
-  let sessionsCompletedHint: number | null = null;
+  const { reachedEnd, sessionsCompletedHint } = progressSignals(fresh);
 
   const push = (question: Question, ev: ObjectiveEvidence) => {
     if (question.recallObjectiveId) {
@@ -95,12 +123,6 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
   };
 
   for (const e of fresh) {
-    if (e.type === "topic_completed" || e.type === "final_test_completed") reachedEnd = true;
-    if (e.type === "session_completed") {
-      const index = typeof e.payload.index === "number" ? e.payload.index : Number(e.payload.index);
-      if (Number.isFinite(index) && index >= 0) sessionsCompletedHint = Math.max(sessionsCompletedHint ?? 0, Math.floor(index) + 1);
-    }
-
     if (e.type === "question_answered") {
       const parsed = QuestionAnsweredPayload.safeParse(e.payload);
       if (!parsed.success) continue;
@@ -148,8 +170,9 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
   }
 
   if (responses.length) {
-    const { error: rErr } = await db.from("responses").insert(responses);
+    const { data: inserted, error: rErr } = await db.from("responses").insert(responses).select("id");
     if (rErr) throw rErr;
+    for (const r of inserted ?? []) responseIds.push(r.id as string);
   }
 
   // 3. Update per-objective mastery and topic progress. Recall evidence first,
@@ -159,7 +182,66 @@ export async function ingestEventBatch(session: SessionRow, batch: EventBatch): 
     sessionsCompletedHint,
     finalQuestionIds,
   });
-  return { inserted: fresh.length };
+}
+
+/** Whether the events reach the end of the lesson, and how many game rounds they finish. */
+function progressSignals(events: LearningEvent[]): { reachedEnd: boolean; sessionsCompletedHint: number | null } {
+  let reachedEnd = false;
+  let sessionsCompletedHint: number | null = null;
+  for (const e of events) {
+    if (e.type === "topic_completed" || e.type === "final_test_completed") reachedEnd = true;
+    if (e.type === "session_completed") {
+      const index = typeof e.payload.index === "number" ? e.payload.index : Number(e.payload.index);
+      if (Number.isFinite(index) && index >= 0) sessionsCompletedHint = Math.max(sessionsCompletedHint ?? 0, Math.floor(index) + 1);
+    }
+  }
+  return { reachedEnd, sessionsCompletedHint };
+}
+
+/**
+ * Rebuilds a topic's progress row from its stored events without applying
+ * mastery evidence again. Recovers progress whose write failed after the
+ * events themselves were saved.
+ */
+export async function rebuildTopicProgress(childId: string, topicId: string): Promise<boolean> {
+  const db = createServiceClient();
+  const rows: Array<{ client_event_id: string; type: string; payload: Record<string, unknown> | null; occurred_at: string; artifact_id: string }> = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db
+      .from("learning_events")
+      .select("client_event_id, type, payload, occurred_at, artifact_id")
+      .eq("child_id", childId)
+      .eq("topic_id", topicId)
+      .order("occurred_at")
+      .range(from, from + 999);
+    if (error) throw error;
+    rows.push(...((data ?? []) as typeof rows));
+    if (!data || data.length < 1000) break;
+  }
+  if (rows.length === 0) return false;
+
+  const events = rows.map((r) => ({
+    clientEventId: r.client_event_id,
+    type: r.type,
+    occurredAt: r.occurred_at,
+    payload: r.payload ?? {},
+  })) as LearningEvent[];
+  const { reachedEnd, sessionsCompletedHint } = progressSignals(events);
+
+  const { data: artifacts, error: aErr } = await db.from("artifacts").select("blueprint").in("id", [...new Set(rows.map((r) => r.artifact_id))]);
+  if (aErr) throw aErr;
+  const finalQuestionIds = new Set<string>();
+  for (const a of artifacts ?? []) {
+    const bp = a.blueprint ? parseBlueprint(a.blueprint) : null;
+    if (bp && isGameBlueprint(bp)) for (const q of bp.finalTest.questions) finalQuestionIds.add(q.id);
+  }
+
+  await recomputeTopic(childId, topicId, new Map(), reachedEnd, events, {
+    sessionsCompletedHint,
+    finalQuestionIds: [...finalQuestionIds],
+    enqueueMemory: false,
+  });
+  return true;
 }
 
 /** Credit recall answers to the earlier objective they revisit, only on this child's own curricula. */
@@ -191,13 +273,14 @@ async function recomputeTopic(
   const db = createServiceClient();
   const { data: objRows } = await db.from("learning_objectives").select("*").eq("topic_id", topicId).order("position");
   const objectives = (objRows ?? []) as ObjectiveRow[];
-  if (objectives.length === 0) return;
 
-  const { data: masteryRows } = await db
-    .from("objective_mastery")
-    .select("*")
-    .eq("child_id", childId)
-    .in("objective_id", objectives.map((o) => o.id));
+  const { data: masteryRows } = objectives.length
+    ? await db
+        .from("objective_mastery")
+        .select("*")
+        .eq("child_id", childId)
+        .in("objective_id", objectives.map((o) => o.id))
+    : { data: [] };
   const current = new Map((masteryRows ?? []).map((m) => [m.objective_id as string, m as ObjectiveMasteryRow]));
 
   const upserts: Array<Record<string, unknown>> = [];
@@ -225,12 +308,9 @@ async function recomputeTopic(
     }
     states.push({ code: o.code, state });
   }
-  if (upserts.length) {
-    const { error } = await db.from("objective_mastery").upsert(upserts, { onConflict: "child_id,objective_id" });
-    if (error) throw error;
-  }
 
-  const { data: progressRow } = await db.from("topic_progress").select("*").eq("child_id", childId).eq("topic_id", topicId).maybeSingle();
+  const { data: progressRow, error: prevErr } = await db.from("topic_progress").select("*").eq("child_id", childId).eq("topic_id", topicId).maybeSingle();
+  if (prevErr) throw prevErr;
   const prev = progressRow as TopicProgressRow | null;
   const summary = summarizeTopic(states);
   const reachedEnd = Boolean(prev?.reached_end) || reachedEndNow;
@@ -244,7 +324,7 @@ async function recomputeTopic(
   const earliest = events.reduce((min, e) => (e.occurredAt < min ? e.occurredAt : min), events[0]!.occurredAt);
 
   let feedback: LessonFeedback | null = prev?.feedback ?? null;
-  if (reachedEnd) {
+  if (reachedEnd && states.length) {
     const { data: topic } = await db.from("topics").select("title").eq("id", topicId).maybeSingle();
     const textByCode = new Map(objectives.map((o) => [o.code, o.text]));
     feedback = buildLessonFeedback(
@@ -271,6 +351,12 @@ async function recomputeTopic(
     { onConflict: "child_id,topic_id" },
   );
   if (pErr) throw pErr;
+
+  // Progress is written first: if it fails, mastery is untouched and a retry of the batch can't count evidence twice.
+  if (upserts.length) {
+    const { error } = await db.from("objective_mastery").upsert(upserts, { onConflict: "child_id,objective_id" });
+    if (error) throw error;
+  }
 
   // Memory updates after every lesson, and after a burst of answers.
   if (opts.enqueueMemory !== false && (upserts.length || reachedEndNow)) {

@@ -187,13 +187,42 @@ export const ExplainSection = z.object({
   visual: VisualSpec.optional(),
 });
 
+export const LibraryArtifactId = z
+  .string()
+  .min(3)
+  .max(64)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "artifact ids are lowercase words joined by hyphens, e.g. solar-system-simulator");
+
+export const LibraryParamValue = z.union([
+  z.string().max(200),
+  z.number().finite(),
+  z.boolean(),
+  z.array(z.string().max(60)).max(20),
+  z.array(z.number().finite()).max(20),
+]);
+export type LibraryParamValue = z.infer<typeof LibraryParamValue>;
+
+/**
+ * A pinned library artifact shown in place of the built-in visual. Attached by
+ * the server after search, never written by the lesson model.
+ */
+export const LibraryRef = z.object({
+  artifactId: LibraryArtifactId,
+  version: z.number().int().min(1),
+  params: z.record(z.string().max(40), LibraryParamValue).default({}),
+});
+export type LibraryRef = z.infer<typeof LibraryRef>;
+
 export const ExploreSection = z.object({
   type: z.literal("explore"),
   ...SectionBase,
   lead: z.string().min(8).max(180).describe("One short sentence. The visual does the teaching."),
   prompt: z.string().min(5).max(140).describe("What the child should do, e.g. 'Tap a planet'"),
+  /** Always kept: the fallback when a library artifact cannot load. */
   visual: VisualSpec,
+  library: LibraryRef.optional(),
 });
+export type ExploreSection = z.infer<typeof ExploreSection>;
 
 export const QuizRole = z.enum(["formative", "final_check"]);
 export type QuizRole = z.infer<typeof QuizRole>;

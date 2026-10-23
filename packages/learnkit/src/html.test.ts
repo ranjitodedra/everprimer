@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { ArtifactBlueprint } from "@eco/contracts";
 import { ArtifactBlueprint as BlueprintSchema, isGameBlueprint, lintBlueprint, parseBlueprint } from "@eco/contracts";
-import { inlineAssets, normalizeGeneratedHtml, refreshPlayerHtml, renderBlueprintHtml, validateArtifactHtml, validateHtmlAgainstBlueprint, withTouchGuards } from "./html";
+import type { ArtifactManifest } from "@eco/contracts";
+import { solarSystemManifest } from "@eco/contracts/testing";
+import {
+  ARTIFACT_CSP,
+  collectLibraryRefs,
+  inlineAssets,
+  libraryArtifactCsp,
+  normalizeGeneratedHtml,
+  refreshPlayerHtml,
+  renderBlueprintHtml,
+  validateArtifactHtml,
+  validateHtmlAgainstBlueprint,
+  withTouchGuards,
+} from "./html";
 import { PLAYER_CSS, PLAYER_SOURCE } from "./player";
 import { LEARNKIT_RUNTIME_SOURCE } from "./runtime";
 
@@ -203,8 +216,63 @@ describe("refreshPlayerHtml", () => {
     expect(refreshPlayerHtml(stale)).toBe(fresh);
   });
 
+  it("swaps in the current runtime too", () => {
+    const fresh = renderBlueprintHtml(bp);
+    const old = "(function () {\n  if (window.LearnKit) return;\n  window.LearnKit = { emit: function () {} };\n})();";
+    const stale = fresh.replace(LEARNKIT_RUNTIME_SOURCE, old);
+    expect(stale).not.toContain(LEARNKIT_RUNTIME_SOURCE);
+    expect(refreshPlayerHtml(stale)).toBe(fresh);
+  });
+
   it("leaves generated documents alone", () => {
     const html = "<!doctype html><html><head><style>body{}</style></head><body><script>1</script></body></html>";
     expect(refreshPlayerHtml(html)).toBe(html);
+  });
+});
+
+describe("library embedding", () => {
+  const ORIGIN = "https://artifacts.example";
+  const libBp = JSON.parse(JSON.stringify(bp)) as typeof bp & { sections: Array<{ type: string; library?: unknown }> };
+  const explore = libBp.sections.find((s) => s.type === "explore")!;
+  explore.library = { artifactId: "solar-system", version: 1, params: {} };
+  const manifest: ArtifactManifest = solarSystemManifest();
+  const manifests: Record<string, ArtifactManifest> = { "solar-system@1": manifest };
+
+  it("libraryArtifactCsp widens only frame-src and names the origin explicitly", () => {
+    const csp = libraryArtifactCsp(ORIGIN);
+    expect(csp).toContain(`frame-src ${ORIGIN}`);
+    expect(csp).not.toContain("frame-src 'none'");
+    // Other directives are unchanged.
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'unsafe-inline'");
+    expect(csp).toContain("connect-src 'none'");
+    expect(csp).toContain("base-uri 'none'");
+  });
+
+  it("collectLibraryRefs returns dedup'd pins from explore bites only", () => {
+    const refs = collectLibraryRefs(libBp);
+    expect(refs).toEqual([{ artifactId: "solar-system", version: 1, params: {} }]);
+    expect(collectLibraryRefs(bp)).toEqual([]);
+  });
+
+  it("renderBlueprintHtml keeps the strict CSP when the blueprint has no library ref", () => {
+    const html = renderBlueprintHtml(bp, [], { library: { origin: ORIGIN, manifests: {} } });
+    expect(html).toContain(ARTIFACT_CSP);
+    expect(html).not.toContain("window.__LIBRARY__=");
+  });
+
+  it("renderBlueprintHtml keeps the strict CSP when the blueprint has library refs but no host origin was supplied", () => {
+    const html = renderBlueprintHtml(libBp);
+    expect(html).toContain(ARTIFACT_CSP);
+    expect(html).not.toContain("window.__LIBRARY__=");
+  });
+
+  it("renderBlueprintHtml widens CSP and embeds window.__LIBRARY__ when a library ref needs it", () => {
+    const html = renderBlueprintHtml(libBp, [], { library: { origin: ORIGIN, manifests } });
+    expect(html).toContain(libraryArtifactCsp(ORIGIN));
+    expect(html).not.toContain("frame-src 'none'");
+    expect(html).toContain("window.__LIBRARY__=");
+    expect(html).toContain(`"origin":"${ORIGIN}"`);
+    expect(html).toContain("solar-system@1");
   });
 });

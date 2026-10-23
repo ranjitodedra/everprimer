@@ -1,7 +1,11 @@
 /**
  * Display catalog for Free, Plus (`paid`), and Max.
  * Balances, child caps, and enqueue limits are enforced in
- * packages/db/supabase/migrations/0004_billing.sql. Keep the numbers together.
+ * packages/db/supabase/migrations/0004_billing.sql; monthly credits in
+ * plan_credits() (0010_metered_credits.sql). Keep the numbers together.
+ *
+ * Credits are metered API spend shared by lessons and the live tutor; a
+ * typical lesson is about 100 (CREDITS_PER_LESSON in packages/ai/src/pricing.ts).
  */
 
 export const PLANS = {
@@ -9,7 +13,9 @@ export const PLANS = {
     id: "free" as const,
     name: "Free",
     price: 0,
-    credits: 10,
+    credits: 1000,
+    /** Rough lesson count the credits buy, for plan copy only. */
+    lessons: 10,
     childCap: 1,
     regenerate: false,
   },
@@ -17,7 +23,8 @@ export const PLANS = {
     id: "paid" as const,
     name: "Plus",
     price: 12,
-    credits: 50,
+    credits: 5000,
+    lessons: 50,
     childCap: 8,
     regenerate: true,
   },
@@ -25,11 +32,16 @@ export const PLANS = {
     id: "max" as const,
     name: "Max",
     price: 29,
-    credits: 150,
+    credits: 15000,
+    lessons: 150,
     childCap: 8,
     regenerate: true,
   },
 };
+
+export function formatCredits(n: number): string {
+  return Math.max(0, Math.round(n)).toLocaleString("en-US");
+}
 
 export type PlanId = keyof typeof PLANS;
 

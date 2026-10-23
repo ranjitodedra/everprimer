@@ -1,10 +1,22 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LEARNKIT_PROTOCOL_VERSION, LearnKitMessage, type HostInitMessage, type LearningEvent } from "@eco/contracts";
-import { Star } from "@/components/icons";
+import {
+  LEARNKIT_PROTOCOL_VERSION,
+  LearnKitMessage,
+  TutorImageDataUri,
+  type HostInitMessage,
+  type HostTutorArtMessage,
+  type HostTutorStateMessage,
+  type LearningEvent,
+  type TutorContext,
+  type TutorVoiceState,
+} from "@eco/contracts";
+import { Star, X } from "@/components/icons";
+import { LiveTutor } from "@/components/live-tutor";
 import { SheetPanel, closeSheet, openSheet } from "@/components/sheet";
+import type { CharacterStatus } from "@/lib/lesson-art";
 import { newId } from "@/lib/uuid";
 
 interface Props {
@@ -16,10 +28,123 @@ interface Props {
   title: string;
   backHref: string;
   startSession?: number;
+  background?: string;
+  dark?: boolean;
+  /** The lesson's tutor character; the lesson stays plain text until both poses load. */
+  character?: CharacterStatus;
+  /** Offer the voice tutor. The server re-checks plan, switch and limits on start. */
+  liveTutor?: boolean;
 }
 
 const FLUSH_MS = 2000;
 const FLUSH_AT = 25;
+/** Longest a learner waits on the way out for the last progress to save. */
+const LEAVE_WAIT_MS = 4000;
+const CHARACTER_POLL_MS = 5000;
+const CHARACTER_POLL_FOR_MS = 3 * 60_000;
+const CHARACTER_MAX_BYTES = 4 * 1024 * 1024;
+
+type CharacterArt = { talk: string; teach: string; cutout: boolean };
+
+async function poseDataUri(url: string, signal: AbortSignal): Promise<string | null> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  if (!/^image\/(png|jpeg|webp)$/.test(blob.type) || blob.size === 0 || blob.size > CHARACTER_MAX_BYTES) return null;
+  const uri = await new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(blob);
+  });
+  return uri && TutorImageDataUri.safeParse(uri).success ? uri : null;
+}
+
+/**
+ * Both poses of the lesson's character as data URIs (the lesson frame's CSP allows no network),
+ * or null while they are drawn, if they fail, or when art is off. Waits a few minutes for a new drawing.
+ */
+function useLessonCharacter(topicId: string, initial: CharacterStatus | undefined): CharacterArt | null {
+  const [art, setArt] = useState<CharacterArt | null>(null);
+  const initialStatus = initial?.status ?? "off";
+  const initialVersion = initial?.version ?? null;
+  const initialCutout = initial?.cutout ?? false;
+  useEffect(() => {
+    if (initialStatus === "off" || initialStatus === "failed") return;
+    const ctrl = new AbortController();
+    void (async () => {
+      let status: CharacterStatus = { status: initialStatus, version: initialVersion, cutout: initialCutout };
+      const until = Date.now() + CHARACTER_POLL_FOR_MS;
+      while ((status.status === "queued" || status.status === "running") && Date.now() < until) {
+        await new Promise((r) => setTimeout(r, CHARACTER_POLL_MS));
+        if (ctrl.signal.aborted) return;
+        const res = await fetch(`/api/topics/${topicId}/character`, { cache: "no-store", signal: ctrl.signal });
+        if (!res.ok) return;
+        status = (await res.json()) as CharacterStatus;
+      }
+      if (status.status !== "ready" || !status.version) return;
+      const v = encodeURIComponent(status.version);
+      const [talk, teach] = await Promise.all(
+        (["talk", "teach"] as const).map((pose) => poseDataUri(`/api/topics/${topicId}/character/${pose}?v=${v}`, ctrl.signal)),
+      );
+      if (talk && teach && !ctrl.signal.aborted) setArt({ talk, teach, cutout: status.cutout === true });
+    })().catch(() => {});
+    return () => ctrl.abort();
+  }, [topicId, initialStatus, initialVersion, initialCutout]);
+  return art;
+}
+
+/**
+ * Height of the area above the on-screen keyboard, or null while it is closed.
+ * Web uses the visual viewport; the native app reports the keyboard height.
+ */
+function useKeyboardFreeHeight(): number | null {
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    let keyboard = 0;
+    let shownAt = window.innerHeight;
+    const update = () => {
+      const base = keyboard ? shownAt : window.innerHeight;
+      const free = Math.min(vv?.height ?? base, window.innerHeight, base - keyboard);
+      setHeight(base - free > 80 ? Math.round(free) : null);
+      // iOS scrolls the page to reveal a field inside the frame; the frame already sits above the keyboard.
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+    };
+    update();
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+
+    let cancelled = false;
+    const removers: Array<() => void> = [];
+    void (async () => {
+      const { Capacitor } = await import("@capacitor/core");
+      if (!Capacitor.isNativePlatform() || cancelled) return;
+      const { Keyboard } = await import("@capacitor/keyboard");
+      const show = await Keyboard.addListener("keyboardWillShow", (info) => {
+        shownAt = window.innerHeight;
+        keyboard = info.keyboardHeight;
+        update();
+      });
+      const hide = await Keyboard.addListener("keyboardWillHide", () => {
+        keyboard = 0;
+        update();
+      });
+      removers.push(() => void show.remove(), () => void hide.remove());
+      if (cancelled) removers.forEach((r) => r());
+    })();
+
+    return () => {
+      cancelled = true;
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      removers.forEach((r) => r());
+    };
+  }, []);
+  return height;
+}
 
 /**
  * Hosts a generated lesson in a sandboxed iframe and relays its LearnKit
@@ -30,14 +155,25 @@ const FLUSH_AT = 25;
  * cannot make same-origin requests. We accept messages only from this exact
  * iframe window and only when they carry the per-session nonce.
  */
-export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, title, backHref, startSession = 0 }: Props) {
+export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, title, backHref, startSession = 0, background, dark, character, liveTutor = false }: Props) {
+  const router = useRouter();
+  const keyboardFree = useKeyboardFreeHeight();
+  const art = useLessonCharacter(topicId, character);
+  const artRef = useRef<CharacterArt | null>(null);
+  const [lessonContext, setLessonContext] = useState<TutorContext | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const queueRef = useRef<Map<string, LearningEvent>>(new Map());
   const inFlightRef = useRef(false);
   const followRef = useRef(false);
   const followKeepaliveRef = useRef(false);
   const [completed, setCompleted] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [saveState, setSaveStateValue] = useState<"idle" | "saving" | "error">("idle");
+  const saveStateRef = useRef(saveState);
+  const setSaveState = useCallback((s: "idle" | "saving" | "error") => {
+    saveStateRef.current = s;
+    setSaveStateValue(s);
+  }, []);
   const done = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -87,7 +223,7 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
         if (again) void flush({ keepalive });
       }
     },
-    [sessionId],
+    [sessionId, setSaveState],
   );
 
   const enqueue = useCallback(
@@ -103,10 +239,36 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
     [flush],
   );
 
+  /** Sends whatever is queued and waits for it, so the next page reads saved progress. */
+  const leave = useCallback(async () => {
+    setLeaving(true);
+    const drain = async () => {
+      while (queueRef.current.size > 0 || inFlightRef.current) {
+        if (inFlightRef.current) await new Promise((r) => setTimeout(r, 100));
+        else await flush();
+        if (saveStateRef.current === "error") return;
+      }
+    };
+    await Promise.race([drain(), new Promise((r) => setTimeout(r, LEAVE_WAIT_MS))]);
+    router.push(backHref);
+  }, [backHref, flush, router]);
+
+  const postToFrame = useCallback((msg: HostInitMessage | HostTutorArtMessage | HostTutorStateMessage) => {
+    iframeRef.current?.contentWindow?.postMessage(msg, "*");
+  }, []);
+
+  const sendArt = useCallback(() => {
+    const a = artRef.current;
+    if (a) postToFrame({ source: "learnkit-host", v: LEARNKIT_PROTOCOL_VERSION, kind: "tutor_art", talk: a.talk, teach: a.teach, cutout: a.cutout });
+  }, [postToFrame]);
+
+  useEffect(() => {
+    artRef.current = art;
+    sendArt();
+  }, [art, sendArt]);
+
   const sendInit = useCallback(() => {
-    const win = iframeRef.current?.contentWindow;
-    if (!win) return;
-    const msg: HostInitMessage = {
+    postToFrame({
       source: "learnkit-host",
       v: LEARNKIT_PROTOCOL_VERSION,
       kind: "init",
@@ -115,9 +277,15 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
       artifactId,
       reducedMotion: typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       startSession,
-    };
-    win.postMessage(msg, "*");
-  }, [nonce, topicId, artifactId, startSession]);
+    });
+    // A reloaded frame starts plain, so it gets the character again.
+    sendArt();
+  }, [postToFrame, nonce, topicId, artifactId, startSession, sendArt]);
+
+  const sendTutorState = useCallback(
+    (state: TutorVoiceState) => postToFrame({ source: "learnkit-host", v: LEARNKIT_PROTOCOL_VERSION, kind: "tutor_state", state }),
+    [postToFrame],
+  );
 
   useEffect(() => {
     // The host records the open; the artifact records everything after.
@@ -135,6 +303,9 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
       else if (msg.kind === "event") {
         if (msg.nonce !== nonce) return;
         enqueue(msg.event);
+      } else if (msg.kind === "context") {
+        if (msg.nonce !== nonce || !liveTutor) return;
+        setLessonContext(msg.context);
       }
     };
     window.addEventListener("message", onMessage);
@@ -153,24 +324,39 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
       clearInterval(timer);
       void flush({ keepalive: true });
     };
-  }, [artifactId, enqueue, flush, nonce, sendInit]);
+  }, [artifactId, enqueue, flush, liveTutor, nonce, sendInit]);
 
   return (
-    <div className="relative min-h-0 flex-1 pb-[env(safe-area-inset-bottom,0px)]">
-      <iframe
-        ref={iframeRef}
-        title={title}
-        srcDoc={html}
-        sandbox="allow-scripts"
-        referrerPolicy="no-referrer"
-        loading="eager"
-        onLoad={sendInit}
-        className="block h-full w-full border-0"
-      />
-      <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-4" aria-live="polite">
-        {saveState === "error" ? (
-          <p className="animate-rise rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">Progress will save when you&apos;re back online.</p>
+    <div
+      className={`flex h-dvh flex-col overflow-hidden ${dark ? "text-white" : ""}`}
+      style={{ background, height: keyboardFree ?? undefined }}
+    >
+      <div className="flex shrink-0 items-center px-3 pt-[max(0.5rem,env(safe-area-inset-top,0px))]">
+        <button type="button" onClick={() => void leave()} disabled={leaving} className="press grid h-11 w-11 place-items-center rounded-full bg-current/10" aria-label="Close lesson">
+          <X size={20} />
+        </button>
+        {liveTutor ? (
+          <div className="ml-auto">
+            <LiveTutor sessionId={sessionId} context={lessonContext} onState={sendTutorState} />
+          </div>
         ) : null}
+      </div>
+      <div className={`relative min-h-0 flex-1 ${keyboardFree ? "" : "pb-[env(safe-area-inset-bottom,0px)]"}`}>
+        <iframe
+          ref={iframeRef}
+          title={title}
+          srcDoc={html}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          loading="eager"
+          onLoad={sendInit}
+          className="block h-full w-full border-0"
+        />
+        <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center px-4" aria-live="polite">
+          {saveState === "error" ? (
+            <p className="animate-rise rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white">Not saved yet. Still trying.</p>
+          ) : null}
+        </div>
       </div>
 
       <SheetPanel ref={done} title="Lesson done">
@@ -179,7 +365,9 @@ export function ArtifactPlayer({ html, sessionId, nonce, topicId, artifactId, ti
             <Star size={48} />
           </span>
           <p className="mt-5 text-lg text-ink-soft">That one is in the bag.</p>
-          <Link href={backHref} className="btn-primary btn-lg mt-7 w-full">Back to path</Link>
+          <button type="button" onClick={() => void leave()} disabled={leaving} className="btn-primary btn-lg mt-7 w-full">
+            {leaving ? "Saving…" : "Back to path"}
+          </button>
           <button type="button" onClick={() => closeSheet(done)} className="btn-ghost mt-2 w-full">Stay here</button>
         </div>
       </SheetPanel>

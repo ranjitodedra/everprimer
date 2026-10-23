@@ -13,8 +13,8 @@ insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
 -- ---------------------------------------------------------------------------
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  10,
-  'signup grants 10 lesson credits'
+  1000,
+  'signup grants 1000 credits'
 );
 select is(
   (select credits_period_start from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
@@ -72,7 +72,7 @@ select is(
   'a failed reserve writes no ledger row'
 );
 
-update public.parents set credit_balance = 5 where id = 'f1000000-0000-4000-8000-000000000001';
+update public.parents set credit_balance = 500 where id = 'f1000000-0000-4000-8000-000000000001';
 select is(
   public.reserve_credit('f1000000-0000-4000-8000-000000000001', 'f1300000-0000-4000-8000-000000000001', 'test'),
   true,
@@ -85,35 +85,35 @@ select is(
 );
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  4,
-  'one job decrements the balance once'
+  420,
+  'one job holds its estimate once'
 );
 
 select is(
-  public.spend_credit('f1300000-0000-4000-8000-000000000001'),
+  public.settle_credit('f1300000-0000-4000-8000-000000000001', 80),
   true,
-  'spend settles the open reserve'
+  'settle charges the open reserve its measured cost'
 );
 select is(
   public.refund_credit('f1300000-0000-4000-8000-000000000001'),
   false,
-  'refund after spend is a no-op'
+  'refund after settle is a no-op'
 );
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  4,
-  'spend and a later refund leave the balance unchanged'
+  420,
+  'a settle that matches the hold and a later refund leave the balance unchanged'
 );
 
 -- Open reserve must survive a new period grant. Leftover available credits expire.
 insert into public.generation_jobs (id, kind, payload, parent_id) values
   ('f1300000-0000-4000-8000-000000000002', 'artifact', '{"topicId":"y"}', 'f1000000-0000-4000-8000-000000000001');
 select public.reserve_credit('f1000000-0000-4000-8000-000000000001', 'f1300000-0000-4000-8000-000000000002', 'open');
--- balance is 3; the open reserve is not part of it.
-select public.grant_period('f1000000-0000-4000-8000-000000000001', 10, '2099-01-01');
+-- balance is 340; the open reserve is not part of it.
+select public.grant_period('f1000000-0000-4000-8000-000000000001', 1000, '2099-01-01');
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  10,
+  1000,
   'a new period expires leftover credits and grants the new amount'
 );
 select is(
@@ -121,16 +121,16 @@ select is(
   1::bigint,
   'a period grant does not touch an open reserve'
 );
-select public.grant_period('f1000000-0000-4000-8000-000000000001', 10, '2099-01-01');
+select public.grant_period('f1000000-0000-4000-8000-000000000001', 1000, '2099-01-01');
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  10,
+  1000,
   'granting the same period again does not add credits'
 );
-select public.grant_period('f1000000-0000-4000-8000-000000000001', 50, '2099-01-01');
+select public.grant_period('f1000000-0000-4000-8000-000000000001', 5000, '2099-01-01');
 select is(
   (select credit_balance from public.parents where id = 'f1000000-0000-4000-8000-000000000001'),
-  50,
+  5000,
   'a higher grant for the same period tops up the difference'
 );
 

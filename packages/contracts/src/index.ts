@@ -6,3 +6,4 @@ export * from "./events";
 export * from "./child";
 export * from "./memory";
 export * from "./generation";
+export * from "./library";

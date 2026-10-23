@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#070b19" />
+  <title>CellVerse 3D — Interactive Animal Cell Explorer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <!-- 3D WebGL Viewport -->
+    <canvas id="cell-canvas" aria-label="Interactive 3D Animal Cell"></canvas>
+
+    <!-- Floating 3D Pin Labels Layer -->
+    <div id="labels-container" aria-hidden="true"></div>
+
+    <!-- Top HUD Bar -->
+    <header class="hud-header">
+      <div class="brand-badge">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <div>
+          <h1 class="brand-title">CellVerse <span>3D</span></h1>
+          <p class="brand-subtitle">Animal Cell Lab • Tap an organelle to inspect</p>
+        </div>
+      </div>
+
+      <div class="hud-controls" role="toolbar" aria-label="Explorer Controls">
+        <button id="btn-labels" class="hud-btn is-active" type="button" aria-pressed="true" title="Toggle 3D Labels">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          </svg>
+          <span>Labels</span>
+        </button>
+
+        <button id="btn-membrane" class="hud-btn is-active" type="button" aria-pressed="true" title="Toggle Outer Membrane Shell">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+          </svg>
+          <span>Shell</span>
+        </button>
+
+        <button id="btn-tour" class="hud-btn" type="button" aria-pressed="false" title="Auto-Orbit Tour">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span>Spin</span>
+        </button>
+
+        <button id="btn-reset" class="hud-btn" type="button" title="Reset Camera View">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+            <path d="M3 3v5h5"></path>
+          </svg>
+          <span>Reset</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Discovery Progress Pill -->
+    <div class="discovery-pill" aria-live="polite">
+      <span class="discovery-icon">🔬</span>
+      <span>Discovered: <strong id="discovery-count">0 / 9</strong> organelles</span>
+    </div>
+
+    <!-- Quick Organelle Dock (Horizontal Scrollable Chips) -->
+    <nav class="organelle-dock" aria-label="Organelle Quick Select">
+      <div id="organelle-chips" class="chips-track"></div>
+    </nav>
+
+    <!-- Organelle Inspector Panel (Floating Card on Desktop, Bottom Sheet on Mobile) -->
+    <aside id="info-panel" class="info-panel" aria-live="polite">
+      <div class="sheet-handle" id="sheet-toggle" aria-hidden="true">
+        <span></span>
+      </div>
+
+      <div class="panel-header">
+        <div class="organelle-badge-row">
+          <span id="info-swatch" class="organelle-swatch"></span>
+          <span id="info-nickname" class="organelle-nickname">TAP TO EXPLORE</span>
+        </div>
+        <div class="panel-nav-btns">
+          <button id="btn-prev" class="icon-btn" type="button" aria-label="Previous organelle" title="Previous Organelle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <button id="btn-next" class="icon-btn" type="button" aria-label="Next organelle" title="Next Organelle">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+          <button id="btn-close-info" class="icon-btn" type="button" aria-label="Overview mode" title="Back to Cell Overview">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <h2 id="info-title" class="info-title">Welcome to the Animal Cell!</h2>
+      <p id="info-summary" class="info-summary">
+        Every animal—including you—is built from trillions of microscopic living factories called cells. Drag to rotate in 3D, pinch or scroll to zoom, and tap any glowing part inside!
+      </p>
+
+      <div id="info-details" class="info-details">
+        <div class="stat-grid">
+          <div class="stat-box">
+            <span class="stat-label">Main Job</span>
+            <strong id="info-job" class="stat-value">Keep life running</strong>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">City Analogy</span>
+            <strong id="info-analogy" class="stat-value">Entire Mini-City</strong>
+          </div>
+        </div>
+
+        <div class="fact-card">
+          <div class="fact-header">
+            <span class="fact-spark">⚡</span>
+            <strong>Mind-Blowing Fact</strong>
+          </div>
+          <p id="info-fact">
+            Your body has around 30 to 40 trillion cells, and each single cell performs thousands of chemical reactions every second!
+          </p>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

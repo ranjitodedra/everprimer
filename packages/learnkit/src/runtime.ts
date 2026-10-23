@@ -57,16 +57,38 @@ export const LEARNKIT_RUNTIME_SOURCE = String.raw`
     try { document.documentElement.classList.toggle("lk-reduced-motion", !!reducedMotion); } catch (e) {}
   }
 
+  // Tutor context is a snapshot, not a log: only the latest one matters.
+  var pendingContext = null;
+  function sendContext(c) { post({ source: SOURCE, v: V, kind: "context", nonce: nonce, context: c }); }
+  function tutorContext(c) {
+    if (!c || typeof c !== "object") return;
+    if (nonce === null) pendingContext = c; else sendContext(c);
+  }
+
+  var hostHandlers = {};
+  function onHost(kind, fn) {
+    if (kind === "init" || typeof fn !== "function") return;
+    (hostHandlers[kind] || (hostHandlers[kind] = [])).push(fn);
+  }
+
   window.addEventListener("message", function (e) {
     var d = e.data;
-    if (!d || d.source !== "learnkit-host" || d.kind !== "init") return;
-    nonce = String(d.nonce);
-    ctx.topicId = d.topicId; ctx.artifactId = d.artifactId;
-    if (typeof d.startSession === "number" && d.startSession >= 0) ctx.startSession = Math.floor(d.startSession);
-    reducedMotion = reducedMotion || !!d.reducedMotion;
-    applyMotion();
-    flush();
-    reportHeight();
+    if (!d || d.source !== "learnkit-host") return;
+    if (d.kind === "init") {
+      nonce = String(d.nonce);
+      ctx.topicId = d.topicId; ctx.artifactId = d.artifactId;
+      if (typeof d.startSession === "number" && d.startSession >= 0) ctx.startSession = Math.floor(d.startSession);
+      reducedMotion = reducedMotion || !!d.reducedMotion;
+      applyMotion();
+      flush();
+      if (pendingContext) { sendContext(pendingContext); pendingContext = null; }
+      reportHeight();
+      return;
+    }
+    if (e.source !== window.parent) return;
+    var fns = hostHandlers[d.kind];
+    if (!fns) return;
+    for (var i = 0; i < fns.length; i++) { try { fns[i](d); } catch (err) {} }
   });
 
   var lastH = 0;
@@ -105,6 +127,8 @@ export const LEARNKIT_RUNTIME_SOURCE = String.raw`
 
   window.LearnKit = {
     emit: emit,
+    tutorContext: tutorContext,
+    onHost: onHost,
     normalize: normalize,
     uuid: uuid,
     get reducedMotion() { return reducedMotion; },
