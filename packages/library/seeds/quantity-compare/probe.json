@@ -1,0 +1,6 @@
+[
+  { "click": "[data-quantity=more]" },
+  { "expect": "quantity_changed" },
+  { "expect": "comparison_made" },
+  { "emit": "not_a_real_event" }
+]

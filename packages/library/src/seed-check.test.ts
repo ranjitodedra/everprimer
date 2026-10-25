@@ -207,6 +207,54 @@ describe("seed check", () => {
     expect(match?.[4]?.split(",")).toContain("not_declared");
   }, 60_000);
 
+  it("exits 0 for the human-heart seed and prints both heart events", async () => {
+    const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../seeds/human-heart");
+    const { code, line } = await printed(() => runSeedCheck(dir));
+    expect(code).toBe(0);
+    const match = line.match(
+      /^id=human-heart level=3 ok=true phone=(\d+) desktop=(\d+) accepted=(\S+) dropped=(\S+)$/,
+    );
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeLessThan(8000);
+    expect(Number(match?.[2])).toBeLessThan(8000);
+    const accepted = match?.[3]?.split(",") ?? [];
+    expect(accepted).toContain("chamber_selected");
+    expect(accepted).toContain("path_traced");
+    expect(match?.[4]?.split(",")).toContain("not_a_real_event");
+  }, 60_000);
+
+  it("exits 0 for the sequence-builder seed and prints its seed-check line", async () => {
+    const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../seeds/sequence-builder");
+    const { code, line } = await printed(() => runSeedCheck(dir));
+    expect(code).toBe(0);
+    const match = line.match(
+      /^id=sequence-builder level=3 ok=true phone=(\d+) desktop=(\d+) accepted=(\S+) dropped=(\S+)$/,
+    );
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeLessThan(8000);
+    expect(Number(match?.[2])).toBeLessThan(8000);
+    const accepted = match?.[3]?.split(",") ?? [];
+    expect(accepted).toContain("step_placed");
+    expect(accepted).toContain("sequence_checked");
+    expect(match?.[4]?.split(",")).toContain("not_a_real_event");
+  }, 60_000);
+
+  it("exits 0 for the animal-cell seed and prints that seed's check line", async () => {
+    const dir = fileURLToPath(new URL("../seeds/animal-cell", import.meta.url));
+    const { code, line } = await printed(() => runSeedCheck(dir));
+    expect(code).toBe(0);
+    const match = line.match(
+      /^id=animal-cell level=3 ok=true phone=(\d+) desktop=(\d+) accepted=(\S+) dropped=(\S+)$/,
+    );
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeLessThan(8000);
+    expect(Number(match?.[2])).toBeLessThan(8000);
+    const accepted = match?.[3]?.split(",") ?? [];
+    expect(accepted).toContain("organelle_selected");
+    expect(accepted).toContain("cell_labeled");
+    expect(match?.[4]?.split(",")).toContain("not_a_real_event");
+  }, 60_000);
+
   it("does not exit 0 for a reduced-motion run when the page leaves that state unmarked", async () => {
     const dir = await writeSeed("tap-once", 3, { html: STRIP_MOTION_PAGE, probe: TAP_PROBE });
     dirs.push(path.dirname(dir));
