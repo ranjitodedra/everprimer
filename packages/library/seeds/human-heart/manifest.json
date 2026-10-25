@@ -1,0 +1,87 @@
+{
+  "manifestVersion": 1,
+  "id": "human-heart",
+  "version": 1,
+  "title": "Human heart",
+  "description": "Choose a heart chamber and trace the path blood takes through that side of the heart.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["human body", "circulation"],
+  "concepts": ["heart chambers", "blood path"],
+  "prerequisites": [],
+  "learningObjectives": [
+    "Explain the path blood takes through the left side of the heart",
+    "Sequence the chambers blood passes on its way out to the body"
+  ],
+  "objectiveIntents": ["explain_process", "sequence"],
+  "visualKinds": ["parts", "sequence"],
+  "interactionTypes": ["select", "sequence"],
+  "ageRange": [9, 13],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "rate",
+      "type": "number",
+      "default": 70,
+      "description": "Resting heartbeats per minute."
+    }
+  ],
+  "events": [
+    {
+      "name": "chamber_selected",
+      "data": { "chamber": "string", "rate": "number" },
+      "description": "The child chose a heart chamber."
+    },
+    {
+      "name": "path_traced",
+      "data": { "chamber": "string", "rate": "number" },
+      "description": "The page traced the blood path through the chosen chamber."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "The heart is four rooms. Blood visits them in order. Tap the left ventricle to see the path out to the body.",
+    "steps": [
+      "Tap the left ventricle.",
+      "Read the path from the lungs, through the left atrium, into the left ventricle, and out to the body."
+    ],
+    "observationPrompts": [
+      "Which chamber pumps blood out to the whole body?",
+      "Where does blood go just before it enters the left ventricle?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "The left side of the drawing is the person's left side.",
+        "response": "You are looking at the heart from the front, so the person's left side is on your right."
+      },
+      {
+        "belief": "The heart puts oxygen into the blood.",
+        "response": "The lungs add oxygen. The left side of the heart pumps that blood out to the body."
+      }
+    ],
+    "hints": [
+      "The picture shows the heart from the front.",
+      "The left ventricle is on your right, and its label says it pumps blood to the body."
+    ],
+    "successCriteria": [
+      {
+        "description": "Chose the left ventricle and traced its blood path",
+        "evidence": ["chamber_selected", "path_traced"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Four labeled heart chambers. Choosing the left ventricle traces the path blood takes out to the body.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": {
+    "createdWith": ["hand"],
+    "createdAt": "2026-10-25T16:00:00.000Z"
+  },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}
