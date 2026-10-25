@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { solarSystemManifest } from "@eco/contracts/testing";
@@ -331,7 +332,27 @@ describe("new artifact preview", () => {
   });
 });
 
-function publishDb(options: { manifestVersion?: number; failPublished?: boolean } = {}) {
+function passingStudioReport(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    bundleSha256: "b".repeat(64),
+    webgl: true,
+    params: {
+      planets: ["mercury", "venus", "earth", "mars"],
+      orbitSpeed: 1,
+    },
+    thumbnailPath: null,
+    viewports: [],
+    ...overrides,
+  };
+}
+
+function publishDb(options: {
+  manifestVersion?: number;
+  failPublished?: boolean;
+  report?: unknown;
+  status?: "draft" | "testing" | "published";
+} = {}) {
   const row = {
     artifact_id: "solar-system-simulator",
     version: 1,
@@ -339,8 +360,8 @@ function publishDb(options: { manifestVersion?: number; failPublished?: boolean 
     entry_file: "index.html",
     files: [{ path: "index.html", size: 20, sha256: "a".repeat(64), mime: "text/html" }],
     bundle_sha256: "b".repeat(64),
-    status: "draft" as "draft" | "testing" | "published",
-    validation_report: null,
+    status: (options.status ?? "draft") as "draft" | "testing" | "published",
+    validation_report: ("report" in options ? options.report : passingStudioReport()) as typeof options.report,
     compliance_level: 3 as const,
     created_by: ACTOR,
     created_at: "2026-10-24T00:00:00Z",
@@ -350,11 +371,27 @@ function publishDb(options: { manifestVersion?: number; failPublished?: boolean 
   };
   const calls: string[] = [];
   const db = {
-    from() {
+    from(table: string) {
       const builder = {
         select: () => builder,
         eq: () => builder,
-        maybeSingle: async () => ({ data: { ...row }, error: null }),
+        update: (patch: { validation_report?: unknown }) => (Object.assign(row, patch), builder),
+        maybeSingle: async () => ({
+          data:
+            table === "library_artifacts"
+              ? {
+                  id: "solar-system-simulator",
+                  title: "Solar System Simulator",
+                  owner: ACTOR,
+                  current_version: null,
+                  created_at: "2026-10-24T00:00:00Z",
+                  updated_at: "2026-10-24T00:00:00Z",
+                }
+              : { ...row },
+          error: null,
+        }),
+        then: (resolve: (value: unknown) => unknown, reject?: (error: unknown) => unknown) =>
+          Promise.resolve({ data: null, error: null }).then(resolve, reject),
       };
       return builder;
     },
@@ -365,7 +402,7 @@ function publishDb(options: { manifestVersion?: number; failPublished?: boolean 
       return { data: { status: args.p_status, current_version: args.p_status === "published" ? 1 : null }, error: null };
     },
   };
-  return { db: db as unknown as SupabaseClient, calls, status: () => row.status };
+  return { db: db as unknown as SupabaseClient, calls, status: () => row.status, report: () => row.validation_report };
 }
 
 describe("publish preview", () => {
@@ -385,7 +422,7 @@ describe("publish preview", () => {
     expect(early.status()).toBe("draft");
   });
 
-  it("publishes a ready draft by moving it through testing in one action", async () => {
+  it("publishes a ready draft that already has a matching browser report", async () => {
     const staff = publishDb();
     expect(await publishPreview("staff", { ...input, ready: true }, { db: staff.db })).toEqual({
       type: "published",
@@ -408,6 +445,68 @@ describe("publish preview", () => {
     expect(refused.type).toBe("unavailable");
     expect(invalid.calls).toEqual(["testing", "draft"]);
     expect(invalid.status()).toBe("draft");
+  });
+
+  it("refuses a ready draft whose browser report is missing", async () => {
+    const staff = publishDb({ report: null });
+    const out = await publishPreview("staff", { ...input, ready: true }, { db: staff.db });
+    expect(out).toEqual({
+      type: "unavailable",
+      problems: ["solar-system-simulator@1: browser report is missing"],
+    });
+    expect(staff.calls).toEqual(["testing", "draft"]);
+    expect(staff.status()).toBe("draft");
+  });
+
+  it("stores an injected browser check and its desktop thumbnail without launching Chromium", async () => {
+    const staff = publishDb({ report: null });
+    const png = Uint8Array.of(0x89, 0x50, 0x4e, 0x47);
+    const uploads: { path: string; bytes: Uint8Array; mime: string }[] = [];
+    const seen: { bundleSha256?: string } = {};
+    const out = await publishPreview("staff", { ...input, ready: true }, {
+      db: staff.db,
+      browserCheck: async (check) => {
+        seen.bundleSha256 = check.bundleSha256;
+        return { report: passingStudioReport(), thumbnail: png };
+      },
+      upload: async (path, bytes, mime) => {
+        uploads.push({ path, bytes, mime });
+        return null;
+      },
+    });
+    expect(out).toEqual({ type: "published", artifactId: "solar-system-simulator", version: 1 });
+    expect(seen.bundleSha256).toBe("b".repeat(64));
+    expect(uploads).toEqual([{ path: "previews/solar-system-simulator/1/thumb.png", bytes: png, mime: "image/png" }]);
+    expect(staff.report()).toMatchObject({
+      ok: true,
+      bundleSha256: "b".repeat(64),
+      thumbnailPath: "previews/solar-system-simulator/1/thumb.png",
+    });
+    expect(staff.status()).toBe("published");
+  });
+
+  it("does not store a new thumbnail for a published version", async () => {
+    const staff = publishDb({ status: "published" });
+    const uploads: string[] = [];
+    const out = await publishPreview("staff", { ...input, ready: true }, {
+      db: staff.db,
+      browserCheck: async () => ({ report: passingStudioReport(), thumbnail: Uint8Array.of(1) }),
+      upload: async (path) => {
+        uploads.push(path);
+        return null;
+      },
+    });
+    expect(out).toEqual({
+      type: "refused",
+      problems: ["solar-system-simulator@1 is published and its browser report cannot change"],
+    });
+    expect(uploads).toEqual([]);
+    expect(staff.calls).toEqual([]);
+  });
+
+  it("keeps the hosted publish action from running a browser check", () => {
+    const source = readFileSync(new URL("../app/studio/new/actions.ts", import.meta.url), "utf8");
+    expect(source).not.toMatch(/browserCheck|runBrowserCheck|playwright|browser-check/);
   });
 });
 

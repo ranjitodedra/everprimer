@@ -11,6 +11,7 @@ import {
   listArtifacts,
   listVersions,
   publishVersion,
+  recordBrowserReport,
   registerDraft,
   retireVersion,
   setStatus,
@@ -31,6 +32,21 @@ function files(): LibraryFileEntry[] {
 
 function input(overrides: Partial<VersionInput> = {}): VersionInput {
   return { manifest: solarSystemManifest(), files: files(), bundleSha256: SHA, actor: ACTOR, ...overrides };
+}
+
+function passingReport(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    bundleSha256: SHA,
+    webgl: true,
+    params: {
+      planets: ["mercury", "venus", "earth", "mars"],
+      orbitSpeed: 1,
+    },
+    thumbnailPath: null,
+    viewports: [],
+    ...overrides,
+  };
 }
 
 function versionRow(version: number, status: LibraryVersionStatus): LibraryArtifactVersionRow {
@@ -372,15 +388,78 @@ describe("status changes", () => {
     expect(rpcCalls).toHaveLength(0);
   });
 
-  it("publishes a version in testing", async () => {
+  it("refuses to publish a version with no browser report", async () => {
+    const { db, rpcCalls } = fakeDb({ versions: [versionRow(1, "testing")] });
+    expect(await publishVersion(db, "solar-system-simulator", 1, ACTOR)).toEqual({
+      ok: false,
+      problems: ["solar-system-simulator@1: browser report is missing"],
+    });
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("publishes a version in testing when the browser report matches", async () => {
+    const row = versionRow(1, "testing");
+    row.validation_report = passingReport();
     const { db, rpcCalls } = fakeDb({
-      versions: [versionRow(1, "testing")],
+      versions: [row],
       rpc: () => ({ data: { status: "published", current_version: 1 }, error: null }),
     });
     expect(await publishVersion(db, "solar-system-simulator", 1, ACTOR)).toEqual({ ok: true, status: "published", currentVersion: 1 });
     expect(rpcCalls).toEqual([
       { fn: "library_set_status", args: { p_artifact_id: "solar-system-simulator", p_version: 1, p_status: "published", p_actor: ACTOR } },
     ]);
+  });
+
+  it("allows a title change after the browser report was recorded", async () => {
+    const row = versionRow(1, "testing");
+    row.validation_report = passingReport();
+    row.manifest = { ...row.manifest, title: "Renamed Solar System" };
+    const { db, rpcCalls } = fakeDb({
+      versions: [row],
+      rpc: () => ({ data: { status: "published", current_version: 1 }, error: null }),
+    });
+    expect(await publishVersion(db, "solar-system-simulator", 1, ACTOR)).toEqual({ ok: true, status: "published", currentVersion: 1 });
+    expect(rpcCalls).toHaveLength(1);
+  });
+
+  it("refuses a failed report, a different bundle, a different WebGL flag, or different parameter defaults", async () => {
+    const failed = versionRow(1, "testing");
+    failed.validation_report = passingReport({ ok: false });
+    const hashed = versionRow(1, "testing");
+    hashed.validation_report = passingReport({ bundleSha256: "c".repeat(64) });
+    const webgl = versionRow(1, "testing");
+    webgl.validation_report = passingReport({ webgl: false });
+    const params = versionRow(1, "testing");
+    params.validation_report = passingReport();
+    const manifest = solarSystemManifest();
+    manifest.version = 1;
+    const speed = manifest.params.find((param) => param.key === "orbitSpeed");
+    if (!speed) throw new Error("orbitSpeed missing");
+    speed.default = 2;
+    params.manifest = manifest as unknown as Record<string, unknown>;
+
+    const cases = [
+      [failed, "browser report did not pass"],
+      [hashed, "browser report does not match the bundle"],
+      [webgl, "browser report does not match the WebGL flag"],
+      [params, "browser report does not match the parameter defaults"],
+    ] as const;
+    for (const [row, problem] of cases) {
+      const { db, rpcCalls } = fakeDb({ versions: [row] });
+      expect(await publishVersion(db, "solar-system-simulator", 1, ACTOR)).toEqual({
+        ok: false,
+        problems: [`solar-system-simulator@1: ${problem}`],
+      });
+      expect(rpcCalls).toHaveLength(0);
+    }
+  });
+
+  it("refuses to replace the browser report of a published version", async () => {
+    const { db } = fakeDb({ versions: [versionRow(1, "published")] });
+    expect(await recordBrowserReport(db, "solar-system-simulator", 1, passingReport())).toEqual({
+      ok: false,
+      problems: ["solar-system-simulator@1 is published and its browser report cannot change"],
+    });
   });
 
   it("re-checks the stored manifest before publishing", async () => {
@@ -449,7 +528,7 @@ describe("storage paths", () => {
   it("builds per-version paths in the library bucket", () => {
     expect(LIBRARY_BUCKET).toBe("library");
     expect(bundleObjectPath("solar-system-simulator", 3, "js/main.js")).toBe("bundles/solar-system-simulator/3/js/main.js");
-    expect(previewObjectPath("solar-system-simulator", 3)).toBe("previews/solar-system-simulator/3/thumb.webp");
+    expect(previewObjectPath("solar-system-simulator", 3)).toBe("previews/solar-system-simulator/3/thumb.png");
   });
 
   it("rejects unsafe paths, ids and versions", () => {

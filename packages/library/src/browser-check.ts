@@ -10,7 +10,10 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo, Socket } from "node:net";
 import { chromium, type Browser, type ConsoleMessage, type Page, type Request, type Response } from "playwright";
 import type { ArtifactManifest } from "@eco/contracts";
+import { defaultParams, type BrowserCheckResult, type BrowserFinding, type BrowserReport, type BrowserViewportReport } from "./browser-report";
 import type { InMemoryFile } from "./import/types";
+
+export type { BrowserCheckResult, BrowserFinding, BrowserReport, BrowserViewportReport } from "./browser-report";
 
 /** The lesson player gives up after this long. ADR-002. */
 export const READY_TIMEOUT_MS = 8000;
@@ -29,44 +32,6 @@ const BLOCKING = new Set([
   "missing_webgl",
 ]);
 
-export interface BrowserFinding {
-  code:
-    | "ready_timeout"
-    | "uncaught_exception"
-    | "console_error"
-    | "fatal_error"
-    | "foreign_request"
-    | "failed_request"
-    | "missing_webgl"
-    | "console_warn"
-    | "console_log"
-    | "ak_error"
-    | "autofocus"
-    | "favicon";
-  message: string;
-}
-
-export interface BrowserViewportReport {
-  name: "phone" | "desktop";
-  width: number;
-  height: number;
-  readyMs: number | null;
-  webglCreated: boolean;
-  heapBytes: number | null;
-  frameCount: number | null;
-  findings: BrowserFinding[];
-}
-
-export interface BrowserReport {
-  ok: boolean;
-  bundleSha256: string;
-  webgl: boolean;
-  params: Record<string, unknown>;
-  /** The Studio fills this in when it stores the PNG. The check itself does not. */
-  thumbnailPath: null;
-  viewports: BrowserViewportReport[];
-}
-
 export interface BrowserCheckInput {
   manifest: ArtifactManifest;
   bundleSha256: string;
@@ -81,12 +46,6 @@ export interface BrowserCheckInput {
    * one of them does not become ready, and the browser stays closeable.
    */
   holdPaths?: string[];
-}
-
-export interface BrowserCheckResult {
-  report: BrowserReport;
-  /** PNG bytes of the desktop iframe at ready. Null when that viewport never becomes ready. */
-  thumbnail: Uint8Array | null;
 }
 
 interface Served {
@@ -124,12 +83,6 @@ export async function runBrowserCheck(input: BrowserCheckInput): Promise<Browser
     await browser.close();
     if (served) await served.close();
   }
-}
-
-function defaultParams(manifest: ArtifactManifest): Record<string, unknown> {
-  const params: Record<string, unknown> = {};
-  for (const param of manifest.params) params[param.key] = param.default;
-  return params;
 }
 
 async function serve(files: InMemoryFile[], holdPaths: string[]): Promise<Served> {

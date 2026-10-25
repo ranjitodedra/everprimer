@@ -13,6 +13,7 @@ import type {
   LibraryVersionStatus,
 } from "@eco/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { browserReportProblems, type BrowserReport } from "./browser-report";
 import { isSafeObjectPath } from "./paths";
 import { transitionProblem } from "./status";
 
@@ -245,7 +246,30 @@ export async function publishVersion(db: Db, artifactId: string, version: number
   if (checked.manifest.id !== artifactId || checked.manifest.version !== version) {
     return fail(`${artifactId}@${version}: manifest says ${checked.manifest.id}@${checked.manifest.version}`);
   }
+  const reportProblems = browserReportProblems(row.validation_report, checked.manifest, row.bundle_sha256);
+  if (reportProblems.length) return fail(...reportProblems.map((problem) => `${artifactId}@${version}: ${problem}`));
   return moveTo(db, artifactId, version, "published", actor);
+}
+
+/** Stores a browser report on a draft or a version in testing. A published report stays as it was. */
+export async function recordBrowserReport(
+  db: Db,
+  artifactId: string,
+  version: number,
+  report: BrowserReport,
+): Promise<CatalogResult<{ report: BrowserReport }>> {
+  const loaded = await loadVersion(db, artifactId, version);
+  if (!loaded.ok) return loaded;
+  if (loaded.row.status !== "draft" && loaded.row.status !== "testing") {
+    return fail(`${artifactId}@${version} is ${loaded.row.status} and its browser report cannot change`);
+  }
+  const updated = await db
+    .from("library_artifact_versions")
+    .update({ validation_report: report })
+    .eq("artifact_id", artifactId)
+    .eq("version", version);
+  if (updated.error) return fail(dbProblem(updated.error, `${artifactId}@${version}`));
+  return { ok: true, report };
 }
 
 /** Deletes a draft and, when it was the only version, the artifact row. Published and retired versions stay. */

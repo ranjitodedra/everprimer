@@ -24,5 +24,5 @@ export function bundleObjectPath(artifactId: string, version: number, file: stri
 }
 
 export function previewObjectPath(artifactId: string, version: number): string {
-  return `${versionPrefix("previews", artifactId, version)}/thumb.webp`;
+  return `${versionPrefix("previews", artifactId, version)}/thumb.png`;
 }

@@ -1,4 +1,5 @@
 export * from "./catalog";
+export type { BrowserCheckResult, BrowserFinding, BrowserReport, BrowserViewportReport } from "./browser-report";
 export * from "./paths";
 export * from "./status";
 export {
