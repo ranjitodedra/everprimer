@@ -1,6 +1,7 @@
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BrowserReport } from "./browser-report";
 import { getArtifact } from "./catalog";
@@ -215,6 +216,22 @@ describe("seed check", () => {
       /^id=tap-once level=3 ok=false phone=\d+ desktop=\d+ accepted=\S+ dropped=\S+ reducedMotion=true$/,
     );
   }, 60_000);
+
+  it("prints a passing seed-check line for the shape-compare seed", async () => {
+    const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../seeds/shape-compare");
+    const { code, line } = await printed(() => runSeedCheck(dir));
+    expect(code).toBe(0);
+    const match = line.match(
+      /^id=shape-compare level=3 ok=true phone=(\d+) desktop=(\d+) accepted=(\S+) dropped=(\S+)$/,
+    );
+    expect(match).not.toBeNull();
+    expect(Number(match?.[1])).toBeLessThan(8000);
+    expect(Number(match?.[2])).toBeLessThan(8000);
+    const accepted = match?.[3]?.split(",") ?? [];
+    expect(accepted).toContain("shape_rotated");
+    expect(accepted).toContain("shapes_compared");
+    expect(match?.[4]?.split(",")).toContain("not_a_real_event");
+  }, 120_000);
 });
 
 describe("seed load", () => {
