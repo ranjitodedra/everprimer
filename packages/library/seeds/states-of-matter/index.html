@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>States of matter</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #241c14;
+      --paper: #efe6d4;
+      --card: #fffaf2;
+      --line: #241c14;
+      --particle: #1f3a5f;
+      --pool: #d7ebe6;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font: 18px/1.35 Georgia, "Iowan Old Style", Palatino, serif;
+    }
+    main { padding: 16px; max-width: 640px; }
+    h1 { font-size: 28px; line-height: 1.1; margin: 0 0 6px; }
+    h2 { font-size: 16px; letter-spacing: 0.04em; text-transform: uppercase; margin: 16px 0 8px; }
+    .lead { margin: 0 0 12px; }
+    .choices {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 0;
+    }
+    button {
+      min-height: 48px;
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      background: transparent;
+      color: var(--ink);
+      font: 700 18px/1 Georgia, "Iowan Old Style", Palatino, serif;
+      touch-action: manipulation;
+    }
+    button[aria-pressed="true"] { background: var(--ink); color: var(--card); }
+    button:focus-visible { outline: 3px solid #c4552a; outline-offset: 2px; }
+    .stage-wrap {
+      margin-top: 12px;
+      background: var(--card);
+      border: 2px solid var(--line);
+      border-radius: 16px;
+      padding: 10px;
+    }
+    .stage { width: 100%; height: 168px; display: block; }
+    #caption { margin: 8px 0 0; min-height: 2.7em; }
+    .jars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .jars li {
+      border: 2px solid transparent;
+      border-radius: 12px;
+      padding: 4px;
+      text-align: center;
+      font-size: 16px;
+    }
+    .jars li.is-on { border-color: var(--line); background: var(--card); }
+    .jars canvas { width: 100%; height: 88px; display: block; background: var(--card); border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>States of matter</h1>
+    <p class="lead">Tap a state. See how the particles sit.</p>
+    <div class="choices" role="group" aria-label="Choose a state">
+      <button type="button" data-state="solid">Solid</button>
+      <button type="button" data-state="liquid">Liquid</button>
+      <button type="button" data-state="gas">Gas</button>
+    </div>
+    <div class="stage-wrap">
+      <canvas id="stage" class="stage" width="640" height="336" aria-hidden="true"></canvas>
+      <p id="caption" aria-live="polite"></p>
+    </div>
+    <h2>Compare</h2>
+    <ul class="jars">
+      <li data-compare="solid"><canvas width="160" height="110" aria-hidden="true"></canvas><span>Solid</span></li>
+      <li data-compare="liquid"><canvas width="160" height="110" aria-hidden="true"></canvas><span>Liquid</span></li>
+      <li data-compare="gas"><canvas width="160" height="110" aria-hidden="true"></canvas><span>Gas</span></li>
+    </ul>
+  </main>
+  <script>
+    var STATES = {
+      solid: {
+        spacing: "tight",
+        line: "Solid particles are packed in rows. They jiggle, but they do not trade places. Taking heat away keeps them there."
+      },
+      liquid: {
+        spacing: "close",
+        line: "Liquid particles stay close and slide past each other. Heat lets them leave the rows. The jar still holds them."
+      },
+      gas: {
+        spacing: "far",
+        line: "Gas particles are far apart and fly until they bounce. More heat gives them the whole jar."
+      }
+    };
+
+    var current = "";
+    var picked = false;
+    var looping = false;
+    var stage = document.getElementById("stage");
+    var caption = document.getElementById("caption");
+    var buttons = document.querySelectorAll("button[data-state]");
+    var jars = document.querySelectorAll("[data-compare]");
+
+    function reduced() {
+      return document.documentElement.getAttribute("data-reduced-motion") === "true";
+    }
+
+    function lessonState() {
+      var params = window.ArtifactKit && window.ArtifactKit.params;
+      var value = params && params.state;
+      return STATES[value] ? value : "solid";
+    }
+
+    function sizeOf(canvas, cssHeight) {
+      var width = canvas.clientWidth || canvas.parentElement.clientWidth || 280;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      var w = Math.max(1, Math.floor(width * dpr));
+      var h = Math.max(1, Math.floor(cssHeight * dpr));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      return { w: w, h: h, dpr: dpr };
+    }
+
+    function bounce(seed, span, speed, t) {
+      var cycle = span * 2;
+      var pos = (seed + speed * t) % cycle;
+      if (pos < 0) pos += cycle;
+      return pos > span ? cycle - pos : pos;
+    }
+
+    function dots(name, t, w, h, still) {
+      var list = [];
+      var i;
+      var pad = Math.max(8, w * 0.08);
+      var innerW = w - pad * 2;
+      var innerH = h - pad * 2;
+      if (name === "solid") {
+        var cols = 5;
+        var rows = 4;
+        for (i = 0; i < cols * rows; i++) {
+          var col = i % cols;
+          var row = Math.floor(i / cols);
+          var jiggle = still ? 0 : 1;
+          list.push({
+            x: pad + innerW * (0.12 + col * 0.19) + Math.sin(t / 220 + i) * jiggle,
+            y: pad + innerH * (0.16 + row * 0.22) + Math.cos(t / 260 + i) * jiggle,
+            r: Math.max(4, w * 0.018)
+          });
+        }
+        return list;
+      }
+      if (name === "liquid") {
+        for (i = 0; i < 14; i++) {
+          var colL = i % 5;
+          var rowL = Math.floor(i / 5);
+          var drift = still ? 0 : Math.sin(t / 380 + i) * innerW * 0.04;
+          list.push({
+            x: pad + innerW * (0.14 + colL * 0.18) + drift,
+            y: pad + innerH * (0.48 + rowL * 0.16),
+            r: Math.max(4, w * 0.016)
+          });
+        }
+        return list;
+      }
+      for (i = 0; i < 8; i++) {
+        var sx = innerW * ((i * 37) % 100) / 100;
+        var sy = innerH * ((i * 53) % 100) / 100;
+        list.push({
+          x: pad + (still ? sx : bounce(sx, innerW, 0.03 + (i % 3) * 0.012, t)),
+          y: pad + (still ? sy : bounce(sy, innerH, 0.025 + (i % 4) * 0.01, t)),
+          r: Math.max(3, w * 0.012)
+        });
+      }
+      return list;
+    }
+
+    function draw(canvas, name, t, cssHeight, still) {
+      var box = sizeOf(canvas, cssHeight);
+      var ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      var w = box.w;
+      var h = box.h;
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#fffaf2";
+      ctx.fillRect(0, 0, w, h);
+      if (name === "liquid") {
+        ctx.fillStyle = "#d7ebe6";
+        ctx.fillRect(box.dpr * 10, h * 0.42, w - box.dpr * 20, h * 0.58 - box.dpr * 10);
+      }
+      ctx.strokeStyle = "#241c14";
+      ctx.lineWidth = Math.max(2, box.dpr * 2);
+      ctx.strokeRect(box.dpr * 8, box.dpr * 8, w - box.dpr * 16, h - box.dpr * 16);
+      var points = dots(name, still ? 0 : t, w, h, still);
+      ctx.fillStyle = "#1f3a5f";
+      for (var i = 0; i < points.length; i++) {
+        ctx.beginPath();
+        ctx.arc(points[i].x, points[i].y, points[i].r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function paintJars() {
+      for (var i = 0; i < jars.length; i++) {
+        var canvas = jars[i].querySelector("canvas");
+        draw(canvas, jars[i].getAttribute("data-compare"), 0, 88, true);
+      }
+    }
+
+    function show(name) {
+      if (!STATES[name]) name = "solid";
+      current = name;
+      caption.textContent = STATES[name].line;
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].setAttribute("aria-pressed", buttons[i].getAttribute("data-state") === name ? "true" : "false");
+      }
+      for (var j = 0; j < jars.length; j++) {
+        jars[j].className = jars[j].getAttribute("data-compare") === name ? "is-on" : "";
+      }
+      draw(stage, name, reduced() ? 0 : (window.performance ? performance.now() : 0), 168, reduced());
+      if (!reduced() && !looping) {
+        looping = true;
+        requestAnimationFrame(tick);
+      }
+    }
+
+    function tick(now) {
+      if (reduced()) {
+        looping = false;
+        if (current) draw(stage, current, 0, 168, true);
+        return;
+      }
+      if (current) draw(stage, current, now || 0, 168, false);
+      requestAnimationFrame(tick);
+    }
+
+    function watchParams() {
+      var params = window.ArtifactKit && window.ArtifactKit.params;
+      if (!params || typeof params.state !== "string") {
+        requestAnimationFrame(watchParams);
+        return;
+      }
+      if (!picked) show(lessonState());
+    }
+
+    function onStateClick(event) {
+      var params = window.ArtifactKit.params;
+      var starting = params && typeof params.state === "string" && STATES[params.state] ? params.state : "solid";
+      var next = event.currentTarget.getAttribute("data-state");
+      if (!STATES[next]) return;
+      var from = current || starting;
+      picked = true;
+      show(next);
+      window.ArtifactKit.emit("state_changed", { from: from, to: next });
+      window.ArtifactKit.emit("particle_observed", { state: next, spacing: STATES[next].spacing });
+    }
+
+    for (var n = 0; n < buttons.length; n++) buttons[n].addEventListener("click", onStateClick);
+    paintJars();
+    watchParams();
+  </script>
+</body>
+</html>
