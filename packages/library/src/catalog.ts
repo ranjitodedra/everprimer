@@ -33,8 +33,17 @@ export interface ArtifactWithVersion {
 
 export interface ListFilters {
   status?: LibraryVersionStatus;
+  /** Staff list. Omit the published-only default so drafts and testing versions are included. */
+  allStatuses?: boolean;
   subject?: string;
   visualKind?: string;
+  /** Case-insensitive substring of the manifest title. A list filter, not lesson search. */
+  title?: string;
+  /** Case-insensitive substring of the artifact id. */
+  id?: string;
+  /** A learner age that must fall inside the manifest age range. */
+  age?: number;
+  compliance?: ComplianceLevel;
   limit?: number;
 }
 
@@ -146,20 +155,43 @@ export async function getArtifact(db: Db, artifactId: string, version?: number):
   return { ok: true, artifact, version: row };
 }
 
+/** A literal substring for ILIKE. `%`, `_`, and `\` in the typed text stay literal. */
+function containsPattern(value: string): string {
+  return `%${value.trim().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
 /** Versions matching the filters, newest first per artifact. Defaults to published versions. */
 export async function listArtifacts(db: Db, filters: ListFilters = {}): Promise<CatalogResult<{ versions: LibraryArtifactVersionRow[] }>> {
-  let query = db
-    .from("library_artifact_versions")
-    .select(VERSION_COLUMNS)
-    .eq("status", filters.status ?? "published");
+  let query = db.from("library_artifact_versions").select(VERSION_COLUMNS);
+  if (filters.status) query = query.eq("status", filters.status);
+  else if (!filters.allStatuses) query = query.eq("status", "published");
   if (filters.subject) query = query.contains("manifest", { subjects: [filters.subject] });
   if (filters.visualKind) query = query.contains("manifest", { visualKinds: [filters.visualKind] });
+  if (filters.compliance != null) query = query.eq("compliance_level", filters.compliance);
+  if (filters.id?.trim()) query = query.ilike("artifact_id", containsPattern(filters.id));
+  if (filters.title?.trim()) query = query.filter("manifest->>title", "ilike", containsPattern(filters.title));
+  if (filters.age != null) {
+    query = query.filter("manifest->ageRange->0", "lte", filters.age);
+    query = query.filter("manifest->ageRange->1", "gte", filters.age);
+  }
   const { data, error } = await query
     .order("artifact_id", { ascending: true })
     .order("version", { ascending: false })
     .limit(Math.min(Math.max(filters.limit ?? 50, 1), 200));
   if (error) return fail(dbProblem(error, "library list"));
   return { ok: true, versions: (data ?? []) as LibraryArtifactVersionRow[] };
+}
+
+/** Every draft and version of one artifact, oldest first. Does not offer one to a lesson. */
+export async function listVersions(db: Db, artifactId: string): Promise<CatalogResult<{ versions: LibraryArtifactVersionRow[] }>> {
+  const { data, error } = await db
+    .from("library_artifact_versions")
+    .select(VERSION_COLUMNS)
+    .eq("artifact_id", artifactId)
+    .order("version", { ascending: true });
+  if (error) return fail(dbProblem(error, artifactId));
+  const versions = ((data ?? []) as LibraryArtifactVersionRow[]).slice().sort((a, b) => a.version - b.version);
+  return { ok: true, versions };
 }
 
 async function loadVersion(db: Db, artifactId: string, version: number): Promise<CatalogResult<{ row: LibraryArtifactVersionRow }>> {
@@ -214,6 +246,24 @@ export async function publishVersion(db: Db, artifactId: string, version: number
     return fail(`${artifactId}@${version}: manifest says ${checked.manifest.id}@${checked.manifest.version}`);
   }
   return moveTo(db, artifactId, version, "published", actor);
+}
+
+/** Deletes a draft and, when it was the only version, the artifact row. Published and retired versions stay. */
+export async function deleteDraft(db: Db, artifactId: string, version: number): Promise<CatalogResult<{ files: LibraryFileEntry[] }>> {
+  const loaded = await loadVersion(db, artifactId, version);
+  if (!loaded.ok) return loaded;
+  if (loaded.row.status !== "draft") return fail(`${artifactId}@${version} is ${loaded.row.status} and cannot be deleted`);
+
+  const removed = await db.from("library_artifact_versions").delete().eq("artifact_id", artifactId).eq("version", version);
+  if (removed.error) return fail(dbProblem(removed.error, `${artifactId}@${version}`));
+
+  const rest = await db.from("library_artifact_versions").select("version").eq("artifact_id", artifactId);
+  if (rest.error) return fail(dbProblem(rest.error, artifactId));
+  if (!rest.data?.length) {
+    const artifact = await db.from("library_artifacts").delete().eq("id", artifactId);
+    if (artifact.error) return fail(dbProblem(artifact.error, `artifact "${artifactId}"`));
+  }
+  return { ok: true, files: loaded.row.files };
 }
 
 /** Retires a published version. Lessons already pinned to it keep playing it. */

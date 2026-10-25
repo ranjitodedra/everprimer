@@ -132,6 +132,6 @@ export async function importArtifact(input: ImporterInput, options: ImportIntern
     ok: true,
     errors: [],
     warnings,
-    normalized: { manifest, files, bundleSha256: bundle, changes },
+    normalized: { manifest, files, contents: withRuntime, bundleSha256: bundle, changes },
   };
 }

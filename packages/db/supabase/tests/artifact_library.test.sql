@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(42);
+select plan(46);
 
 -- Staff S. Family A: parent A, child a1 (child login C).
 insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
@@ -223,6 +223,10 @@ select throws_ok(
   $$ insert into public.library_artifacts (id, title) values ('sneaky-lab', 'Sneaky') $$,
   '42501', null, 'a parent cannot insert artifacts'
 );
+select throws_ok(
+  $$ select public.remove_staff_member('5a000000-0000-4000-8000-0000000000a1') $$,
+  '42501', null, 'a parent cannot remove staff'
+);
 
 -- ---------------------------------------------------------------------------
 -- Child login C and anon
@@ -237,6 +241,15 @@ reset role;
 set local role anon;
 select is((select count(*) from public.library_artifact_versions), 0::bigint, 'anonymous visitors see nothing');
 reset role;
+
+insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
+  ('5a000000-0000-4000-8000-0000000000a2', 'library-staff-2@test.invalid', '{}', '{}');
+insert into public.staff_users (user_id) values ('5a000000-0000-4000-8000-0000000000a2');
+set local role service_role;
+select is(public.remove_staff_member('5a000000-0000-4000-8000-0000000000a2'), true, 'a staff member can be removed when another remains');
+select is(public.remove_staff_member('5a000000-0000-4000-8000-0000000000a1'), false, 'the last staff member cannot be removed');
+reset role;
+select is((select count(*) from public.staff_users), 1::bigint, 'the last staff row stays');
 
 select * from finish();
 rollback;

@@ -6,8 +6,10 @@ import { solarSystemManifest } from "../../contracts/src/testing";
 import {
   addVersion,
   checkVersionInput,
+  deleteDraft,
   getArtifact,
   listArtifacts,
+  listVersions,
   publishVersion,
   registerDraft,
   retireVersion,
@@ -61,7 +63,7 @@ function artifactRow(currentVersion: number | null): LibraryArtifactRow {
   };
 }
 
-type Filter = ["eq" | "contains", string, unknown];
+type Filter = ["eq" | "contains" | "ilike" | "lte" | "gte", string, unknown];
 
 /** Just enough of the PostgREST builder for the catalog: eq/contains filters over in-memory rows, and recorded RPC calls. */
 function fakeDb(state: {
@@ -72,8 +74,27 @@ function fakeDb(state: {
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   const queries: { table: string; filters: Filter[]; limit?: number }[] = [];
 
+  const likeNeedle = (pattern: string) => {
+    let body = pattern;
+    if (body.startsWith("%")) body = body.slice(1);
+    if (body.endsWith("%")) body = body.slice(0, -1);
+    return body.replace(/\\([\\%_])/g, "$1").toLowerCase();
+  };
+
   const matches = (row: Record<string, unknown>, [op, col, val]: Filter) => {
     if (op === "eq") return row[col] === val;
+    if (op === "ilike") {
+      const needle = likeNeedle(String(val));
+      const haystack = col === "manifest->>title" ? String((row.manifest as { title?: string }).title ?? "") : String(row[col] ?? "");
+      return haystack.toLowerCase().includes(needle);
+    }
+    if (op === "lte" || op === "gte") {
+      const range = (row.manifest as { ageRange?: number[] }).ageRange;
+      if (!range) return false;
+      const bound = col.endsWith("->0") ? range[0] : range[1];
+      if (bound == null) return false;
+      return op === "lte" ? bound <= Number(val) : bound >= Number(val);
+    }
     const doc = row[col] as Record<string, unknown[]>;
     return Object.entries(val as Record<string, unknown[]>).every(([k, wanted]) => wanted.every((w) => doc[k]?.includes(w)));
   };
@@ -84,21 +105,44 @@ function fakeDb(state: {
       return state.rpc?.(fn, args) ?? { data: 1, error: null };
     },
     from(table: string) {
-      const q: { table: string; filters: Filter[]; limit?: number } = { table, filters: [] };
+      const q: { table: string; filters: Filter[]; limit?: number; mode?: "delete" } = { table, filters: [] };
       queries.push(q);
-      const rows = () =>
-        ((table === "library_artifacts" ? state.artifacts : state.versions) ?? []).filter((r) =>
+      const rows = () => {
+        let matched = ((table === "library_artifacts" ? state.artifacts : state.versions) ?? []).filter((r) =>
           q.filters.every((f) => matches(r as unknown as Record<string, unknown>, f)),
         );
+        if (table === "library_artifact_versions") {
+          const versions = matched as LibraryArtifactVersionRow[];
+          matched = versions.slice().sort((a, b) => {
+            const byId = a.artifact_id.localeCompare(b.artifact_id);
+            return byId !== 0 ? byId : b.version - a.version;
+          });
+        }
+        return q.limit != null ? matched.slice(0, q.limit) : matched;
+      };
       const builder = {
         select: () => builder,
         eq: (col: string, val: unknown) => (q.filters.push(["eq", col, val]), builder),
         contains: (col: string, val: unknown) => (q.filters.push(["contains", col, val]), builder),
+        ilike: (col: string, val: unknown) => (q.filters.push(["ilike", col, val]), builder),
+        filter: (col: string, op: "lte" | "gte" | "ilike", val: unknown) => (q.filters.push([op, col, val]), builder),
         order: () => builder,
         limit: (n: number) => ((q.limit = n), builder),
+        delete: () => ((q.mode = "delete"), builder),
         maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
-        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-          Promise.resolve({ data: rows(), error: null }).then(resolve, reject),
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => {
+          if (q.mode === "delete") {
+            const list = table === "library_artifacts" ? state.artifacts : state.versions;
+            if (list) {
+              for (let i = list.length - 1; i >= 0; i--) {
+                const row = list[i] as unknown as Record<string, unknown>;
+                if (q.filters.every((f) => matches(row, f))) list.splice(i, 1);
+              }
+            }
+            return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+          }
+          return Promise.resolve({ data: rows(), error: null }).then(resolve, reject);
+        },
       };
       return builder;
     },
@@ -231,6 +275,92 @@ describe("getArtifact and listArtifacts", () => {
 
     const none = await listArtifacts(db, { subject: "history" });
     expect(none.ok && none.versions).toHaveLength(0);
+  });
+
+  it("applies title, id, and age before the row cap", async () => {
+    const earlier = versionRow(1, "published");
+    earlier.artifact_id = "aaa-other";
+    earlier.manifest = { ...earlier.manifest, id: "aaa-other", title: "Other", ageRange: [14, 16] };
+    const lever = versionRow(1, "published");
+    lever.artifact_id = "lever-lab";
+    lever.manifest = { ...lever.manifest, id: "lever-lab", title: "Lever Lab", ageRange: [5, 7] };
+    const { db } = fakeDb({ versions: [earlier, lever] });
+
+    const titled = await listArtifacts(db, { title: "Lever", limit: 1 });
+    expect(titled.ok && titled.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+    const byId = await listArtifacts(db, { id: "lever", limit: 1 });
+    expect(byId.ok && byId.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+    const age = await listArtifacts(db, { age: 6, limit: 1 });
+    expect(age.ok && age.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+  });
+
+  it("filters by title, id, age, and compliance, and includes drafts when asked", async () => {
+    const published = versionRow(2, "published");
+    const draft = versionRow(3, "draft");
+    const lever = versionRow(1, "published");
+    lever.artifact_id = "lever-lab";
+    lever.compliance_level = 1;
+    lever.manifest = { ...lever.manifest, id: "lever-lab", title: "Lever Lab", subjects: ["physics"], ageRange: [5, 7] };
+
+    const { db } = fakeDb({ versions: [published, draft, lever] });
+
+    const titled = await listArtifacts(db, { title: "lever", allStatuses: true });
+    expect(titled.ok && titled.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+
+    const byId = await listArtifacts(db, { id: "SOLAR", allStatuses: true });
+    expect(byId.ok && byId.versions.map((v) => v.version).sort()).toEqual([2, 3]);
+
+    const age = await listArtifacts(db, { age: 8, allStatuses: true });
+    expect(age.ok && age.versions.map((v) => v.artifact_id)).toEqual(["solar-system-simulator", "solar-system-simulator"]);
+
+    const tooYoung = await listArtifacts(db, { age: 4, allStatuses: true });
+    expect(tooYoung.ok && tooYoung.versions).toHaveLength(0);
+
+    const compliance = await listArtifacts(db, { compliance: 1, allStatuses: true });
+    expect(compliance.ok && compliance.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+
+    const drafts = await listArtifacts(db, { status: "draft" });
+    expect(drafts.ok && drafts.versions.map((v) => v.version)).toEqual([3]);
+
+    const stillPublished = await listArtifacts(db, { id: "solar" });
+    expect(stillPublished.ok && stillPublished.versions.map((v) => v.version)).toEqual([2]);
+  });
+
+  it("lists every version of one artifact in version order", async () => {
+    const other = versionRow(1, "published");
+    other.artifact_id = "lever-lab";
+    const { db, queries } = fakeDb({
+      versions: [versionRow(3, "draft"), other, versionRow(1, "retired"), versionRow(2, "published")],
+    });
+    const out = await listVersions(db, "solar-system-simulator");
+    expect(out.ok && out.versions.map((row) => [row.version, row.status, row.published_at, row.files.map((file) => file.path)])).toEqual([
+      [1, "retired", "2026-10-22T00:00:00Z", ["index.html", "js/main.js"]],
+      [2, "published", "2026-10-22T00:00:00Z", ["index.html", "js/main.js"]],
+      [3, "draft", null, ["index.html", "js/main.js"]],
+    ]);
+    expect(queries.at(-1)?.filters).toEqual([["eq", "artifact_id", "solar-system-simulator"]]);
+  });
+});
+
+describe("deleteDraft", () => {
+  it("deletes a draft and its artifact when nothing remains", async () => {
+    const versions = [versionRow(1, "draft")];
+    const artifacts = [artifactRow(null)];
+    const { db } = fakeDb({ artifacts, versions });
+    const out = await deleteDraft(db, "solar-system-simulator", 1);
+    expect(out.ok && out.files.map((f) => f.path)).toEqual(["index.html", "js/main.js"]);
+    expect(versions).toHaveLength(0);
+    expect(artifacts).toHaveLength(0);
+  });
+
+  it("refuses to delete a published version", async () => {
+    const versions = [versionRow(1, "published")];
+    const { db } = fakeDb({ artifacts: [artifactRow(1)], versions });
+    expect(await deleteDraft(db, "solar-system-simulator", 1)).toEqual({
+      ok: false,
+      problems: ["solar-system-simulator@1 is published and cannot be deleted"],
+    });
+    expect(versions).toHaveLength(1);
   });
 });
 

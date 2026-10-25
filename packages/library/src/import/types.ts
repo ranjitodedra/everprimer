@@ -57,6 +57,8 @@ export interface ImportResult {
   normalized?: {
     manifest: ArtifactManifest;
     files: LibraryFileEntry[];
+    /** Post-rewrite, post-injection bytes. These are what get stored for preview. */
+    contents: InMemoryFile[];
     bundleSha256: string;
     changes: RewriteChange[];
   };
