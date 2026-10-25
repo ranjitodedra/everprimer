@@ -1,0 +1,90 @@
+{
+  "manifestVersion": 1,
+  "id": "states-of-matter",
+  "version": 1,
+  "title": "States of matter",
+  "description": "A child moves one substance among solid, liquid, and gas and compares how the particles are arranged.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["states of matter", "particles"],
+  "concepts": ["solid", "liquid", "gas"],
+  "prerequisites": [],
+  "learningObjectives": ["Explain how particles are arranged in a solid, a liquid, and a gas, and compare the three."],
+  "objectiveIntents": ["explain_process", "compare"],
+  "visualKinds": ["simulation", "comparison"],
+  "interactionTypes": ["select", "simulate", "compare"],
+  "ageRange": [7, 11],
+  "difficulty": 1,
+  "durationSec": [40, 120],
+  "params": [
+    {
+      "key": "state",
+      "type": "string",
+      "default": "solid",
+      "options": ["solid", "liquid", "gas"],
+      "description": "Which state the substance starts in."
+    }
+  ],
+  "events": [
+    {
+      "name": "state_changed",
+      "data": { "from": "string", "to": "string" },
+      "description": "The child moved the substance from one state to another."
+    },
+    {
+      "name": "particle_observed",
+      "data": { "state": "string", "spacing": "string" },
+      "description": "The child looked at how close the particles are in that state."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Particles stay put, slide, or fly. The state is the difference.",
+    "steps": [
+      "Look at the state the sample starts in.",
+      "Tap Solid, Liquid, or Gas.",
+      "Watch the particles, then compare the three jars."
+    ],
+    "observationPrompts": [
+      "Where are the particles closest together?",
+      "What do the gas particles do that the solid particles do not?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "A solid is one hard piece with nothing inside.",
+        "response": "A solid is many tiny particles. They are packed in place and only jiggle."
+      },
+      {
+        "belief": "Gas is empty, so it has no particles.",
+        "response": "A gas is particles too. They are far apart and moving, so the jar looks mostly empty."
+      }
+    ],
+    "hints": [
+      "Start with the solid. The particles sit in rows.",
+      "Liquid particles stay close and slide. Gas particles fly far apart."
+    ],
+    "successCriteria": [
+      {
+        "description": "Moved the substance from one state to another",
+        "evidence": ["state_changed"]
+      },
+      {
+        "description": "Noticed how the particles are spaced in the chosen state",
+        "evidence": ["particle_observed"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Three buttons show a solid, a liquid, and a gas. The picture and the sentence change to match the particles.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": {
+    "createdWith": ["hand"],
+    "createdAt": "2026-10-25T16:40:00.000Z"
+  },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}

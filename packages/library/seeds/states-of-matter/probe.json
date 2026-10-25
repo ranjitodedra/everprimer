@@ -1,0 +1,6 @@
+[
+  { "click": "[data-state=liquid]" },
+  { "expect": "state_changed" },
+  { "expect": "particle_observed" },
+  { "emit": "not_a_real_event" }
+]
