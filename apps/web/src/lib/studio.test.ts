@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { solarSystemManifest } from "@eco/contracts/testing";
 import type { LibraryArtifactVersionRow } from "@eco/db";
-import { isChildLogin, libraryListQuery, listForStudio, studioActor, studioGate } from "./studio";
+import { signDraftToken } from "./artifact-headers";
+import {
+  abandonPreview,
+  draftPreviewUrl,
+  isChildLogin,
+  libraryListQuery,
+  listForStudio,
+  previewNewArtifact,
+  sittingManifest,
+  studioActor,
+  studioGate,
+  tagSuggestions,
+} from "./studio";
 
 describe("studioActor", () => {
   it("treats a missing user as signed out, and a child login as a child even if staff is also set", () => {
@@ -99,5 +112,157 @@ describe("library list", () => {
   it("returns catalog rows to staff, including a draft", async () => {
     const listed = await listForStudio("staff", listDb([draft]).db, { title: "solar" });
     expect(listed).toEqual({ type: "list", versions: [draft] });
+  });
+});
+
+const PREVIEW_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><h1>Solar System</h1></body></html>`;
+const ACTOR = "00000000-0000-4000-8000-000000000001";
+
+function previewDeps(uploadError: string | null = null) {
+  const uploads: string[] = [];
+  const removed: string[][] = [];
+  const rpc: string[] = [];
+  const db = {
+    rpc: async (fn: string) => {
+      rpc.push(fn);
+      return { data: 1, error: null };
+    },
+    from: () => {
+      throw new Error("preview must not read the catalog");
+    },
+  } as unknown as SupabaseClient;
+  return {
+    uploads,
+    removed,
+    rpc,
+    deps: {
+      db,
+      origin: "http://artifacts.test",
+      secret: "draft-secret",
+      now: 1_700_000_000,
+      upload: async (path: string) => {
+        uploads.push(path);
+        return uploadError;
+      },
+      remove: async (paths: string[]) => {
+        removed.push(paths);
+        return null;
+      },
+    },
+  };
+}
+
+describe("new artifact preview", () => {
+  it("builds a manifest whose compliance is calculated, and suggests tags already in the library", () => {
+    const manifest = sittingManifest({
+      id: "lever-lab",
+      title: "Lever Lab",
+      description: "A lever with a movable fulcrum for ages six to eight.",
+      subjects: "physics, science",
+      topics: "forces",
+      concepts: "fulcrum",
+      params: "",
+      events: "",
+      entry: "",
+      ageYoungest: "6",
+      ageOldest: "8",
+      objective: "Explain how moving the fulcrum changes the lift",
+      summary: "A bar pivots on a fulcrum and lifts a load.",
+      tutorIntro: "",
+    });
+    expect(manifest).toMatchObject({ id: "lever-lab", subjects: ["physics", "science"], ageRange: [6, 8] });
+    expect(manifest).not.toHaveProperty("compliance");
+    expect(tagSuggestions([{ manifest: { subjects: ["science"], topics: ["astronomy"], concepts: ["orbit"] } }, { manifest }])).toEqual({
+      subjects: ["physics", "science"],
+      topics: ["astronomy", "forces"],
+      concepts: ["fulcrum", "orbit"],
+    });
+  });
+
+  it("signs a draft preview url for the artifact host", () => {
+    const token = signDraftToken("solar-system-simulator", 1, 1_700_001_800, "draft-secret");
+    expect(draftPreviewUrl("http://artifacts.test", "solar-system-simulator", 1, "index.html", token)).toBe(
+      `http://artifacts.test/a/solar-system-simulator/1/index.html?t=${token.signature}&e=1700001800`,
+    );
+  });
+
+  it("refuses a parent and does not store a draft when the import has errors", async () => {
+    const parent = previewDeps();
+    expect(
+      await previewNewArtifact("parent", { html: PREVIEW_HTML, manifest: solarSystemManifest(), actorId: ACTOR }, parent.deps),
+    ).toEqual({ type: "not-found" });
+    expect(parent.rpc).toHaveLength(0);
+    expect(parent.uploads).toHaveLength(0);
+
+    const staff = previewDeps();
+    const invalid = await previewNewArtifact("staff", { html: "", manifest: solarSystemManifest(), actorId: ACTOR }, staff.deps);
+    expect(invalid.type).toBe("invalid");
+    expect(staff.rpc).toHaveLength(0);
+    expect(staff.uploads).toHaveLength(0);
+  });
+
+  it("stores a draft and returns a signed preview url, with publish still off", async () => {
+    const staff = previewDeps();
+    const out = await previewNewArtifact("staff", { html: PREVIEW_HTML, manifest: solarSystemManifest(), actorId: ACTOR }, staff.deps);
+    expect(out.type).toBe("preview");
+    if (out.type !== "preview") return;
+    expect(staff.rpc).toEqual(["library_register_draft"]);
+    expect(staff.uploads).toEqual(["bundles/solar-system-simulator/1/index.html"]);
+    expect(out.url).toContain("http://artifacts.test/a/solar-system-simulator/1/index.html?t=");
+    expect(out.compliance).toBe(3);
+    expect(out.publish).toBe("off");
+  });
+
+  it("deletes a draft when staff leave, and refuses anyone else", async () => {
+    const versions = [
+      {
+        artifact_id: "solar-system-simulator",
+        version: 1,
+        status: "draft",
+        files: [{ path: "index.html", size: 10, sha256: "a".repeat(64), mime: "text/html" }],
+      },
+    ];
+    let removed: string[] = [];
+    const db = {
+      from(table: string) {
+        const filters: [string, unknown][] = [];
+        const builder = {
+          select: () => builder,
+          delete: () => builder,
+          eq: (col: string, val: unknown) => (filters.push([col, val]), builder),
+          maybeSingle: async () => ({ data: versions[0] ?? null, error: null }),
+          then: (resolve: (value: unknown) => unknown) => {
+            if (builder.deleting) {
+              const version = filters.find(([col]) => col === "version")?.[1];
+              const idx = versions.findIndex((row) => row.version === version);
+              if (idx >= 0) versions.splice(idx, 1);
+            }
+            return Promise.resolve({ data: table === "library_artifact_versions" ? versions : [], error: null }).then(resolve);
+          },
+          deleting: false,
+        };
+        const del = builder.delete;
+        builder.delete = () => ((builder.deleting = true), builder);
+        void del;
+        return builder;
+      },
+    } as unknown as SupabaseClient;
+    const deps = {
+      db,
+      origin: "http://artifacts.test",
+      secret: "draft-secret",
+      now: 0,
+      upload: async () => null,
+      remove: async (paths: string[]) => {
+        removed = paths;
+        return null;
+      },
+    };
+    expect(await abandonPreview("staff", "solar-system-simulator", 1, deps)).toEqual({ type: "deleted" });
+    expect(removed).toEqual(["bundles/solar-system-simulator/1/index.html"]);
+    expect(versions).toHaveLength(0);
+
+    const published = await abandonPreview("parent", "solar-system-simulator", 1, deps);
+    expect(published).toEqual({ type: "not-found" });
   });
 });

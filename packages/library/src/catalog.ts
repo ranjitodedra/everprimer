@@ -236,6 +236,24 @@ export async function publishVersion(db: Db, artifactId: string, version: number
   return moveTo(db, artifactId, version, "published", actor);
 }
 
+/** Deletes a draft and, when it was the only version, the artifact row. Published and retired versions stay. */
+export async function deleteDraft(db: Db, artifactId: string, version: number): Promise<CatalogResult<{ files: LibraryFileEntry[] }>> {
+  const loaded = await loadVersion(db, artifactId, version);
+  if (!loaded.ok) return loaded;
+  if (loaded.row.status !== "draft") return fail(`${artifactId}@${version} is ${loaded.row.status} and cannot be deleted`);
+
+  const removed = await db.from("library_artifact_versions").delete().eq("artifact_id", artifactId).eq("version", version);
+  if (removed.error) return fail(dbProblem(removed.error, `${artifactId}@${version}`));
+
+  const rest = await db.from("library_artifact_versions").select("version").eq("artifact_id", artifactId);
+  if (rest.error) return fail(dbProblem(rest.error, artifactId));
+  if (!rest.data?.length) {
+    const artifact = await db.from("library_artifacts").delete().eq("id", artifactId);
+    if (artifact.error) return fail(dbProblem(artifact.error, `artifact "${artifactId}"`));
+  }
+  return { ok: true, files: loaded.row.files };
+}
+
 /** Retires a published version. Lessons already pinned to it keep playing it. */
 export async function retireVersion(db: Db, artifactId: string, version: number, actor: string | null) {
   const loaded = await loadVersion(db, artifactId, version);

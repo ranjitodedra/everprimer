@@ -29,6 +29,7 @@ describe("importArtifact", () => {
       throw new Error(`unexpected errors: ${JSON.stringify(r.errors, null, 2)}`);
     }
     expect(r.normalized!.files.map((f) => f.path)).toEqual(["index.html"]);
+    expect(new TextDecoder().decode(r.normalized!.contents[0]!.bytes)).toContain("ArtifactKit");
     expect(r.normalized!.files[0]!.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(r.normalized!.bundleSha256).toMatch(/^[0-9a-f]{64}$/);
     expect(r.normalized!.changes.some((c) => c.rule === "jsdelivr")).toBe(true);

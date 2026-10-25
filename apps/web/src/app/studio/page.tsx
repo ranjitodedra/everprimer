@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { LibraryArtifactVersionRow } from "@eco/db";
 import { EmptyState, ListRow, PageHeader, StatusBadge } from "@/components/ui";
-import { getUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { isChildLogin, libraryListQuery, listForStudio, studioActor, studioGate } from "@/lib/studio";
+import { libraryListQuery, listForStudio, studioGate } from "@/lib/studio";
+import { currentStudioActor } from "@/lib/studio-session";
 
 export const metadata = { title: "Artifact Studio" };
 
@@ -21,15 +21,7 @@ function manifestText(row: LibraryArtifactVersionRow) {
 
 /** Staff home. The request gate is the primary check. This repeats it so a skipped gate still cannot render the page. */
 export default async function StudioHome(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const user = await getUser();
-  const child = isChildLogin(user);
-  let staff = false;
-  if (user && !child) {
-    const supabase = await createClient();
-    const { data } = await supabase.rpc("is_staff");
-    staff = data === true;
-  }
-  const actor = studioActor({ user: !!user, child, staff });
+  const { actor } = await currentStudioActor();
   const decision = studioGate(actor, "/studio");
   if (decision.type === "redirect") redirect(decision.to);
   if (decision.type === "not-found") notFound();
