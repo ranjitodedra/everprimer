@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Chain Reaction</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #241910;
+      --paper: #f4efe4;
+      --clay: #8f341c;
+      --face: #f7f3ea;
+      --wood: #8b5a34;
+      --wood-deep: #6e4324;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 1rem 1rem 1.25rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .lead, #ask, #note {
+      margin: 0.5rem 0 0;
+      font-size: 1.125rem;
+      line-height: 1.35;
+    }
+    #note:empty { display: none; }
+    .table {
+      margin-top: 1rem;
+      padding: 1.15rem 0.6rem 1.2rem;
+      overflow: hidden;
+      background: linear-gradient(180deg, #a56b3e 0%, var(--wood) 40%, var(--wood-deep) 100%);
+      border-radius: 1.25rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+    #row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 0.3rem;
+      min-height: 6rem;
+      padding-right: 2.5rem;
+    }
+    .domino {
+      flex: 1 1 1.25rem;
+      max-width: 2.25rem;
+      min-width: 0;
+      height: 4.75rem;
+      margin: 0;
+      padding: 0;
+      border: 2px solid var(--ink);
+      border-radius: 0.4rem;
+      background: var(--face);
+      color: var(--ink);
+      box-shadow: 2px 3px 0 var(--ink);
+      transform-origin: 50% 100%;
+      transition: transform 0.34s ease-in;
+      transition-delay: calc(var(--i, 0) * 70ms);
+      font: inherit;
+      cursor: default;
+      -webkit-appearance: none;
+      appearance: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    button.domino {
+      flex: 1.2 1 2.5rem;
+      max-width: 2.75rem;
+      min-width: 2.5rem;
+      height: 5.25rem;
+      background: var(--clay);
+      color: #fff8f3;
+      cursor: pointer;
+    }
+    button.domino:focus-visible {
+      outline: 3px solid #fff8f3;
+      outline-offset: 3px;
+    }
+    .pip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 0.95rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+    .domino.down { transform: rotate(68deg); }
+    #again {
+      margin-top: 1rem;
+      min-height: 2.75rem;
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 1rem;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #again:focus-visible {
+      outline: 3px solid var(--ink);
+      outline-offset: 3px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .domino { transition: none; }
+    }
+    html[data-reduced-motion="true"] .domino { transition: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Chain reaction</h1>
+    <p class="lead">Tap the first domino. One tap can knock the whole row down.</p>
+    <p id="ask">Count the standing dominoes. How many will fall?</p>
+    <div class="table">
+      <div id="row">
+        <button type="button" class="domino" data-domino="first" aria-label="First domino. Tap to start the chain.">
+          <span class="pip">Tap</span>
+        </button>
+      </div>
+    </div>
+    <p id="note" aria-live="polite"></p>
+    <button type="button" id="again" hidden>Stand them up</button>
+  </main>
+  <script>
+    (function () {
+      var row = document.getElementById("row");
+      var ask = document.getElementById("ask");
+      var note = document.getElementById("note");
+      var again = document.getElementById("again");
+      var started = false;
+
+      function shownCount(raw) {
+        var count = typeof raw === "number" && isFinite(raw) ? Math.round(raw) : 5;
+        if (count < 1) count = 1;
+        if (count > 12) count = 12;
+        return count;
+      }
+
+      function draw(count) {
+        while (row.firstChild) row.removeChild(row.firstChild);
+        var i;
+        for (i = 0; i < count; i++) {
+          var first = i === 0;
+          var piece = document.createElement(first ? "button" : "div");
+          piece.className = "domino";
+          piece.style.setProperty("--i", String(i));
+          if (first) {
+            piece.type = "button";
+            piece.setAttribute("data-domino", "first");
+            piece.setAttribute("aria-label", "First domino. Tap to start the chain.");
+            piece.addEventListener("click", onFirst);
+          } else {
+            piece.setAttribute("aria-hidden", "true");
+          }
+          var pip = document.createElement("span");
+          pip.className = "pip";
+          pip.textContent = first ? "Tap" : String(i + 1);
+          piece.appendChild(pip);
+          row.appendChild(piece);
+        }
+        ask.textContent = count + (count === 1 ? " domino is" : " dominoes are") + " standing. How many will fall if you tap the first one?";
+      }
+
+      function onFirst() {
+        var params = window.ArtifactKit.params;
+        var count = shownCount(params.count);
+        var reduced = window.ArtifactKit.reducedMotion === true;
+        started = true;
+        draw(count);
+        var pieces = row.querySelectorAll(".domino");
+        var starter = row.querySelector("[data-domino=first]");
+        if (starter) starter.disabled = true;
+        var mark = function () {
+          var n;
+          for (n = 0; n < pieces.length; n++) pieces[n].classList.add("down");
+        };
+        if (reduced) mark();
+        else requestAnimationFrame(mark);
+        ask.textContent = count + (count === 1 ? " domino was" : " dominoes were") + " standing.";
+        note.textContent = "All " + count + " fell. One tap was enough, because each one hits the next.";
+        again.hidden = false;
+        window.ArtifactKit.emit("domino_toppled", { count: count });
+        window.ArtifactKit.emit("chain_completed", { count: count });
+      }
+
+      again.addEventListener("click", function () {
+        var params = window.ArtifactKit.params;
+        var count = shownCount(params.count);
+        started = false;
+        note.textContent = "";
+        again.hidden = true;
+        draw(count);
+      });
+
+      var standing = row.querySelector("[data-domino=first]");
+      if (standing) standing.addEventListener("click", onFirst);
+
+      function showStanding() {
+        if (started) return;
+        var count = window.ArtifactKit.params.count;
+        if (typeof count !== "number") {
+          requestAnimationFrame(showStanding);
+          return;
+        }
+        draw(shownCount(count));
+      }
+      requestAnimationFrame(showStanding);
+    })();
+  </script>
+</body>
+</html>

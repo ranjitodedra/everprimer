@@ -1,0 +1,6 @@
+[
+  { "click": "[data-domino=first]" },
+  { "expect": "domino_toppled" },
+  { "expect": "chain_completed" },
+  { "emit": "not_a_real_event" }
+]
