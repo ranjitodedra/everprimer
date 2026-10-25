@@ -1,0 +1,6 @@
+[
+  { "click": "[data-chamber=left-ventricle]" },
+  { "expect": "chamber_selected" },
+  { "expect": "path_traced" },
+  { "emit": "not_a_real_event" }
+]
