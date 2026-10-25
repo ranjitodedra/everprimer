@@ -1,0 +1,6 @@
+[
+  { "click": "[data-part=nucleus]" },
+  { "expect": "organelle_selected" },
+  { "expect": "cell_labeled" },
+  { "emit": "not_a_real_event" }
+]

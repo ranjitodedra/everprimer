@@ -1,0 +1,85 @@
+{
+  "manifestVersion": 1,
+  "id": "animal-cell",
+  "version": 1,
+  "title": "Animal and plant cell",
+  "description": "Tap the nucleus in an animal cell. The kind param also draws a plant cell, with a wall, chloroplasts, and a large vacuole.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["cells", "biology"],
+  "concepts": ["animal cell", "plant cell", "nucleus"],
+  "prerequisites": ["Living things are made of cells"],
+  "learningObjectives": [
+    "Identify the nucleus in an animal cell or a plant cell",
+    "Explain how a plant cell differs from an animal cell"
+  ],
+  "objectiveIntents": ["identify", "explain"],
+  "visualKinds": ["parts"],
+  "interactionTypes": ["select", "label"],
+  "ageRange": [8, 12],
+  "difficulty": 2,
+  "durationSec": [60, 180],
+  "params": [
+    {
+      "key": "kind",
+      "type": "string",
+      "default": "animal",
+      "options": ["animal", "plant"],
+      "description": "Which cell to draw: animal or plant."
+    }
+  ],
+  "events": [
+    {
+      "name": "organelle_selected",
+      "data": { "part": "string", "kind": "string" },
+      "description": "The child selected an organelle in the cell."
+    },
+    {
+      "name": "cell_labeled",
+      "data": { "part": "string", "kind": "string" },
+      "description": "The child labeled the nucleus of this cell."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "This cell drawing changes with the kind param. Animal is the start. Plant adds the wall, chloroplasts, and a large vacuole.",
+    "steps": [
+      "Look at the shape of the cell.",
+      "Tap the nucleus.",
+      "Name one part a plant cell has that this animal cell does not."
+    ],
+    "observationPrompts": [
+      "What shape is the outside of this cell?",
+      "Which parts show up only when the cell is a plant cell?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "Plant cells and animal cells have the same parts.",
+        "response": "A plant cell has a cell wall, chloroplasts, and a large vacuole. An animal cell does not."
+      },
+      {
+        "belief": "The cell wall and the nucleus are the same part.",
+        "response": "The wall is the stiff outer layer of a plant cell. The nucleus sits inside and holds the cell's instructions."
+      }
+    ],
+    "hints": [
+      "The nucleus is the round purple part.",
+      "A plant cell is more like a box, with a thick wall.",
+      "Look for green chloroplasts only on the plant cell."
+    ],
+    "successCriteria": [
+      { "description": "Selected the nucleus", "evidence": ["organelle_selected"] },
+      { "description": "Labeled the nucleus of the cell", "evidence": ["cell_labeled"] }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "A cell diagram. Tap the nucleus to label it. A plant cell adds a wall, chloroplasts, and a large vacuole.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["hand"], "createdAt": "2026-10-25T16:00:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}
