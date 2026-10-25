@@ -488,3 +488,85 @@ export async function publishPreview(
   }
   return { type: "published", artifactId: input.artifactId, version: input.version };
 }
+
+export type StaffRecord = { userId: string; email: string };
+
+export type StaffSignIn = { email: string; password: string; emailConfirm: true };
+
+export type StaffDeps = {
+  list: () => Promise<{ ok: true; staff: StaffRecord[] } | { ok: false; message: string }>;
+  createSignIn: (input: StaffSignIn) => Promise<{ ok: true; userId: string } | { ok: false; message: string }>;
+  deleteSignIn: (userId: string) => Promise<void>;
+  insertStaff: (userId: string) => Promise<{ ok: true } | { ok: false; message: string }>;
+  deleteStaff: (userId: string) => Promise<{ ok: true; removed: boolean } | { ok: false; message: string }>;
+};
+
+export type StaffList =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "unavailable"; problems: string[] }
+  | { type: "list"; staff: StaffRecord[] };
+
+export type GrantResult =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "refused"; problems: string[] }
+  | { type: "unavailable"; problems: string[] }
+  | { type: "granted"; userId: string; email: string };
+
+function staffEmail(value: string): string | null {
+  const email = value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
+}
+
+/** Staff on the staff screen. Everyone else is turned away. */
+export async function listStaff(actor: StudioActor, deps: StaffDeps): Promise<StaffList> {
+  const gate = studioGate(actor, "/studio/staff");
+  if (gate.type !== "allow") return gate;
+  const listed = await deps.list();
+  if (!listed.ok) return { type: "unavailable", problems: [listed.message] };
+  return { type: "list", staff: listed.staff };
+}
+
+/**
+ * Creates a sign-in and a staff row. No account kind is sent, so the signup
+ * trigger does not create a learner, and this does not create a child login.
+ */
+export async function grantStaff(actor: StudioActor, input: { email: string; password: string }, deps: StaffDeps): Promise<GrantResult> {
+  const gate = studioGate(actor, "/studio/staff");
+  if (gate.type !== "allow") return gate;
+  const email = staffEmail(input.email);
+  if (!email) return { type: "refused", problems: ["Enter an email address."] };
+  if (input.password.length < 8) return { type: "refused", problems: ["Password must be at least 8 characters."] };
+
+  const created = await deps.createSignIn({ email, password: input.password, emailConfirm: true });
+  if (!created.ok) return { type: "refused", problems: [created.message] };
+  const inserted = await deps.insertStaff(created.userId);
+  if (!inserted.ok) {
+    await deps.deleteSignIn(created.userId);
+    return { type: "unavailable", problems: [inserted.message] };
+  }
+  return { type: "granted", userId: created.userId, email };
+}
+
+export type RemoveStaffResult =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "refused"; problems: string[] }
+  | { type: "unavailable"; problems: string[] }
+  | { type: "removed"; userId: string };
+
+/** Removes one staff row. The last staff member stays. */
+export async function removeStaff(actor: StudioActor, userId: string, deps: StaffDeps): Promise<RemoveStaffResult> {
+  const gate = studioGate(actor, "/studio/staff");
+  if (gate.type !== "allow") return gate;
+  const listed = await deps.list();
+  if (!listed.ok) return { type: "unavailable", problems: [listed.message] };
+  if (!listed.staff.some((person) => person.userId === userId)) return { type: "refused", problems: ["That person is not staff."] };
+  if (listed.staff.length <= 1) return { type: "refused", problems: ["The last staff member cannot be removed."] };
+  const deleted = await deps.deleteStaff(userId);
+  if (!deleted.ok) return { type: "unavailable", problems: [deleted.message] };
+  if (!deleted.removed) return { type: "refused", problems: ["The last staff member cannot be removed."] };
+  return { type: "removed", userId };
+}

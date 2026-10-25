@@ -12,8 +12,11 @@ import {
   isChildLogin,
   libraryListQuery,
   listForStudio,
+  grantStaff,
   historyForStudio,
+  listStaff,
   previewNewArtifact,
+  removeStaff,
   retireForStudio,
   sittingManifest,
   studioActor,
@@ -734,5 +737,133 @@ describe("version history", () => {
     const retired = retireDb([historyRow(1, "retired")], null);
     expect((await retireForStudio("staff", retired.db, "solar-system-simulator", 1, ACTOR)).type).toBe("refused");
     expect(retired.rpc).toHaveLength(0);
+  });
+});
+
+const OTHER = "00000000-0000-4000-8000-000000000002";
+const NEW_STAFF = "00000000-0000-4000-8000-000000000003";
+
+function staffDirectory(people: { userId: string; email: string }[]) {
+  const created: { email: string; password: string; emailConfirm: true }[] = [];
+  const deletedSignIns: string[] = [];
+  const inserted: string[] = [];
+  const removed: string[] = [];
+  let createError: string | null = null;
+  let insertError: string | null = null;
+  const deps = {
+    list: async () => ({ ok: true as const, staff: people.map((person) => ({ ...person })) }),
+    createSignIn: async (input: { email: string; password: string; emailConfirm: true }) => {
+      created.push(input);
+      return createError ? { ok: false as const, message: createError } : { ok: true as const, userId: NEW_STAFF };
+    },
+    deleteSignIn: async (userId: string) => {
+      deletedSignIns.push(userId);
+    },
+    insertStaff: async (userId: string) => {
+      inserted.push(userId);
+      if (insertError) return { ok: false as const, message: insertError };
+      return { ok: true as const };
+    },
+    deleteStaff: async (userId: string) => {
+      removed.push(userId);
+      return { ok: true as const, removed: true };
+    },
+  };
+  return {
+    deps,
+    created,
+    deletedSignIns,
+    inserted,
+    removed,
+    failCreate: (message: string) => {
+      createError = message;
+    },
+    failInsert: (message: string) => {
+      insertError = message;
+    },
+  };
+}
+
+describe("staff", () => {
+  it("shows the staff screen to staff only", async () => {
+    const directory = staffDirectory([{ userId: ACTOR, email: "ada@example.com" }]);
+    expect(await listStaff("parent", directory.deps)).toEqual({ type: "not-found" });
+    expect(await listStaff("child", directory.deps)).toEqual({ type: "not-found" });
+    expect(await listStaff("signed-out", directory.deps)).toEqual({ type: "redirect", to: "/login?next=%2Fstudio%2Fstaff" });
+    expect(await grantStaff("parent", { email: "new@example.com", password: "long-enough" }, directory.deps)).toEqual({ type: "not-found" });
+    expect(await removeStaff("child", ACTOR, directory.deps)).toEqual({ type: "not-found" });
+    expect(directory.created).toEqual([]);
+    expect(directory.removed).toEqual([]);
+    expect(await listStaff("staff", directory.deps)).toEqual({ type: "list", staff: [{ userId: ACTOR, email: "ada@example.com" }] });
+  });
+
+  it("creates a sign-in with no learner and no child login, then records staff", async () => {
+    const directory = staffDirectory([{ userId: ACTOR, email: "ada@example.com" }]);
+    expect(await grantStaff("staff", { email: "  new@example.com ", password: "long-enough" }, directory.deps)).toEqual({
+      type: "granted",
+      userId: NEW_STAFF,
+      email: "new@example.com",
+    });
+    expect(directory.created).toEqual([{ email: "new@example.com", password: "long-enough", emailConfirm: true }]);
+    expect(directory.inserted).toEqual([NEW_STAFF]);
+    expect(directory.deletedSignIns).toEqual([]);
+
+    const invalid = staffDirectory([]);
+    expect((await grantStaff("staff", { email: "not-an-email", password: "long-enough" }, invalid.deps)).type).toBe("refused");
+    expect((await grantStaff("staff", { email: "new@example.com", password: "short" }, invalid.deps)).type).toBe("refused");
+    expect(invalid.created).toEqual([]);
+
+    const taken = staffDirectory([]);
+    taken.failCreate("A user with this email address has already been registered");
+    expect(await grantStaff("staff", { email: "ada@example.com", password: "long-enough" }, taken.deps)).toEqual({
+      type: "refused",
+      problems: ["A user with this email address has already been registered"],
+    });
+    expect(taken.inserted).toEqual([]);
+
+    const rollback = staffDirectory([]);
+    rollback.failInsert("staff row was not saved");
+    expect(await grantStaff("staff", { email: "new@example.com", password: "long-enough" }, rollback.deps)).toEqual({
+      type: "unavailable",
+      problems: ["staff row was not saved"],
+    });
+    expect(rollback.deletedSignIns).toEqual([NEW_STAFF]);
+  });
+
+  it("removes a staff member and refuses to remove the last one", async () => {
+    const two = staffDirectory([
+      { userId: ACTOR, email: "ada@example.com" },
+      { userId: OTHER, email: "grace@example.com" },
+    ]);
+    expect(await removeStaff("staff", OTHER, two.deps)).toEqual({ type: "removed", userId: OTHER });
+    expect(two.removed).toEqual([OTHER]);
+
+    const last = staffDirectory([{ userId: ACTOR, email: "ada@example.com" }]);
+    expect(await removeStaff("staff", ACTOR, last.deps)).toEqual({
+      type: "refused",
+      problems: ["The last staff member cannot be removed."],
+    });
+    expect(last.removed).toEqual([]);
+
+    const stranger = staffDirectory([{ userId: ACTOR, email: "ada@example.com" }, { userId: OTHER, email: "grace@example.com" }]);
+    expect(await removeStaff("staff", NEW_STAFF, stranger.deps)).toEqual({
+      type: "refused",
+      problems: ["That person is not staff."],
+    });
+    expect(stranger.removed).toEqual([]);
+
+    const lost = staffDirectory([
+      { userId: ACTOR, email: "ada@example.com" },
+      { userId: OTHER, email: "grace@example.com" },
+    ]);
+    lost.deps.deleteStaff = async (userId: string) => {
+      lost.removed.push(userId);
+      return { ok: true, removed: false };
+    };
+    expect(await removeStaff("staff", OTHER, lost.deps)).toEqual({
+      type: "refused",
+      problems: ["The last staff member cannot be removed."],
+    });
+    expect(lost.removed).toEqual([OTHER]);
   });
 });
