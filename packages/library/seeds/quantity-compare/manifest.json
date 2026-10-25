@@ -1,0 +1,83 @@
+{
+  "manifestVersion": 1,
+  "id": "quantity-compare",
+  "version": 1,
+  "title": "Compare two quantities",
+  "description": "A child adds one to an amount, then sees which of the two quantities is more. The page can show fractions, ratios, quantities, or before and after.",
+  "format": "bundle",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["math"],
+  "topics": ["quantities", "comparison"],
+  "concepts": ["more and less", "fractions", "ratios"],
+  "prerequisites": [],
+  "learningObjectives": ["Tell which of two quantities is more after one amount changes"],
+  "objectiveIntents": ["compare", "apply"],
+  "visualKinds": ["comparison"],
+  "interactionTypes": ["compare", "select"],
+  "ageRange": [7, 11],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "mode",
+      "type": "string",
+      "default": "fractions",
+      "options": ["fractions", "ratios", "quantities", "beforeAfter"],
+      "description": "Which kind of quantity the page shows."
+    }
+  ],
+  "events": [
+    {
+      "name": "quantity_changed",
+      "data": { "mode": "string" },
+      "description": "The child added one to a quantity."
+    },
+    {
+      "name": "comparison_made",
+      "data": { "mode": "string" },
+      "description": "The child compared the two quantities."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Both amounts start equal. Add one more, then say which quantity is greater.",
+    "steps": [
+      "Look at the two amounts.",
+      "Tap Add one more.",
+      "Read which amount is greater."
+    ],
+    "observationPrompts": [
+      "What changed when you added one more?",
+      "Which amount is greater now?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "The bigger colored blocks are more even when the count is smaller.",
+        "response": "Count the filled blocks. The number, not the color, shows which amount is more."
+      }
+    ],
+    "hints": [
+      "More means the greater amount.",
+      "Tap Add one more, then read the sentence under the blocks."
+    ],
+    "successCriteria": [
+      {
+        "description": "Added one to a quantity",
+        "evidence": ["quantity_changed"]
+      },
+      {
+        "description": "Compared the two amounts",
+        "evidence": ["comparison_made"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Two amounts start equal. Activating Add one more increases one amount and states which is greater.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["seed"], "createdAt": "2026-10-25T16:40:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}
