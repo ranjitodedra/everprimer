@@ -1,0 +1,6 @@
+[
+  { "click": "[data-step=first]" },
+  { "expect": "step_placed" },
+  { "expect": "sequence_checked" },
+  { "emit": "not_a_real_event" }
+]

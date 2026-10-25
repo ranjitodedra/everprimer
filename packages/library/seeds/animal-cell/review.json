@@ -1,0 +1,24 @@
+{
+  "Scientific accuracy": "Left for staff.",
+  "Age fit": "The words and the tap-the-nucleus task are written for ages 8 to 12. Staff confirm the fit.",
+  "Whether it teaches the objective": "Tapping the nucleus names that part. The kind param shows how a plant cell differs from an animal cell.",
+  "Interaction quality": "The tap selects an organelle. On the nucleus it also labels the cell. The handler reads the kind param and draws that cell.",
+  "Mobile feel": "The diagram fits a phone width and each part is a large button. Staff confirm the feel on a device.",
+  "Tutor-guide completeness": {
+    "note": "Observation prompts and misconceptions are recorded here and in the tutor guide. The level grade does not read them.",
+    "observationPrompts": [
+      "What shape is the outside of this cell?",
+      "Which parts show up only when the cell is a plant cell?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "Plant cells and animal cells have the same parts.",
+        "response": "A plant cell has a cell wall, chloroplasts, and a large vacuole. An animal cell does not."
+      },
+      {
+        "belief": "The cell wall and the nucleus are the same part.",
+        "response": "The wall is the stiff outer layer of a plant cell. The nucleus sits inside and holds the cell's instructions."
+      }
+    ]
+  }
+}
