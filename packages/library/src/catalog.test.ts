@@ -61,7 +61,7 @@ function artifactRow(currentVersion: number | null): LibraryArtifactRow {
   };
 }
 
-type Filter = ["eq" | "contains", string, unknown];
+type Filter = ["eq" | "contains" | "ilike" | "lte" | "gte", string, unknown];
 
 /** Just enough of the PostgREST builder for the catalog: eq/contains filters over in-memory rows, and recorded RPC calls. */
 function fakeDb(state: {
@@ -72,8 +72,27 @@ function fakeDb(state: {
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   const queries: { table: string; filters: Filter[]; limit?: number }[] = [];
 
+  const likeNeedle = (pattern: string) => {
+    let body = pattern;
+    if (body.startsWith("%")) body = body.slice(1);
+    if (body.endsWith("%")) body = body.slice(0, -1);
+    return body.replace(/\\([\\%_])/g, "$1").toLowerCase();
+  };
+
   const matches = (row: Record<string, unknown>, [op, col, val]: Filter) => {
     if (op === "eq") return row[col] === val;
+    if (op === "ilike") {
+      const needle = likeNeedle(String(val));
+      const haystack = col === "manifest->>title" ? String((row.manifest as { title?: string }).title ?? "") : String(row[col] ?? "");
+      return haystack.toLowerCase().includes(needle);
+    }
+    if (op === "lte" || op === "gte") {
+      const range = (row.manifest as { ageRange?: number[] }).ageRange;
+      if (!range) return false;
+      const bound = col.endsWith("->0") ? range[0] : range[1];
+      if (bound == null) return false;
+      return op === "lte" ? bound <= Number(val) : bound >= Number(val);
+    }
     const doc = row[col] as Record<string, unknown[]>;
     return Object.entries(val as Record<string, unknown[]>).every(([k, wanted]) => wanted.every((w) => doc[k]?.includes(w)));
   };
@@ -86,14 +105,25 @@ function fakeDb(state: {
     from(table: string) {
       const q: { table: string; filters: Filter[]; limit?: number } = { table, filters: [] };
       queries.push(q);
-      const rows = () =>
-        ((table === "library_artifacts" ? state.artifacts : state.versions) ?? []).filter((r) =>
+      const rows = () => {
+        let matched = ((table === "library_artifacts" ? state.artifacts : state.versions) ?? []).filter((r) =>
           q.filters.every((f) => matches(r as unknown as Record<string, unknown>, f)),
         );
+        if (table === "library_artifact_versions") {
+          const versions = matched as LibraryArtifactVersionRow[];
+          matched = versions.slice().sort((a, b) => {
+            const byId = a.artifact_id.localeCompare(b.artifact_id);
+            return byId !== 0 ? byId : b.version - a.version;
+          });
+        }
+        return q.limit != null ? matched.slice(0, q.limit) : matched;
+      };
       const builder = {
         select: () => builder,
         eq: (col: string, val: unknown) => (q.filters.push(["eq", col, val]), builder),
         contains: (col: string, val: unknown) => (q.filters.push(["contains", col, val]), builder),
+        ilike: (col: string, val: unknown) => (q.filters.push(["ilike", col, val]), builder),
+        filter: (col: string, op: "lte" | "gte" | "ilike", val: unknown) => (q.filters.push([op, col, val]), builder),
         order: () => builder,
         limit: (n: number) => ((q.limit = n), builder),
         maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
@@ -231,6 +261,55 @@ describe("getArtifact and listArtifacts", () => {
 
     const none = await listArtifacts(db, { subject: "history" });
     expect(none.ok && none.versions).toHaveLength(0);
+  });
+
+  it("applies title, id, and age before the row cap", async () => {
+    const earlier = versionRow(1, "published");
+    earlier.artifact_id = "aaa-other";
+    earlier.manifest = { ...earlier.manifest, id: "aaa-other", title: "Other", ageRange: [14, 16] };
+    const lever = versionRow(1, "published");
+    lever.artifact_id = "lever-lab";
+    lever.manifest = { ...lever.manifest, id: "lever-lab", title: "Lever Lab", ageRange: [5, 7] };
+    const { db } = fakeDb({ versions: [earlier, lever] });
+
+    const titled = await listArtifacts(db, { title: "Lever", limit: 1 });
+    expect(titled.ok && titled.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+    const byId = await listArtifacts(db, { id: "lever", limit: 1 });
+    expect(byId.ok && byId.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+    const age = await listArtifacts(db, { age: 6, limit: 1 });
+    expect(age.ok && age.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+  });
+
+  it("filters by title, id, age, and compliance, and includes drafts when asked", async () => {
+    const published = versionRow(2, "published");
+    const draft = versionRow(3, "draft");
+    const lever = versionRow(1, "published");
+    lever.artifact_id = "lever-lab";
+    lever.compliance_level = 1;
+    lever.manifest = { ...lever.manifest, id: "lever-lab", title: "Lever Lab", subjects: ["physics"], ageRange: [5, 7] };
+
+    const { db } = fakeDb({ versions: [published, draft, lever] });
+
+    const titled = await listArtifacts(db, { title: "lever", allStatuses: true });
+    expect(titled.ok && titled.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+
+    const byId = await listArtifacts(db, { id: "SOLAR", allStatuses: true });
+    expect(byId.ok && byId.versions.map((v) => v.version).sort()).toEqual([2, 3]);
+
+    const age = await listArtifacts(db, { age: 8, allStatuses: true });
+    expect(age.ok && age.versions.map((v) => v.artifact_id)).toEqual(["solar-system-simulator", "solar-system-simulator"]);
+
+    const tooYoung = await listArtifacts(db, { age: 4, allStatuses: true });
+    expect(tooYoung.ok && tooYoung.versions).toHaveLength(0);
+
+    const compliance = await listArtifacts(db, { compliance: 1, allStatuses: true });
+    expect(compliance.ok && compliance.versions.map((v) => v.artifact_id)).toEqual(["lever-lab"]);
+
+    const drafts = await listArtifacts(db, { status: "draft" });
+    expect(drafts.ok && drafts.versions.map((v) => v.version)).toEqual([3]);
+
+    const stillPublished = await listArtifacts(db, { id: "solar" });
+    expect(stillPublished.ok && stillPublished.versions.map((v) => v.version)).toEqual([2]);
   });
 });
 

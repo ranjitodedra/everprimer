@@ -1,3 +1,8 @@
+import type { ComplianceLevel } from "@eco/contracts";
+import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
+import { listArtifacts } from "@eco/library";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 /**
  * Who may open the Artifact Studio, and where everyone else is sent.
  * The request gate and the Studio pages both call this. Tests call it directly.
@@ -39,4 +44,55 @@ export function studioGate(actor: StudioActor, path: string): StudioDecision {
     return { type: "redirect", to: "/studio" };
   }
   return { type: "allow" };
+}
+
+const VERSION_STATUSES: readonly LibraryVersionStatus[] = ["draft", "testing", "published", "retired"];
+
+export type LibraryListQuery = {
+  title?: string;
+  id?: string;
+  status?: LibraryVersionStatus;
+  subject?: string;
+  age?: number;
+  compliance?: ComplianceLevel;
+};
+
+function firstParam(value: string | string[] | undefined): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw?.trim() ?? "";
+}
+
+/** The list filters a staff member typed. Anything else is ignored, including a usage sort. */
+export function libraryListQuery(params: Record<string, string | string[] | undefined>): LibraryListQuery {
+  const query: LibraryListQuery = {};
+  const title = firstParam(params.title);
+  const id = firstParam(params.id);
+  const subject = firstParam(params.subject);
+  const status = firstParam(params.status);
+  const age = firstParam(params.age);
+  const compliance = firstParam(params.compliance);
+  if (title) query.title = title;
+  if (id) query.id = id;
+  if (subject) query.subject = subject;
+  if (VERSION_STATUSES.includes(status as LibraryVersionStatus)) query.status = status as LibraryVersionStatus;
+  if (/^\d{1,2}$/.test(age)) query.age = Number(age);
+  if (compliance === "0" || compliance === "1" || compliance === "2" || compliance === "3") {
+    query.compliance = Number(compliance) as ComplianceLevel;
+  }
+  return query;
+}
+
+export type StudioList =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "list"; versions: LibraryArtifactVersionRow[] }
+  | { type: "unavailable"; problems: string[] };
+
+/** Staff see every status, including drafts. A status filter narrows that. Everyone else is refused. */
+export async function listForStudio(actor: StudioActor, db: SupabaseClient, query: LibraryListQuery): Promise<StudioList> {
+  const gate = studioGate(actor, "/studio");
+  if (gate.type !== "allow") return gate;
+  const listed = await listArtifacts(db, { ...query, allStatuses: query.status == null });
+  if (!listed.ok) return { type: "unavailable", problems: listed.problems };
+  return { type: "list", versions: listed.versions };
 }

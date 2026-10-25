@@ -33,8 +33,17 @@ export interface ArtifactWithVersion {
 
 export interface ListFilters {
   status?: LibraryVersionStatus;
+  /** Staff list. Omit the published-only default so drafts and testing versions are included. */
+  allStatuses?: boolean;
   subject?: string;
   visualKind?: string;
+  /** Case-insensitive substring of the manifest title. A list filter, not lesson search. */
+  title?: string;
+  /** Case-insensitive substring of the artifact id. */
+  id?: string;
+  /** A learner age that must fall inside the manifest age range. */
+  age?: number;
+  compliance?: ComplianceLevel;
   limit?: number;
 }
 
@@ -146,14 +155,25 @@ export async function getArtifact(db: Db, artifactId: string, version?: number):
   return { ok: true, artifact, version: row };
 }
 
+/** A literal substring for ILIKE. `%`, `_`, and `\` in the typed text stay literal. */
+function containsPattern(value: string): string {
+  return `%${value.trim().replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
 /** Versions matching the filters, newest first per artifact. Defaults to published versions. */
 export async function listArtifacts(db: Db, filters: ListFilters = {}): Promise<CatalogResult<{ versions: LibraryArtifactVersionRow[] }>> {
-  let query = db
-    .from("library_artifact_versions")
-    .select(VERSION_COLUMNS)
-    .eq("status", filters.status ?? "published");
+  let query = db.from("library_artifact_versions").select(VERSION_COLUMNS);
+  if (filters.status) query = query.eq("status", filters.status);
+  else if (!filters.allStatuses) query = query.eq("status", "published");
   if (filters.subject) query = query.contains("manifest", { subjects: [filters.subject] });
   if (filters.visualKind) query = query.contains("manifest", { visualKinds: [filters.visualKind] });
+  if (filters.compliance != null) query = query.eq("compliance_level", filters.compliance);
+  if (filters.id?.trim()) query = query.ilike("artifact_id", containsPattern(filters.id));
+  if (filters.title?.trim()) query = query.filter("manifest->>title", "ilike", containsPattern(filters.title));
+  if (filters.age != null) {
+    query = query.filter("manifest->ageRange->0", "lte", filters.age);
+    query = query.filter("manifest->ageRange->1", "gte", filters.age);
+  }
   const { data, error } = await query
     .order("artifact_id", { ascending: true })
     .order("version", { ascending: false })
