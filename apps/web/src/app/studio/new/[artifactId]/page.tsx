@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getArtifact } from "@eco/library";
 import { PageHeader } from "@/components/ui";
-import { fieldsFromManifest, listForStudio, studioGate, tagSuggestions } from "@/lib/studio";
+import { fieldsFromManifest, listForStudio, previousForNextVersion, studioGate, tagSuggestions } from "@/lib/studio";
 import { currentStudioActor } from "@/lib/studio-session";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { SittingForm } from "../sitting-form";
@@ -16,7 +15,7 @@ export default async function NextVersionPage(props: { params: Promise<{ artifac
   if (decision.type === "redirect") redirect(decision.to);
   if (decision.type === "not-found") notFound();
 
-  const loaded = await getArtifact(createServiceClient(), artifactId);
+  const loaded = await previousForNextVersion(createServiceClient(), artifactId);
   if (!loaded.ok) notFound();
 
   const listed = await listForStudio(actor, await createClient(), {});
@@ -26,10 +25,10 @@ export default async function NextVersionPage(props: { params: Promise<{ artifac
     <main className="mx-auto max-w-5xl px-6 py-16">
       <PageHeader
         title="Next version"
-        subtitle={`New files for ${artifactId}. The published version stays as it is.`}
+        subtitle={`New files for ${artifactId}. The previous version stays as it is.`}
         leading={<Link href="/studio" className="btn-ghost btn-sm">Library</Link>}
       />
-      <SittingForm suggestions={suggestions} initial={fieldsFromManifest(loaded.version.manifest)} lockId artifactId={artifactId} />
+      <SittingForm suggestions={suggestions} initial={fieldsFromManifest(loaded.manifest)} lockId artifactId={artifactId} />
     </main>
   );
 }

@@ -182,6 +182,18 @@ export async function listArtifacts(db: Db, filters: ListFilters = {}): Promise<
   return { ok: true, versions: (data ?? []) as LibraryArtifactVersionRow[] };
 }
 
+/** Every draft and version of one artifact, oldest first. Does not offer one to a lesson. */
+export async function listVersions(db: Db, artifactId: string): Promise<CatalogResult<{ versions: LibraryArtifactVersionRow[] }>> {
+  const { data, error } = await db
+    .from("library_artifact_versions")
+    .select(VERSION_COLUMNS)
+    .eq("artifact_id", artifactId)
+    .order("version", { ascending: true });
+  if (error) return fail(dbProblem(error, artifactId));
+  const versions = ((data ?? []) as LibraryArtifactVersionRow[]).slice().sort((a, b) => a.version - b.version);
+  return { ok: true, versions };
+}
+
 async function loadVersion(db: Db, artifactId: string, version: number): Promise<CatalogResult<{ row: LibraryArtifactVersionRow }>> {
   const { data, error } = await db
     .from("library_artifact_versions")

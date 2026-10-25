@@ -12,7 +12,9 @@ import {
   isChildLogin,
   libraryListQuery,
   listForStudio,
+  historyForStudio,
   previewNewArtifact,
+  retireForStudio,
   sittingManifest,
   studioActor,
   studioGate,
@@ -556,5 +558,181 @@ describe("next version", () => {
     );
     expect(out.type).toBe("invalid");
     expect(cleared.rpc).toHaveLength(0);
+  });
+
+  it("starts the next version from the newest retired version when nothing is published", async () => {
+    const previous = { ...solarSystemManifest(), version: 1 };
+    const uploads: string[] = [];
+    const rpc: { fn: string; args: Record<string, unknown> }[] = [];
+    const retired = {
+      artifact_id: "solar-system-simulator",
+      version: 1,
+      manifest: previous,
+      entry_file: "index.html",
+      files: [{ path: "index.html", size: 20, sha256: "a".repeat(64), mime: "text/html" }],
+      bundle_sha256: "b".repeat(64),
+      status: "retired" as const,
+      validation_report: null,
+      compliance_level: 3 as const,
+      created_by: ACTOR,
+      created_at: "2026-10-22T00:00:00Z",
+      published_at: "2026-10-22T12:00:00Z",
+      published_by: ACTOR,
+      retired_at: "2026-10-23T00:00:00Z",
+    };
+    const db = {
+      from(table: string) {
+        const builder = {
+          select: () => builder,
+          eq: () => builder,
+          order: () => builder,
+          update: () => {
+            throw new Error("the previous version must stay unchanged");
+          },
+          maybeSingle: async () => ({
+            data:
+              table === "library_artifacts"
+                ? { id: "solar-system-simulator", title: previous.title, owner: ACTOR, current_version: null, created_at: "", updated_at: "" }
+                : null,
+            error: null,
+          }),
+          then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: table === "library_artifact_versions" ? [retired] : [], error: null }).then(resolve),
+        };
+        return builder;
+      },
+      rpc: async (fn: string, args: Record<string, unknown>) => {
+        rpc.push({ fn, args });
+        return { data: 2, error: null };
+      },
+    };
+    const fields = { ...fieldsFromManifest(previous), title: "Solar System Updated" };
+    const out = await previewNextVersion(
+      "staff",
+      { artifactId: "solar-system-simulator", fields, html: PREVIEW_HTML, actorId: ACTOR },
+      {
+        db: db as unknown as SupabaseClient,
+        origin: "http://artifacts.test",
+        secret: "draft-secret",
+        now: 1_700_000_000,
+        upload: async (path: string) => {
+          uploads.push(path);
+          return null;
+        },
+        remove: async () => null,
+      },
+    );
+    expect(out.type).toBe("preview");
+    if (out.type !== "preview") return;
+    expect(out.version).toBe(2);
+    expect(rpc.map((call) => call.fn)).toEqual(["library_add_version"]);
+    expect(uploads).toEqual(["bundles/solar-system-simulator/2/index.html"]);
+    const stored = rpc[0]!.args.p_manifest as { id: string; title: string };
+    expect(stored.id).toBe("solar-system-simulator");
+    expect(stored.title).toBe("Solar System Updated");
+  });
+});
+
+function historyRow(version: number, status: "draft" | "testing" | "published" | "retired"): LibraryArtifactVersionRow {
+  return {
+    artifact_id: "solar-system-simulator",
+    version,
+    manifest: { id: "solar-system-simulator", title: "Solar System Simulator", version },
+    entry_file: "index.html",
+    files: [{ path: version === 2 ? "scene.html" : "index.html", size: 20, sha256: "a".repeat(64), mime: "text/html" }],
+    bundle_sha256: "b".repeat(64),
+    status,
+    validation_report: null,
+    compliance_level: 3,
+    created_by: ACTOR,
+    created_at: "2026-10-22T00:00:00Z",
+    published_at: status === "published" || status === "retired" ? "2026-10-22T12:00:00Z" : null,
+    published_by: null,
+    retired_at: status === "retired" ? "2026-10-23T00:00:00Z" : null,
+  };
+}
+
+function retireDb(rows: LibraryArtifactVersionRow[], currentVersion: number | null) {
+  const rpc: { fn: string; args: Record<string, unknown> }[] = [];
+  const db = {
+    from(table: string) {
+      const filters: [string, unknown][] = [];
+      const builder = {
+        select: () => builder,
+        eq: (col: string, val: unknown) => {
+          filters.push([col, val]);
+          return builder;
+        },
+        maybeSingle: async () => {
+          if (table !== "library_artifact_versions") return { data: null, error: null };
+          const version = filters.find(([col]) => col === "version")?.[1];
+          const id = filters.find(([col]) => col === "artifact_id")?.[1];
+          return { data: rows.find((row) => row.artifact_id === id && row.version === version) ?? null, error: null };
+        },
+      };
+      return builder;
+    },
+    rpc: async (fn: string, args: Record<string, unknown>) => {
+      rpc.push({ fn, args });
+      return { data: { status: "retired", current_version: currentVersion }, error: null };
+    },
+  };
+  return { db: db as unknown as SupabaseClient, rpc };
+}
+
+describe("version history", () => {
+  it("shows a parent nothing and returns every version to staff, oldest first", async () => {
+    const rows = [historyRow(3, "draft"), historyRow(1, "retired"), historyRow(2, "published")];
+    const parent = listDb(rows);
+    expect(await historyForStudio("parent", parent.db, "solar-system-simulator")).toEqual({ type: "not-found" });
+    expect(parent.calls()).toBe(0);
+
+    const staff = await historyForStudio("staff", listDb(rows).db, "solar-system-simulator");
+    expect(staff.type).toBe("history");
+    if (staff.type !== "history") return;
+    expect(staff.versions.map((row) => [row.version, row.status, row.published_at, row.manifest, row.files.map((file) => file.path)])).toEqual([
+      [1, "retired", "2026-10-22T12:00:00Z", rows[1]!.manifest, ["index.html"]],
+      [2, "published", "2026-10-22T12:00:00Z", rows[2]!.manifest, ["scene.html"]],
+      [3, "draft", null, rows[0]!.manifest, ["index.html"]],
+    ]);
+    expect(await historyForStudio("staff", listDb([]).db, "missing-artifact")).toEqual({ type: "not-found" });
+  });
+
+  it("retires a published version and leaves the newest remaining published version offered", async () => {
+    const staff = retireDb([historyRow(1, "published"), historyRow(2, "published")], 1);
+    expect(await retireForStudio("staff", staff.db, "solar-system-simulator", 2, ACTOR)).toEqual({
+      type: "retired",
+      artifactId: "solar-system-simulator",
+      version: 2,
+      currentVersion: 1,
+    });
+    expect(staff.rpc).toEqual([
+      {
+        fn: "library_set_status",
+        args: { p_artifact_id: "solar-system-simulator", p_version: 2, p_status: "retired", p_actor: ACTOR },
+      },
+    ]);
+
+    const only = retireDb([historyRow(1, "published")], null);
+    expect(await retireForStudio("staff", only.db, "solar-system-simulator", 1, ACTOR)).toEqual({
+      type: "retired",
+      artifactId: "solar-system-simulator",
+      version: 1,
+      currentVersion: null,
+    });
+  });
+
+  it("refuses a parent, a draft, and a version that is already retired", async () => {
+    const parent = retireDb([historyRow(1, "published")], null);
+    expect(await retireForStudio("parent", parent.db, "solar-system-simulator", 1, ACTOR)).toEqual({ type: "not-found" });
+    expect(parent.rpc).toHaveLength(0);
+
+    const draft = retireDb([historyRow(1, "draft")], null);
+    const refused = await retireForStudio("staff", draft.db, "solar-system-simulator", 1, ACTOR);
+    expect(refused.type).toBe("refused");
+    expect(draft.rpc).toHaveLength(0);
+
+    const retired = retireDb([historyRow(1, "retired")], null);
+    expect((await retireForStudio("staff", retired.db, "solar-system-simulator", 1, ACTOR)).type).toBe("refused");
+    expect(retired.rpc).toHaveLength(0);
   });
 });

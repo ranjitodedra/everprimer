@@ -5,6 +5,7 @@ import { EmptyState, ListRow, PageHeader, StatusBadge } from "@/components/ui";
 import { createClient } from "@/lib/supabase/server";
 import { libraryListQuery, listForStudio, studioGate } from "@/lib/studio";
 import { currentStudioActor } from "@/lib/studio-session";
+import { RetireButton } from "./retire-button";
 
 export const metadata = { title: "Artifact Studio" };
 
@@ -111,9 +112,12 @@ export default async function StudioHome(props: { searchParams: Promise<Record<s
                     />
                   </div>
                   {row.status === "published" ? (
-                    <Link href={`/studio/new/${row.artifact_id}`} className="btn-ghost btn-sm mr-2 shrink-0">
-                      Next version
-                    </Link>
+                    <div className="flex shrink-0 items-center">
+                      <Link href={`/studio/new/${row.artifact_id}`} className="btn-ghost btn-sm mr-2">
+                        Next version
+                      </Link>
+                      <RetireButton artifactId={row.artifact_id} version={row.version} />
+                    </div>
                   ) : null}
                 </div>
               </li>

@@ -1,6 +1,6 @@
 import { complianceLevel, type ArtifactManifest, type ComplianceLevel } from "@eco/contracts";
 import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
-import { addVersion, bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, publishVersion, registerDraft, setStatus } from "@eco/library";
+import { addVersion, bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, listVersions, publishVersion, registerDraft, retireVersion, setStatus } from "@eco/library";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { signDraftToken, type DraftToken } from "./artifact-headers";
 
@@ -88,6 +88,46 @@ export type StudioList =
   | { type: "not-found" }
   | { type: "list"; versions: LibraryArtifactVersionRow[] }
   | { type: "unavailable"; problems: string[] };
+
+export type VersionHistory =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "unavailable"; problems: string[] }
+  | { type: "history"; versions: LibraryArtifactVersionRow[] };
+
+/** Every draft and version of one artifact, oldest first. A missing artifact is not found. */
+export async function historyForStudio(actor: StudioActor, db: SupabaseClient, artifactId: string): Promise<VersionHistory> {
+  const gate = studioGate(actor, `/studio/artifacts/${artifactId}`);
+  if (gate.type !== "allow") return gate;
+  const listed = await listVersions(db, artifactId);
+  if (!listed.ok) return { type: "unavailable", problems: listed.problems };
+  if (listed.versions.length === 0) return { type: "not-found" };
+  return { type: "history", versions: listed.versions };
+}
+
+export type RetireResult =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "refused"; problems: string[] }
+  | { type: "retired"; artifactId: string; version: number; currentVersion: number | null };
+
+/**
+ * Retire one published version. The row stays, so a lesson that already has
+ * it can still open it. currentVersion is what a new lesson is offered.
+ */
+export async function retireForStudio(
+  actor: StudioActor,
+  db: SupabaseClient,
+  artifactId: string,
+  version: number,
+  actorId: string | null,
+): Promise<RetireResult> {
+  const gate = studioGate(actor, `/studio/artifacts/${artifactId}`);
+  if (gate.type !== "allow") return gate;
+  const retired = await retireVersion(db, artifactId, version, actorId);
+  if (!retired.ok) return { type: "refused", problems: retired.problems };
+  return { type: "retired", artifactId, version, currentVersion: retired.currentVersion };
+}
 
 /** Staff see every status, including drafts. A status filter narrows that. Everyone else is refused. */
 export async function listForStudio(actor: StudioActor, db: SupabaseClient, query: LibraryListQuery): Promise<StudioList> {
@@ -301,6 +341,21 @@ export async function previewNewArtifact(actor: StudioActor, input: NewArtifactI
   return openDraft(deps, registered, imported.normalized, imported.warnings);
 }
 
+/** The current published manifest, or the newest retired one when nothing is still published. */
+export async function previousForNextVersion(
+  db: SupabaseClient,
+  artifactId: string,
+): Promise<{ ok: true; manifest: Record<string, unknown> } | { ok: false; problems: string[] }> {
+  const published = await getArtifact(db, artifactId);
+  if (published.ok) return { ok: true, manifest: published.version.manifest };
+  const listed = await listVersions(db, artifactId);
+  if (!listed.ok) return { ok: false, problems: listed.problems };
+  const retired = listed.versions.filter((row) => row.status === "retired");
+  const latest = retired[retired.length - 1];
+  if (!latest) return { ok: false, problems: published.problems };
+  return { ok: true, manifest: latest.manifest };
+}
+
 export async function previewNextVersion(
   actor: StudioActor,
   input: { artifactId: string; fields: SittingFields; html?: string; zip?: Uint8Array; actorId: string | null },
@@ -315,11 +370,11 @@ export async function previewNextVersion(
     return { type: "refused", problems: ["The artifact id is locked."] };
   }
 
-  const previous = await getArtifact(deps.db, input.artifactId);
+  const previous = await previousForNextVersion(deps.db, input.artifactId);
   if (!previous.ok) return { type: "unavailable", problems: previous.problems };
   let manifest: Record<string, unknown>;
   try {
-    manifest = overlayPrevious(previous.version.manifest as Record<string, unknown>, input.fields, Boolean(input.zip?.byteLength));
+    manifest = overlayPrevious(previous.manifest, input.fields, Boolean(input.zip?.byteLength));
   } catch (error) {
     const message = error instanceof Error ? error.message : "The manifest fields are not valid.";
     return { type: "invalid", errors: [{ code: "manifest", message }], warnings: [] };

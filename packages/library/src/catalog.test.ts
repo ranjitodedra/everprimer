@@ -9,6 +9,7 @@ import {
   deleteDraft,
   getArtifact,
   listArtifacts,
+  listVersions,
   publishVersion,
   registerDraft,
   retireVersion,
@@ -323,6 +324,21 @@ describe("getArtifact and listArtifacts", () => {
 
     const stillPublished = await listArtifacts(db, { id: "solar" });
     expect(stillPublished.ok && stillPublished.versions.map((v) => v.version)).toEqual([2]);
+  });
+
+  it("lists every version of one artifact in version order", async () => {
+    const other = versionRow(1, "published");
+    other.artifact_id = "lever-lab";
+    const { db, queries } = fakeDb({
+      versions: [versionRow(3, "draft"), other, versionRow(1, "retired"), versionRow(2, "published")],
+    });
+    const out = await listVersions(db, "solar-system-simulator");
+    expect(out.ok && out.versions.map((row) => [row.version, row.status, row.published_at, row.files.map((file) => file.path)])).toEqual([
+      [1, "retired", "2026-10-22T00:00:00Z", ["index.html", "js/main.js"]],
+      [2, "published", "2026-10-22T00:00:00Z", ["index.html", "js/main.js"]],
+      [3, "draft", null, ["index.html", "js/main.js"]],
+    ]);
+    expect(queries.at(-1)?.filters).toEqual([["eq", "artifact_id", "solar-system-simulator"]]);
   });
 });
 
