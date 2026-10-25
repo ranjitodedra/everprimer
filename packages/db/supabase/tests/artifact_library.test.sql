@@ -4,7 +4,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(46);
+select plan(49);
 
 -- Staff S. Family A: parent A, child a1 (child login C).
 insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
@@ -93,9 +93,30 @@ select throws_ok(
   $$ select public.library_set_status('orbit-lab', 1, 'testing', null) $$,
   'P0001', 'library version orbit-lab@1 is already testing', 'repeating a status change is refused'
 );
+select throws_ok(
+  $$ select public.library_set_status('orbit-lab', 1, 'published', null) $$,
+  'P0001', 'library version orbit-lab@1 has no browser report', 'publishing without a browser report is refused'
+);
+update public.library_artifact_versions
+set validation_report = jsonb_build_object('ok', false, 'bundleSha256', (select sha from fx))
+where artifact_id = 'orbit-lab' and version = 1;
+select throws_ok(
+  $$ select public.library_set_status('orbit-lab', 1, 'published', null) $$,
+  'P0001', 'library version orbit-lab@1 browser report did not pass', 'publishing a failed browser report is refused'
+);
+update public.library_artifact_versions
+set validation_report = jsonb_build_object('ok', true, 'bundleSha256', repeat('b', 64))
+where artifact_id = 'orbit-lab' and version = 1;
+select throws_ok(
+  $$ select public.library_set_status('orbit-lab', 1, 'published', null) $$,
+  'P0001', 'library version orbit-lab@1 browser report does not match the bundle', 'publishing a report for a different bundle is refused'
+);
+update public.library_artifact_versions
+set validation_report = jsonb_build_object('ok', true, 'bundleSha256', (select sha from fx))
+where artifact_id = 'orbit-lab' and version = 1;
 select is(
   public.library_set_status('orbit-lab', 1, 'published', '5a000000-0000-4000-8000-0000000000a1') ->> 'current_version',
-  '1', 'publishing makes the version current'
+  '1', 'publishing a matching browser report makes the version current'
 );
 select ok(
   (select published_at is not null and published_by = '5a000000-0000-4000-8000-0000000000a1'
@@ -134,6 +155,9 @@ select ok(
 );
 
 select lives_ok($$ select public.library_set_status('orbit-lab', 2, 'testing', null) $$, 'version 2 moves into testing');
+update public.library_artifact_versions
+set validation_report = jsonb_build_object('ok', true, 'bundleSha256', (select sha from fx))
+where artifact_id = 'orbit-lab' and version = 2;
 select is(
   public.library_set_status('orbit-lab', 2, 'published', null) ->> 'current_version',
   '2', 'a newer published version becomes current'

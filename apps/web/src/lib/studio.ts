@@ -1,6 +1,23 @@
 import { complianceLevel, type ArtifactManifest, type ComplianceLevel } from "@eco/contracts";
 import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
-import { addVersion, bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, listVersions, publishVersion, registerDraft, retireVersion, setStatus } from "@eco/library";
+import {
+  addVersion,
+  bundleObjectPath,
+  checkVersionInput,
+  deleteDraft,
+  getArtifact,
+  importArtifact,
+  listArtifacts,
+  listVersions,
+  previewObjectPath,
+  publishVersion,
+  recordBrowserReport,
+  registerDraft,
+  retireVersion,
+  setStatus,
+  type BrowserCheckResult,
+  type BrowserReport,
+} from "@eco/library";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { signDraftToken, type DraftToken } from "./artifact-headers";
 
@@ -465,18 +482,80 @@ export type PublishResult =
   | { type: "unavailable"; problems: string[] }
   | { type: "published"; artifactId: string; version: number };
 
+export type BrowserCheckCommand = (input: {
+  manifest: ArtifactManifest;
+  bundleSha256: string;
+}) => Promise<BrowserCheckResult>;
+
+async function storeBrowserCheck(
+  input: { artifactId: string; version: number; actorId: string | null },
+  db: SupabaseClient,
+  browserCheck: BrowserCheckCommand,
+  upload: PreviewDeps["upload"] | undefined,
+): Promise<PublishResult | { type: "stored" }> {
+  const loaded = await getArtifact(db, input.artifactId, input.version);
+  if (!loaded.ok) return { type: "refused", problems: loaded.problems };
+  if (loaded.version.status !== "draft" && loaded.version.status !== "testing") {
+    return {
+      type: "refused",
+      problems: [`${input.artifactId}@${input.version} is ${loaded.version.status} and its browser report cannot change`],
+    };
+  }
+  const checked = checkVersionInput({
+    manifest: loaded.version.manifest,
+    files: loaded.version.files,
+    bundleSha256: loaded.version.bundle_sha256,
+    actor: input.actorId,
+  });
+  if (!checked.ok) return { type: "refused", problems: checked.problems };
+
+  let result: BrowserCheckResult;
+  try {
+    result = await browserCheck({ manifest: checked.manifest, bundleSha256: loaded.version.bundle_sha256 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "browser check failed";
+    return { type: "unavailable", problems: [message] };
+  }
+
+  const report: BrowserReport = { ...result.report, thumbnailPath: null };
+  if (result.thumbnail) {
+    if (!upload) return { type: "unavailable", problems: ["The desktop thumbnail was not stored."] };
+    const path = previewObjectPath(input.artifactId, input.version);
+    const uploadError = await upload(path, result.thumbnail, "image/png");
+    if (uploadError) return { type: "unavailable", problems: [uploadError] };
+    report.thumbnailPath = path;
+  }
+
+  const recorded = await recordBrowserReport(db, input.artifactId, input.version, report);
+  if (!recorded.ok) return { type: "refused", problems: recorded.problems };
+  return { type: "stored" };
+}
+
 /**
  * One action: draft, then testing, then published. A failure puts the version
  * back to draft. Warnings are not an input; they do not block.
+ *
+ * `browserCheck` is optional. A test or a local run passes it and the report
+ * and desktop PNG are stored first. The hosted action omits it and publishes
+ * the report already stored. This function never imports Playwright.
  */
 export async function publishPreview(
   actor: StudioActor,
   input: { artifactId: string; version: number; ready: boolean; actorId: string | null },
-  deps: { db: SupabaseClient },
+  deps: {
+    db: SupabaseClient;
+    browserCheck?: BrowserCheckCommand;
+    upload?: PreviewDeps["upload"];
+  },
 ): Promise<PublishResult> {
   const gate = studioGate(actor, "/studio/new");
   if (gate.type !== "allow") return gate;
   if (!input.ready) return { type: "refused", problems: ["Publish stays off until the preview is ready."] };
+
+  if (deps.browserCheck) {
+    const stored = await storeBrowserCheck(input, deps.db, deps.browserCheck, deps.upload);
+    if (stored.type !== "stored") return stored;
+  }
 
   const testing = await setStatus(deps.db, input.artifactId, input.version, "testing", input.actorId);
   if (!testing.ok) return { type: "refused", problems: testing.problems };
