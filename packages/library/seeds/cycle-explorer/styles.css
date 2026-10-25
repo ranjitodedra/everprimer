@@ -1,0 +1,233 @@
+html,
+body {
+  height: 100%;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  overscroll-behavior: none;
+  background:
+    radial-gradient(900px 220px at 0% -10%, var(--wash), transparent 55%),
+    var(--paper);
+  color: var(--ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+:root,
+html[data-cycle="water"] {
+  --paper: #d5efe6;
+  --ink: #102f33;
+  --card: #f4fbf8;
+  --accent: #0b6e75;
+  --accent-ink: #f4fbf8;
+  --line: #7ebfb8;
+  --wash: rgba(226, 161, 34, 0.45);
+}
+
+html[data-cycle="rock"] {
+  --paper: #efe4d2;
+  --ink: #2c2418;
+  --card: #fbf7f0;
+  --accent: #8a4328;
+  --accent-ink: #fbf7f0;
+  --line: #c4a882;
+  --wash: rgba(196, 123, 58, 0.4);
+}
+
+html[data-cycle="life"] {
+  --paper: #e4f0d2;
+  --ink: #1c3318;
+  --card: #f7fbea;
+  --accent: #2f6b34;
+  --accent-ink: #f7fbea;
+  --line: #9ec48a;
+  --wash: rgba(212, 93, 120, 0.28);
+}
+
+.shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding:
+    max(14px, env(safe-area-inset-top))
+    max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  background: var(--accent);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
+html[data-cycle="rock"] .mark {
+  border-radius: 3px;
+  transform: none;
+}
+
+html[data-cycle="life"] .mark {
+  border-radius: 0 70% 0 70%;
+  transform: none;
+}
+
+h1,
+h2,
+.name,
+.ord {
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.lead {
+  margin: 4px 0 0;
+  max-width: 38rem;
+}
+
+.flow {
+  height: 8px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 14px, transparent 14px 22px);
+  background-size: 44px 8px;
+  animation: march 1.8s linear infinite;
+}
+
+@keyframes march {
+  to {
+    background-position: 44px 0;
+  }
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.loop {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.loop button {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.ord {
+  width: 1.4rem;
+  flex: none;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.loop button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.loop button[aria-pressed="true"] .ord {
+  color: var(--accent-ink);
+}
+
+.loop button:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.loop button:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .loop button:hover {
+    border-color: var(--accent);
+  }
+}
+
+.detail h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.detail p {
+  margin: 0;
+}
+
+.status {
+  margin-top: 8px;
+}
+
+@media (min-width: 720px) {
+  .board {
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+
+  .loop {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow,
+  .loop button:active {
+    animation: none;
+    transform: none;
+  }
+}
+
+html[data-reduced-motion="true"] .flow,
+html[data-reduced-motion="true"] .loop button:active {
+  animation: none;
+  transform: none;
+}
