@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { abandonSitting, previewSitting } from "./actions";
+import { abandonSitting, previewSitting, publishSitting } from "./actions";
 import { PreviewFrame } from "./preview-frame";
 import type { PreviewResult } from "@/lib/studio";
 
@@ -45,6 +45,7 @@ function TagField({ name, label, suggestions }: { name: string; label: string; s
 
 export function SittingForm({ suggestions }: { suggestions: { subjects: string[]; topics: string[]; concepts: string[] } }) {
   const draft = useRef<{ artifactId: string; version: number } | null>(null);
+  const published = useRef(false);
   const [state, action, pending] = useActionState(async (prev: PreviewResult | null, formData: FormData) => {
     const previous = draft.current;
     if (previous) {
@@ -54,8 +55,16 @@ export function SittingForm({ suggestions }: { suggestions: { subjects: string[]
     return previewSitting(prev, formData);
   }, null);
   const router = useRouter();
+  const [ready, setReady] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishProblems, setPublishProblems] = useState<string[]>([]);
   const preview = state?.type === "preview" ? state : null;
-  draft.current = preview ? { artifactId: preview.artifactId, version: preview.version } : draft.current;
+  useEffect(() => {
+    setReady(false);
+    setPublishProblems([]);
+  }, [preview?.url]);
+  if (published.current) draft.current = null;
+  else if (preview) draft.current = { artifactId: preview.artifactId, version: preview.version };
 
   useEffect(() => {
     const leave = () => {
@@ -122,8 +131,26 @@ export function SittingForm({ suggestions }: { suggestions: { subjects: string[]
         <button type="submit" className="btn-primary btn-sm" disabled={pending}>
           {pending ? "Checking" : "Preview"}
         </button>
-        <button type="button" className="btn-primary btn-sm" disabled>
-          Publish
+        <button
+          type="button"
+          className="btn-primary btn-sm"
+          disabled={!preview || !ready || publishing}
+          onClick={() => {
+            if (!preview || !ready) return;
+            setPublishing(true);
+            void publishSitting(preview.artifactId, preview.version, true).then((result) => {
+              setPublishing(false);
+              if (result.type === "published") {
+                published.current = true;
+                draft.current = null;
+                router.push(`/studio?id=${encodeURIComponent(result.artifactId)}`);
+                return;
+              }
+              if (result.type === "refused" || result.type === "unavailable") setPublishProblems(result.problems);
+            });
+          }}
+        >
+          {publishing ? "Publishing" : "Publish"}
         </button>
         {preview ? (
           <button
@@ -144,7 +171,8 @@ export function SittingForm({ suggestions }: { suggestions: { subjects: string[]
       {preview ? (
         <div className="sm:col-span-2">
           <p className="text-sm font-semibold">Compliance {preview.compliance}</p>
-          <PreviewFrame url={preview.url} manifest={preview.manifest as { params?: []; events?: { name: string }[] }} />
+          <PreviewFrame url={preview.url} manifest={preview.manifest as { params?: []; events?: { name: string }[] }} onReady={setReady} />
+          {publishProblems.length > 0 ? <p className="mt-3 text-sm text-berry">{publishProblems.join(" ")}</p> : null}
         </div>
       ) : null}
     </form>

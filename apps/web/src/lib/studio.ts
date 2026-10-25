@@ -1,6 +1,6 @@
 import { complianceLevel, type ComplianceLevel } from "@eco/contracts";
 import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
-import { bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, registerDraft } from "@eco/library";
+import { bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, publishVersion, registerDraft, setStatus } from "@eco/library";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { signDraftToken, type DraftToken } from "./artifact-headers";
 
@@ -296,4 +296,35 @@ export async function abandonPreview(
   const deleted = await deleteDraft(deps.db, artifactId, version);
   if (!deleted.ok) return { type: "unavailable", problems: deleted.problems };
   return { type: "deleted" };
+}
+
+export type PublishResult =
+  | { type: "redirect"; to: string }
+  | { type: "not-found" }
+  | { type: "refused"; problems: string[] }
+  | { type: "unavailable"; problems: string[] }
+  | { type: "published"; artifactId: string; version: number };
+
+/**
+ * One action: draft, then testing, then published. A failure puts the version
+ * back to draft. Warnings are not an input; they do not block.
+ */
+export async function publishPreview(
+  actor: StudioActor,
+  input: { artifactId: string; version: number; ready: boolean; actorId: string | null },
+  deps: { db: SupabaseClient },
+): Promise<PublishResult> {
+  const gate = studioGate(actor, "/studio/new");
+  if (gate.type !== "allow") return gate;
+  if (!input.ready) return { type: "refused", problems: ["Publish stays off until the preview is ready."] };
+
+  const testing = await setStatus(deps.db, input.artifactId, input.version, "testing", input.actorId);
+  if (!testing.ok) return { type: "refused", problems: testing.problems };
+
+  const published = await publishVersion(deps.db, input.artifactId, input.version, input.actorId);
+  if (!published.ok) {
+    const back = await setStatus(deps.db, input.artifactId, input.version, "draft", input.actorId);
+    return { type: "unavailable", problems: back.ok ? published.problems : [...published.problems, ...back.problems] };
+  }
+  return { type: "published", artifactId: input.artifactId, version: input.version };
 }

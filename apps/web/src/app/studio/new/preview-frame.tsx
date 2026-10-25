@@ -30,7 +30,7 @@ function initialParams(manifest: PreviewManifest): Record<string, unknown> {
 }
 
 /** Sandboxed preview. Messages are accepted only from this iframe, and events must carry the current nonce. */
-export function PreviewFrame({ url, manifest }: { url: string; manifest: PreviewManifest }) {
+export function PreviewFrame({ url, manifest, onReady }: { url: string; manifest: PreviewManifest; onReady?: (ready: boolean) => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const nonceRef = useRef("");
   const [frame, setFrame] = useState<keyof typeof FRAMES>("desktop");
@@ -42,6 +42,11 @@ export function PreviewFrame({ url, manifest }: { url: string; manifest: Preview
   const [errors, setErrors] = useState<string[]>([]);
   const declaredKey = (manifest.events ?? []).map((event) => event.name).join("\n");
   const names = useMemo(() => declaredNames(declaredKey), [declaredKey]);
+
+  useEffect(() => {
+    setReady(false);
+    onReady?.(false);
+  }, [url, onReady]);
 
   function send(message: Record<string, unknown>) {
     const target = iframeRef.current?.contentWindow;
@@ -62,6 +67,7 @@ export function PreviewFrame({ url, manifest }: { url: string; manifest: Preview
       if (!data || data.source !== "artifactkit" || data.v !== 1) return;
       if (data.kind === "ak-ready") {
         setReady(true);
+        onReady?.(true);
         return;
       }
       if (data.kind === "ak-event" && data.name && data.nonce && data.nonce === nonceRef.current) {

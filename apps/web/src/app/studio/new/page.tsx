@@ -19,7 +19,7 @@ export default async function NewArtifactPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-16">
-      <PageHeader title="New artifact" subtitle="Paste HTML or upload a ZIP, then preview it. Publish stays off." leading={<Link href="/studio" className="btn-ghost btn-sm">Library</Link>} />
+      <PageHeader title="New artifact" subtitle="Paste HTML or upload a ZIP, then preview it. Publish turns on when the preview is ready." leading={<Link href="/studio" className="btn-ghost btn-sm">Library</Link>} />
       <SittingForm suggestions={suggestions} />
     </main>
   );

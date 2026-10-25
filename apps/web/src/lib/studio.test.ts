@@ -6,6 +6,7 @@ import { signDraftToken } from "./artifact-headers";
 import {
   abandonPreview,
   draftPreviewUrl,
+  publishPreview,
   isChildLogin,
   libraryListQuery,
   listForStudio,
@@ -264,5 +265,85 @@ describe("new artifact preview", () => {
 
     const published = await abandonPreview("parent", "solar-system-simulator", 1, deps);
     expect(published).toEqual({ type: "not-found" });
+  });
+});
+
+function publishDb(options: { manifestVersion?: number; failPublished?: boolean } = {}) {
+  const row = {
+    artifact_id: "solar-system-simulator",
+    version: 1,
+    manifest: { ...solarSystemManifest(), version: options.manifestVersion ?? 1 },
+    entry_file: "index.html",
+    files: [{ path: "index.html", size: 20, sha256: "a".repeat(64), mime: "text/html" }],
+    bundle_sha256: "b".repeat(64),
+    status: "draft" as "draft" | "testing" | "published",
+    validation_report: null,
+    compliance_level: 3 as const,
+    created_by: ACTOR,
+    created_at: "2026-10-24T00:00:00Z",
+    published_at: null,
+    published_by: null,
+    retired_at: null,
+  };
+  const calls: string[] = [];
+  const db = {
+    from() {
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        maybeSingle: async () => ({ data: { ...row }, error: null }),
+      };
+      return builder;
+    },
+    rpc: async (_fn: string, args: { p_status: string }) => {
+      calls.push(args.p_status);
+      if (options.failPublished && args.p_status === "published") return { data: null, error: { message: "publish failed" } };
+      row.status = args.p_status as typeof row.status;
+      return { data: { status: args.p_status, current_version: args.p_status === "published" ? 1 : null }, error: null };
+    },
+  };
+  return { db: db as unknown as SupabaseClient, calls, status: () => row.status };
+}
+
+describe("publish preview", () => {
+  const input = { artifactId: "solar-system-simulator", version: 1, actorId: ACTOR };
+
+  it("refuses a parent and a preview that is not ready, without changing the draft", async () => {
+    const parent = publishDb();
+    expect(await publishPreview("parent", { ...input, ready: true }, { db: parent.db })).toEqual({ type: "not-found" });
+    expect(parent.calls).toEqual([]);
+
+    const early = publishDb();
+    expect(await publishPreview("staff", { ...input, ready: false }, { db: early.db })).toEqual({
+      type: "refused",
+      problems: ["Publish stays off until the preview is ready."],
+    });
+    expect(early.calls).toEqual([]);
+    expect(early.status()).toBe("draft");
+  });
+
+  it("publishes a ready draft by moving it through testing in one action", async () => {
+    const staff = publishDb();
+    expect(await publishPreview("staff", { ...input, ready: true }, { db: staff.db })).toEqual({
+      type: "published",
+      artifactId: "solar-system-simulator",
+      version: 1,
+    });
+    expect(staff.calls).toEqual(["testing", "published"]);
+    expect(staff.status()).toBe("published");
+  });
+
+  it("leaves a draft in place when publish fails or the stored manifest has errors", async () => {
+    const failed = publishDb({ failPublished: true });
+    const out = await publishPreview("staff", { ...input, ready: true }, { db: failed.db });
+    expect(out.type).toBe("unavailable");
+    expect(failed.calls).toEqual(["testing", "published", "draft"]);
+    expect(failed.status()).toBe("draft");
+
+    const invalid = publishDb({ manifestVersion: 9 });
+    const refused = await publishPreview("staff", { ...input, ready: true }, { db: invalid.db });
+    expect(refused.type).toBe("unavailable");
+    expect(invalid.calls).toEqual(["testing", "draft"]);
+    expect(invalid.status()).toBe("draft");
   });
 });
