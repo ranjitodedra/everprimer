@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isArtifactHost, isArtifactRoutePath } from "@/lib/artifact-host";
 import { KID_MODE_COOKIE } from "@/lib/kid-mode";
+import { isChildLogin, studioActor, studioGate } from "@/lib/studio";
 
 const PROTECTED_PREFIXES = ["/parent", "/learn", "/unlock"];
 
@@ -65,15 +66,32 @@ export async function proxy(request: NextRequest) {
     return res;
   };
 
+  const meta = user?.app_metadata as { account?: string; child_id?: string } | undefined;
+  const child = isChildLogin(user);
+  let staff = false;
+  if (user && !child) {
+    const { data } = await supabase.rpc("is_staff");
+    staff = data === true;
+  }
+  const decision = studioGate(studioActor({ user: !!user, child, staff }), path);
+  if (decision.type === "redirect") {
+    const target = new URL(decision.to, request.url);
+    return redirectTo(target.pathname, target.search);
+  }
+  if (decision.type === "not-found") {
+    const res = new NextResponse(null, { status: 404 });
+    response.cookies.getAll().forEach((c) => res.cookies.set(c));
+    return res;
+  }
+
   if (!user) {
     if (PROTECTED_PREFIXES.some((p) => under(path, p))) return redirectTo("/login", `?next=${encodeURIComponent(path)}`);
     return response;
   }
 
-  const meta = user.app_metadata as { account?: string; child_id?: string } | undefined;
-  if (meta?.account === "child") {
-    const home = `/learn/${meta.child_id}`;
-    return meta.child_id && under(path, home) ? response : redirectTo(home);
+  if (child) {
+    const home = `/learn/${meta?.child_id}`;
+    return meta?.child_id && under(path, home) ? response : redirectTo(home);
   }
 
   if (path === "/login") return redirectTo("/");
