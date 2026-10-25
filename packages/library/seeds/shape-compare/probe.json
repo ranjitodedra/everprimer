@@ -1,0 +1,6 @@
+[
+  { "click": "[data-shape=a]" },
+  { "expect": "shape_rotated" },
+  { "expect": "shapes_compared" },
+  { "emit": "not_a_real_event" }
+]
