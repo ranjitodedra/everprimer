@@ -2,21 +2,21 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { abandonSitting, previewSitting, publishSitting } from "./actions";
+import { abandonSitting, previewNextSitting, previewSitting, publishSitting } from "./actions";
 import { PreviewFrame } from "./preview-frame";
-import type { PreviewResult } from "@/lib/studio";
+import type { PreviewResult, SittingFields } from "@/lib/studio";
 
-function Field({ name, label, defaultValue }: { name: string; label: string; defaultValue?: string }) {
+function Field({ name, label, defaultValue, readOnly }: { name: string; label: string; defaultValue?: string; readOnly?: boolean }) {
   return (
     <label className="block text-sm font-semibold">
       {label}
-      <input name={name} defaultValue={defaultValue} className="input mt-1" />
+      <input name={name} defaultValue={defaultValue} readOnly={readOnly} className="input mt-1" />
     </label>
   );
 }
 
-function TagField({ name, label, suggestions }: { name: string; label: string; suggestions: string[] }) {
-  const [value, setValue] = useState("");
+function TagField({ name, label, suggestions, initial = "" }: { name: string; label: string; suggestions: string[]; initial?: string }) {
+  const [value, setValue] = useState(initial);
   return (
     <label className="block text-sm font-semibold">
       {label}
@@ -43,7 +43,17 @@ function TagField({ name, label, suggestions }: { name: string; label: string; s
   );
 }
 
-export function SittingForm({ suggestions }: { suggestions: { subjects: string[]; topics: string[]; concepts: string[] } }) {
+export function SittingForm({
+  suggestions,
+  initial,
+  lockId = false,
+  artifactId,
+}: {
+  suggestions: { subjects: string[]; topics: string[]; concepts: string[] };
+  initial?: SittingFields;
+  lockId?: boolean;
+  artifactId?: string;
+}) {
   const draft = useRef<{ artifactId: string; version: number } | null>(null);
   const published = useRef(false);
   const [state, action, pending] = useActionState(async (prev: PreviewResult | null, formData: FormData) => {
@@ -52,7 +62,7 @@ export function SittingForm({ suggestions }: { suggestions: { subjects: string[]
       draft.current = null;
       await abandonSitting(previous.artifactId, previous.version);
     }
-    return previewSitting(prev, formData);
+    return artifactId ? previewNextSitting(artifactId, prev, formData) : previewSitting(prev, formData);
   }, null);
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -87,37 +97,37 @@ export function SittingForm({ suggestions }: { suggestions: { subjects: string[]
 
   return (
     <form action={action} className="grid gap-3 sm:grid-cols-2">
-      <Field name="id" label="Id" />
-      <Field name="title" label="Title" />
+      <Field name="id" label="Id" defaultValue={initial?.id} readOnly={lockId} />
+      <Field name="title" label="Title" defaultValue={initial?.title} />
       <label className="block text-sm font-semibold sm:col-span-2">
         Description
-        <textarea name="description" className="input mt-1 min-h-20" />
+        <textarea name="description" defaultValue={initial?.description} className="input mt-1 min-h-20" />
       </label>
-      <TagField name="subjects" label="Subjects" suggestions={suggestions.subjects} />
-      <TagField name="topics" label="Topics" suggestions={suggestions.topics} />
-      <TagField name="concepts" label="Concepts" suggestions={suggestions.concepts} />
-      <Field name="entry" label="Entry file" defaultValue="index.html" />
-      <Field name="ageYoungest" label="Youngest age" />
-      <Field name="ageOldest" label="Oldest age" />
+      <TagField name="subjects" label="Subjects" suggestions={suggestions.subjects} initial={initial?.subjects} />
+      <TagField name="topics" label="Topics" suggestions={suggestions.topics} initial={initial?.topics} />
+      <TagField name="concepts" label="Concepts" suggestions={suggestions.concepts} initial={initial?.concepts} />
+      <Field name="entry" label="Entry file" defaultValue={initial?.entry || "index.html"} />
+      <Field name="ageYoungest" label="Youngest age" defaultValue={initial?.ageYoungest} />
+      <Field name="ageOldest" label="Oldest age" defaultValue={initial?.ageOldest} />
       <label className="block text-sm font-semibold sm:col-span-2">
         Learning objective
-        <input name="objective" className="input mt-1" />
+        <input name="objective" defaultValue={initial?.objective} className="input mt-1" />
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">
         Screen reader summary
-        <input name="summary" className="input mt-1" />
+        <input name="summary" defaultValue={initial?.summary} className="input mt-1" />
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">
         Params
-        <textarea name="params" className="input mt-1 min-h-16 font-mono text-sm" placeholder="Optional JSON list" />
+        <textarea name="params" defaultValue={initial?.params} className="input mt-1 min-h-16 font-mono text-sm" placeholder="Optional JSON list" />
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">
         Events
-        <textarea name="events" className="input mt-1 min-h-16 font-mono text-sm" placeholder="Optional JSON list" />
+        <textarea name="events" defaultValue={initial?.events} className="input mt-1 min-h-16 font-mono text-sm" placeholder="Optional JSON list" />
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">
         Tutor guide
-        <textarea name="tutorIntro" className="input mt-1 min-h-16" placeholder="Optional" />
+        <textarea name="tutorIntro" defaultValue={initial?.tutorIntro} className="input mt-1 min-h-16" placeholder="Optional" />
       </label>
       <label className="block text-sm font-semibold sm:col-span-2">
         HTML
@@ -197,6 +207,6 @@ function Notices({ state }: { state: PreviewResult | null }) {
       </ul>
     );
   }
-  if (state.type === "unavailable") return <p className="text-sm text-berry sm:col-span-2">{state.problems.join(" ")}</p>;
+  if (state.type === "unavailable" || state.type === "refused") return <p className="text-sm text-berry sm:col-span-2">{state.problems.join(" ")}</p>;
   return null;
 }

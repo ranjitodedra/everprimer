@@ -3,7 +3,7 @@
 import { LIBRARY_BUCKET } from "@eco/library";
 import { getArtifactOrigin } from "@/lib/artifact-host";
 import { artifactHostEnv } from "@/lib/env";
-import { abandonPreview, previewNewArtifact, publishPreview, sittingManifest, type PreviewResult, type SittingFields } from "@/lib/studio";
+import { abandonPreview, previewNewArtifact, previewNextVersion, publishPreview, sittingManifest, type PreviewResult, type SittingFields } from "@/lib/studio";
 import { currentStudioActor } from "@/lib/studio-session";
 import { createServiceClient } from "@/lib/supabase/server";
 
@@ -60,6 +60,17 @@ export async function previewSitting(_prev: PreviewResult | null, formData: Form
   }
   if (zip) manifest.format = "bundle";
   return previewNewArtifact(actor, { html: String(formData.get("html") ?? ""), zip, manifest, actorId: userId }, storage());
+}
+
+export async function previewNextSitting(artifactId: string, _prev: PreviewResult | null, formData: FormData): Promise<PreviewResult> {
+  const { actor, userId } = await currentStudioActor();
+  const file = formData.get("zip");
+  const zip = file instanceof File && file.size > 0 ? new Uint8Array(await file.arrayBuffer()) : undefined;
+  return previewNextVersion(
+    actor,
+    { artifactId, fields: fieldsFrom(formData), html: String(formData.get("html") ?? ""), zip, actorId: userId },
+    storage(),
+  );
 }
 
 export async function publishSitting(artifactId: string, version: number, ready: boolean) {

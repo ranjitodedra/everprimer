@@ -1,6 +1,6 @@
-import { complianceLevel, type ComplianceLevel } from "@eco/contracts";
+import { complianceLevel, type ArtifactManifest, type ComplianceLevel } from "@eco/contracts";
 import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
-import { bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, publishVersion, registerDraft, setStatus } from "@eco/library";
+import { addVersion, bundleObjectPath, deleteDraft, getArtifact, importArtifact, listArtifacts, publishVersion, registerDraft, setStatus } from "@eco/library";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { signDraftToken, type DraftToken } from "./artifact-headers";
 
@@ -168,6 +168,61 @@ export function sittingManifest(fields: SittingFields, createdAt = "2026-10-24T0
   return manifest;
 }
 
+function listText(value: unknown): string {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(", ") : "";
+}
+
+/** Form fields copied from the previous version. The id is that artifact's id. */
+export function fieldsFromManifest(manifest: Record<string, unknown>): SittingFields {
+  const ages = Array.isArray(manifest.ageRange) ? manifest.ageRange : [];
+  const objectives = Array.isArray(manifest.learningObjectives) ? manifest.learningObjectives : [];
+  const access = manifest.accessibility as { screenReaderSummary?: string } | undefined;
+  const guide = manifest.tutorGuide as { intro?: string } | undefined;
+  return {
+    id: typeof manifest.id === "string" ? manifest.id : "",
+    title: typeof manifest.title === "string" ? manifest.title : "",
+    description: typeof manifest.description === "string" ? manifest.description : "",
+    subjects: listText(manifest.subjects),
+    topics: listText(manifest.topics),
+    concepts: listText(manifest.concepts),
+    params: JSON.stringify(manifest.params ?? []),
+    events: JSON.stringify(manifest.events ?? []),
+    entry: typeof manifest.entry === "string" ? manifest.entry : "index.html",
+    ageYoungest: ages[0] != null ? String(ages[0]) : "",
+    ageOldest: ages[1] != null ? String(ages[1]) : "",
+    objective: typeof objectives[0] === "string" ? objectives[0] : "",
+    summary: access?.screenReaderSummary ?? "",
+    tutorIntro: guide?.intro ?? "",
+  };
+}
+
+function overlayPrevious(previous: Record<string, unknown>, fields: SittingFields, zip: boolean): Record<string, unknown> {
+  const next = structuredClone(previous);
+  next.id = previous.id;
+  next.title = fields.title.trim();
+  next.description = fields.description.trim();
+  next.subjects = tags(fields.subjects);
+  next.topics = tags(fields.topics);
+  next.concepts = tags(fields.concepts);
+  next.format = zip ? "bundle" : "html";
+  const entry = fields.entry.trim() || "index.html";
+  next.entry = next.format === "html" ? "index.html" : entry;
+  next.ageRange = [Number(fields.ageYoungest), Number(fields.ageOldest)];
+  next.params = jsonList(fields.params);
+  next.events = jsonList(fields.events);
+  next.learningObjectives = [fields.objective.trim()].filter(Boolean);
+  const access = { ...((next.accessibility as Record<string, unknown> | undefined) ?? {}) };
+  access.screenReaderSummary = fields.summary.trim();
+  next.accessibility = access;
+  const guide = { ...((typeof next.tutorGuide === "object" && next.tutorGuide ? next.tutorGuide : {}) as Record<string, unknown>) };
+  const intro = fields.tutorIntro.trim();
+  if (intro) guide.intro = intro;
+  else delete guide.intro;
+  if (Object.keys(guide).length) next.tutorGuide = guide;
+  else delete next.tutorGuide;
+  return next;
+}
+
 export function tagSuggestions(versions: { manifest: unknown }[]) {
   const collect = (key: "subjects" | "topics" | "concepts") => {
     const found = new Set<string>();
@@ -209,6 +264,7 @@ export type PreviewResult =
   | { type: "redirect"; to: string }
   | { type: "not-found" }
   | { type: "invalid"; errors: StudioNotice[]; warnings: StudioNotice[] }
+  | { type: "refused"; problems: string[] }
   | { type: "unavailable"; problems: string[] }
   | {
       type: "preview";
@@ -242,9 +298,58 @@ export async function previewNewArtifact(actor: StudioActor, input: NewArtifactI
     actor: input.actorId,
   });
   if (!registered.ok) return { type: "unavailable", problems: registered.problems };
+  return openDraft(deps, registered, imported.normalized, imported.warnings);
+}
 
+export async function previewNextVersion(
+  actor: StudioActor,
+  input: { artifactId: string; fields: SittingFields; html?: string; zip?: Uint8Array; actorId: string | null },
+  deps: PreviewDeps,
+): Promise<PreviewResult> {
+  const gate = studioGate(actor, `/studio/new/${input.artifactId}`);
+  if (gate.type !== "allow") return gate;
+  if (!input.zip?.byteLength && !input.html?.trim()) {
+    return { type: "invalid", errors: [{ code: "empty", message: "Paste HTML or upload a ZIP." }], warnings: [] };
+  }
+  if (input.fields.id.trim() !== input.artifactId) {
+    return { type: "refused", problems: ["The artifact id is locked."] };
+  }
+
+  const previous = await getArtifact(deps.db, input.artifactId);
+  if (!previous.ok) return { type: "unavailable", problems: previous.problems };
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = overlayPrevious(previous.version.manifest as Record<string, unknown>, input.fields, Boolean(input.zip?.byteLength));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "The manifest fields are not valid.";
+    return { type: "invalid", errors: [{ code: "manifest", message }], warnings: [] };
+  }
+
+  const source = input.zip ? { kind: "zip" as const, bytes: input.zip } : { kind: "html" as const, source: input.html ?? "" };
+  const imported = await importArtifact(source, { manifest, actor: input.actorId });
+  if (!imported.ok || !imported.normalized) return { type: "invalid", errors: imported.errors, warnings: imported.warnings };
+  if (!deps.origin || !deps.secret) return { type: "unavailable", problems: ["The artifact host is not configured."] };
+
+  const added = await addVersion(deps.db, input.artifactId, {
+    manifest: imported.normalized.manifest,
+    files: imported.normalized.files,
+    bundleSha256: imported.normalized.bundleSha256,
+    actor: input.actorId,
+  });
+  if (!added.ok) return { type: "unavailable", problems: added.problems };
+  return openDraft(deps, added, imported.normalized, imported.warnings);
+}
+
+async function openDraft(
+  deps: PreviewDeps,
+  registered: { artifactId: string; version: number },
+  normalized: { manifest: ArtifactManifest; contents: { path: string; bytes: Uint8Array; mime: string }[] },
+  warnings: StudioNotice[],
+): Promise<PreviewResult> {
+  const origin = deps.origin;
+  if (!origin || !deps.secret) return { type: "unavailable", problems: ["The artifact host is not configured."] };
   const uploaded: string[] = [];
-  for (const file of imported.normalized.contents) {
+  for (const file of normalized.contents) {
     const path = bundleObjectPath(registered.artifactId, registered.version, file.path);
     const error = await deps.upload(path, file.bytes, file.mime);
     if (error) {
@@ -260,11 +365,11 @@ export async function previewNewArtifact(actor: StudioActor, input: NewArtifactI
     type: "preview",
     artifactId: registered.artifactId,
     version: registered.version,
-    entry: imported.normalized.manifest.entry,
-    url: draftPreviewUrl(deps.origin, registered.artifactId, registered.version, imported.normalized.manifest.entry, token),
-    warnings: imported.warnings,
-    compliance: complianceLevel(imported.normalized.manifest),
-    manifest: imported.normalized.manifest,
+    entry: normalized.manifest.entry,
+    url: draftPreviewUrl(origin, registered.artifactId, registered.version, normalized.manifest.entry, token),
+    warnings,
+    compliance: complianceLevel(normalized.manifest),
+    manifest: normalized.manifest,
     publish: "off",
   };
 }

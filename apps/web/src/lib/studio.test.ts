@@ -6,6 +6,8 @@ import { signDraftToken } from "./artifact-headers";
 import {
   abandonPreview,
   draftPreviewUrl,
+  fieldsFromManifest,
+  previewNextVersion,
   publishPreview,
   isChildLogin,
   libraryListQuery,
@@ -117,6 +119,62 @@ describe("library list", () => {
 });
 
 const PREVIEW_HTML = `<!doctype html><html><head><meta name="viewport" content="width=device-width"></head><body><h1>Solar System</h1></body></html>`;
+
+function zipOf(files: Record<string, string>): Uint8Array {
+  const encoder = new TextEncoder();
+  const crc32 = (data: Uint8Array) => {
+    let c = ~0;
+    for (const byte of data) {
+      c ^= byte;
+      for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+    return ~c >>> 0;
+  };
+  const locals: Uint8Array[] = [];
+  const centrals: Uint8Array[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const nameBytes = encoder.encode(name);
+    const data = encoder.encode(text);
+    const crc = crc32(data);
+    const local = new Uint8Array(30 + nameBytes.length + data.length);
+    const view = new DataView(local.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, data.length, true);
+    view.setUint32(22, data.length, true);
+    view.setUint16(26, nameBytes.length, true);
+    local.set(nameBytes, 30);
+    local.set(data, 30 + nameBytes.length);
+    locals.push(local);
+    const central = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(central.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint32(16, crc, true);
+    centralView.setUint32(20, data.length, true);
+    centralView.setUint32(24, data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    central.set(nameBytes, 46);
+    centrals.push(central);
+    offset += local.length;
+  }
+  const centralSize = centrals.reduce((sum, part) => sum + part.length, 0);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(8, centrals.length, true);
+  endView.setUint16(10, centrals.length, true);
+  endView.setUint32(12, centralSize, true);
+  endView.setUint32(16, offset, true);
+  const out = new Uint8Array(offset + centralSize + end.length);
+  let cursor = 0;
+  for (const part of [...locals, ...centrals, end]) {
+    out.set(part, cursor);
+    cursor += part.length;
+  }
+  return out;
+}
 const ACTOR = "00000000-0000-4000-8000-000000000001";
 
 function previewDeps(uploadError: string | null = null) {
@@ -345,5 +403,158 @@ describe("publish preview", () => {
     expect(refused.type).toBe("unavailable");
     expect(invalid.calls).toEqual(["testing", "draft"]);
     expect(invalid.status()).toBe("draft");
+  });
+});
+
+function nextVersionDb() {
+  const previous = { ...solarSystemManifest(), version: 1 };
+  const uploads: string[] = [];
+  const rpc: { fn: string; args: Record<string, unknown> }[] = [];
+  const db = {
+    from(table: string) {
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        update: () => {
+          throw new Error("the previous version must stay unchanged");
+        },
+        maybeSingle: async () => ({
+          data:
+            table === "library_artifacts"
+              ? { id: "solar-system-simulator", title: previous.title, owner: ACTOR, current_version: 1, created_at: "", updated_at: "" }
+              : {
+                  artifact_id: "solar-system-simulator",
+                  version: 1,
+                  manifest: previous,
+                  entry_file: "index.html",
+                  files: [{ path: "index.html", size: 20, sha256: "a".repeat(64), mime: "text/html" }],
+                  bundle_sha256: "b".repeat(64),
+                  status: "published",
+                  validation_report: null,
+                  compliance_level: 3,
+                  created_by: ACTOR,
+                  created_at: "2026-10-24T00:00:00Z",
+                  published_at: "2026-10-24T00:00:00Z",
+                  published_by: ACTOR,
+                  retired_at: null,
+                },
+          error: null,
+        }),
+      };
+      return builder;
+    },
+    rpc: async (fn: string, args: Record<string, unknown>) => {
+      rpc.push({ fn, args });
+      return { data: 2, error: null };
+    },
+  };
+  return {
+    previous,
+    uploads,
+    rpc,
+    deps: {
+      db: db as unknown as SupabaseClient,
+      origin: "http://artifacts.test",
+      secret: "draft-secret",
+      now: 1_700_000_000,
+      upload: async (path: string) => {
+        uploads.push(path);
+        return null;
+      },
+      remove: async () => null,
+    },
+  };
+}
+
+describe("next version", () => {
+  it("fills the form from the previous manifest and keeps its id", () => {
+    const fields = fieldsFromManifest(solarSystemManifest());
+    expect(fields.id).toBe("solar-system-simulator");
+    expect(fields.title).toBe("Solar System Simulator");
+    expect(fields.subjects).toBe("science");
+    expect(fields.params).toContain("orbitSpeed");
+  });
+
+  it("refuses a parent, a changed id, and a sitting with no new files", async () => {
+    const staff = nextVersionDb();
+    const fields = fieldsFromManifest(staff.previous);
+    expect(await previewNextVersion("parent", { artifactId: "solar-system-simulator", fields, html: PREVIEW_HTML, actorId: ACTOR }, staff.deps)).toEqual({
+      type: "not-found",
+    });
+    expect(staff.rpc).toHaveLength(0);
+
+    const changed = nextVersionDb();
+    const mismatch = await previewNextVersion(
+      "staff",
+      { artifactId: "solar-system-simulator", fields: { ...fields, id: "lever-lab" }, html: PREVIEW_HTML, actorId: ACTOR },
+      changed.deps,
+    );
+    expect(mismatch.type).toBe("refused");
+    expect(changed.rpc).toHaveLength(0);
+
+    const empty = nextVersionDb();
+    const missing = await previewNextVersion("staff", { artifactId: "solar-system-simulator", fields, html: "", actorId: ACTOR }, empty.deps);
+    expect(missing.type).toBe("invalid");
+    expect(empty.rpc).toHaveLength(0);
+    expect(empty.uploads).toHaveLength(0);
+  });
+
+  it("stores a new version from the previous manifest and leaves that version's files alone", async () => {
+    const staff = nextVersionDb();
+    const fields = { ...fieldsFromManifest(staff.previous), title: "Solar System Updated" };
+    const out = await previewNextVersion("staff", { artifactId: "solar-system-simulator", fields, html: PREVIEW_HTML, actorId: ACTOR }, staff.deps);
+    expect(out.type).toBe("preview");
+    if (out.type !== "preview") return;
+    expect(out.version).toBe(2);
+    expect(staff.rpc.map((call) => call.fn)).toEqual(["library_add_version"]);
+    const stored = staff.rpc[0]!.args.p_manifest as { title: string; id: string; format: string; entry: string; rendering: { tech: string[] } };
+    expect(stored.id).toBe("solar-system-simulator");
+    expect(stored.title).toBe("Solar System Updated");
+    expect(stored.rendering.tech).toEqual(["three@0.170.0"]);
+    expect(staff.uploads).toEqual(["bundles/solar-system-simulator/2/index.html"]);
+    expect(stored.format).toBe("html");
+    expect(stored.entry).toBe("index.html");
+  });
+
+  it("marks a ZIP as a bundle even when the published version is a single file", async () => {
+    const staff = nextVersionDb();
+    staff.previous.format = "html";
+    staff.previous.entry = "index.html";
+    const fields = fieldsFromManifest(staff.previous);
+    const out = await previewNextVersion(
+      "staff",
+      { artifactId: "solar-system-simulator", fields, zip: zipOf({ "index.html": "<!doctype html><html></html>", "styles.css": "body{}" }), actorId: ACTOR },
+      staff.deps,
+    );
+    expect(out.type).toBe("preview");
+    const stored = staff.rpc[0]!.args.p_manifest as { format: string; entry: string };
+    expect(stored.format).toBe("bundle");
+    expect(stored.entry).toBe("index.html");
+    expect(staff.uploads).toEqual(["bundles/solar-system-simulator/2/index.html", "bundles/solar-system-simulator/2/styles.css"]);
+  });
+
+  it("uses a cleared field instead of the published value", async () => {
+    const kept = nextVersionDb();
+    const keptFields = { ...fieldsFromManifest(kept.previous), tutorIntro: "", entry: "" };
+    const preview = await previewNextVersion(
+      "staff",
+      { artifactId: "solar-system-simulator", fields: keptFields, html: PREVIEW_HTML, actorId: ACTOR },
+      kept.deps,
+    );
+    expect(preview.type).toBe("preview");
+    const stored = kept.rpc[0]!.args.p_manifest as { entry: string; tutorGuide: { intro?: string; steps: string[] } };
+    expect(stored.entry).toBe("index.html");
+    expect(stored.tutorGuide.intro).toBeUndefined();
+    expect(stored.tutorGuide.steps.length).toBeGreaterThan(0);
+
+    const cleared = nextVersionDb();
+    const fields = { ...fieldsFromManifest(cleared.previous), objective: "" };
+    const out = await previewNextVersion(
+      "staff",
+      { artifactId: "solar-system-simulator", fields, html: PREVIEW_HTML, actorId: ACTOR },
+      cleared.deps,
+    );
+    expect(out.type).toBe("invalid");
+    expect(cleared.rpc).toHaveLength(0);
   });
 });

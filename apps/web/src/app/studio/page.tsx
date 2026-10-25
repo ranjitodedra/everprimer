@@ -101,12 +101,21 @@ export default async function StudioHome(props: { searchParams: Promise<Record<s
             const text = manifestText(row);
             return (
               <li key={`${row.artifact_id}@${row.version}`}>
-                <ListRow
-                  href={`/studio/artifacts/${row.artifact_id}`}
-                  title={text.title}
-                  subtitle={text.subtitle}
-                  trailing={<StatusBadge status={row.status} />}
-                />
+                <div className="flex items-center">
+                  <div className="min-w-0 flex-1">
+                    <ListRow
+                      href={`/studio/artifacts/${row.artifact_id}`}
+                      title={text.title}
+                      subtitle={text.subtitle}
+                      trailing={<StatusBadge status={row.status} />}
+                    />
+                  </div>
+                  {row.status === "published" ? (
+                    <Link href={`/studio/new/${row.artifact_id}`} className="btn-ghost btn-sm mr-2 shrink-0">
+                      Next version
+                    </Link>
+                  ) : null}
+                </div>
               </li>
             );
           })}
