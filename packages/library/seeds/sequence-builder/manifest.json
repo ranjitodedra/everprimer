@@ -1,0 +1,67 @@
+{
+  "manifestVersion": 1,
+  "id": "sequence-builder",
+  "version": 1,
+  "title": "Sequence Builder",
+  "description": "Place the first step of a sequence and check that the order starts in the right place.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["sequences"],
+  "concepts": ["order"],
+  "prerequisites": [],
+  "learningObjectives": ["Place the first step of a sequence and check the order"],
+  "objectiveIntents": ["sequence", "explain"],
+  "visualKinds": ["timeline", "sequence"],
+  "interactionTypes": ["sequence", "select"],
+  "ageRange": [6, 10],
+  "difficulty": 1,
+  "durationSec": [30, 90],
+  "params": [
+    {
+      "key": "topic",
+      "type": "string",
+      "default": "day",
+      "options": ["day", "plants"],
+      "description": "Which sequence to build, such as a day or how a plant grows."
+    }
+  ],
+  "events": [
+    {
+      "name": "step_placed",
+      "data": { "topic": "string" },
+      "description": "The child placed one step into the sequence."
+    },
+    {
+      "name": "sequence_checked",
+      "data": { "topic": "string" },
+      "description": "The child checked that the steps are in order."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Put the steps in the order they happen.",
+    "steps": ["Tap the first step.", "Look at where that step sits in the order."],
+    "observationPrompts": ["What has to happen before the next step?"],
+    "misconceptions": [
+      {
+        "belief": "The steps can go in any order and still tell the same story.",
+        "response": "This sequence only works when the earlier step comes first."
+      }
+    ],
+    "hints": ["Start with the step that happens first.", "Morning comes before night, and a seed comes before a flower."],
+    "successCriteria": [
+      { "description": "Placed a step in the sequence", "evidence": ["step_placed"] },
+      { "description": "Checked the order of the sequence", "evidence": ["sequence_checked"] }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Tap the first step to place it and check the order of the sequence.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["cursor"], "createdAt": "2026-10-25T16:40:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}

@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Animal cell</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1c2430;
+    --paper: #f3efe4;
+    --cyto-animal: #f4ddb0;
+    --cyto-plant: #e4f3cf;
+    --membrane: #c47b3a;
+    --wall: #2f6a3e;
+    --nucleus: #5c3d8a;
+    --mito: #c4512c;
+    --chloro: #1d7a43;
+    --vacuole: #b7def2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+    color: var(--ink);
+    background: var(--paper);
+    font-size: 16px;
+    line-height: 1.35;
+  }
+  main { max-width: 28rem; margin: 0 auto; padding: 1rem 1rem 1.5rem; }
+  h1 { font-size: 1.6rem; line-height: 1.15; margin: 0 0 0.35rem; }
+  .lead { margin: 0 0 0.75rem; }
+  #stage { position: relative; height: 28rem; }
+  .cell {
+    position: absolute;
+    inset: 1.4rem 0.6rem 1.6rem;
+  }
+  .cell[data-kind="animal"] {
+    border-radius: 58% 42% 52% 46%;
+    background: radial-gradient(circle at 40% 40%, #fbe8c4, var(--cyto-animal));
+    border: 5px solid var(--membrane);
+  }
+  .cell[data-kind="plant"] {
+    inset: 0.85rem 0.35rem 1.1rem;
+    border-radius: 0.7rem;
+    background:
+      radial-gradient(circle at 30% 70%, rgba(183, 222, 242, 0.55), transparent 42%),
+      var(--cyto-plant);
+    border: 0.9rem solid var(--wall);
+    box-shadow: inset 0 0 0 4px #d5e36a;
+  }
+  button.part {
+    position: absolute;
+    z-index: 1;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    border: 0;
+    margin: 0;
+    padding: 0.35rem 0.5rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #fff;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button.part:focus-visible,
+  button.part[aria-pressed="true"] {
+    outline: 3px solid #111;
+    outline-offset: 2px;
+  }
+  .nucleus {
+    z-index: 2;
+    left: 50%;
+    top: 46%;
+    width: 6.6rem;
+    height: 6.6rem;
+    border-radius: 50%;
+    background: var(--nucleus);
+    transform: translate(-50%, -50%);
+  }
+  .cell[data-kind="plant"] .nucleus {
+    left: auto;
+    right: 7%;
+    top: 16%;
+    width: 5.2rem;
+    height: 5.2rem;
+    transform: none;
+  }
+  .mito {
+    left: 10%;
+    bottom: 14%;
+    width: 5.4rem;
+    height: 2.8rem;
+    border-radius: 45% 55% 48% 52%;
+    background: var(--mito);
+  }
+  .cell[data-kind="plant"] .mito { left: 8%; top: 18%; bottom: auto; }
+  .membrane {
+    right: 4%;
+    top: 8%;
+    border-radius: 999px;
+    background: var(--membrane);
+    color: #1c2430;
+  }
+  .cell[data-kind="plant"] .membrane { right: auto; left: 8%; bottom: 10%; top: auto; }
+  .wall {
+    left: 6%;
+    top: -0.2rem;
+    border-radius: 0.4rem;
+    background: var(--wall);
+  }
+  .chloro {
+    width: 4.6rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--chloro);
+  }
+  .chloro-a { left: 10%; top: 42%; }
+  .chloro-b { right: 36%; bottom: 16%; }
+  .vacuole {
+    left: 8%;
+    bottom: 22%;
+    width: 7.2rem;
+    height: 5.2rem;
+    border-radius: 46%;
+    background: var(--vacuole);
+    color: #123044;
+  }
+  [data-kind="animal"] [data-only="plant"] { display: none; }
+  [data-kind="plant"] [data-only="animal"] { display: none; }
+  #status { min-height: 3.4rem; margin: 0.75rem 0 0; }
+  html[data-reduced-motion="true"] *,
+  html[data-reduced-motion="true"] *::before,
+  html[data-reduced-motion="true"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Animal cell</h1>
+  <p class="lead" id="lead">Tap the nucleus. It holds the instructions for the cell.</p>
+  <div id="stage">
+    <div class="cell" id="cell" data-kind="animal">
+      <button type="button" class="part nucleus" data-part="nucleus" aria-pressed="false">Nucleus</button>
+      <button type="button" class="part mito" data-part="mitochondrion" aria-pressed="false">Mitochondrion</button>
+      <button type="button" class="part membrane" data-part="membrane" aria-pressed="false">Cell membrane</button>
+      <button type="button" class="part wall" data-part="wall" data-only="plant" aria-pressed="false">Cell wall</button>
+      <button type="button" class="part chloro chloro-a" data-part="chloroplast" data-only="plant" aria-pressed="false">Chloroplast</button>
+      <button type="button" class="part chloro chloro-b" data-part="chloroplast" data-only="plant" aria-pressed="false">Chloroplast</button>
+      <button type="button" class="part vacuole" data-part="vacuole" data-only="plant" aria-pressed="false">Vacuole</button>
+    </div>
+  </div>
+  <p id="status" role="status"></p>
+</main>
+<script>
+(function () {
+  var cell = document.getElementById("cell");
+  var title = document.getElementById("title");
+  var lead = document.getElementById("lead");
+  var status = document.getElementById("status");
+
+  function paramsOf() {
+    return window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+  }
+
+  function namedKind(value) {
+    return value === "plant" ? "plant" : "animal";
+  }
+
+  function applyKind(kind) {
+    var reduced = !!(window.ArtifactKit && window.ArtifactKit.reducedMotion);
+    if (reduced) document.documentElement.setAttribute("data-reduced-motion", "true");
+    cell.setAttribute("data-kind", kind);
+    title.textContent = kind === "plant" ? "Plant cell" : "Animal cell";
+    document.title = title.textContent;
+    lead.textContent = kind === "plant"
+      ? "This is a plant cell. It has a wall, green chloroplasts, and a large vacuole. Tap the nucleus."
+      : "This is an animal cell. It has no cell wall. Tap the nucleus.";
+  }
+
+  function watch() {
+    var params = paramsOf();
+    if (params.kind !== "plant" && params.kind !== "animal") {
+      requestAnimationFrame(watch);
+      return;
+    }
+    applyKind(namedKind(params.kind));
+  }
+
+  cell.addEventListener("click", function (event) {
+    var node = event.target && event.target.closest ? event.target.closest("[data-part]") : null;
+    if (!node || !cell.contains(node)) return;
+    var params = paramsOf();
+    var kind = namedKind(params.kind);
+    applyKind(kind);
+    var part = node.getAttribute("data-part") || "";
+    var buttons = cell.querySelectorAll("[data-part]");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-pressed", buttons[i] === node ? "true" : "false");
+    }
+    window.ArtifactKit.emit("organelle_selected", { part: part, kind: kind });
+    if (part === "nucleus") {
+      window.ArtifactKit.emit("cell_labeled", { part: "nucleus", kind: kind });
+      status.textContent = kind === "plant"
+        ? "Nucleus labeled. This plant cell keeps its instructions here, inside a wall."
+        : "Nucleus labeled. This animal cell keeps its instructions here, with no cell wall.";
+    } else {
+      status.textContent = "You selected the " + (node.textContent || part) + ".";
+    }
+  });
+
+  watch();
+})();
+</script>
+</body>
+</html>
