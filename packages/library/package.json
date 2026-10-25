@@ -15,7 +15,8 @@
     "test": "vitest run",
     "seed": "tsx src/seed-check.ts",
     "vendor:sync": "tsx scripts/vendor-sync.ts",
-    "vendor:check": "tsx scripts/vendor-sync.ts --check"
+    "vendor:check": "tsx scripts/vendor-sync.ts --check",
+    "brief:check": "tsx scripts/brief-check.ts"
   },
   "dependencies": {
     "@eco/contracts": "workspace:*",
