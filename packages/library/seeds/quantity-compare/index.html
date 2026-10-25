@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Compare two quantities</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3ecdf;
+      --ink: #241c15;
+      --card: #fffaf3;
+      --line: #e4d7c6;
+      --teal: #14635c;
+      --clay: #c4522a;
+      --empty: #e7dfd2;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100%;
+      background: var(--paper);
+      color: var(--ink);
+      font: 18px/1.4 "Avenir Next", "Segoe UI", sans-serif;
+      padding: 16px 16px 24px;
+    }
+    h1, h2, h3 { font-family: "Iowan Old Style", Palatino, Georgia, serif; font-weight: 600; }
+    h1 { margin: 0 0 8px; font-size: 1.7rem; letter-spacing: -0.02em; }
+    h2 { margin: 0 0 12px; font-size: 1.15rem; }
+    h3 { margin: 0; font-size: 0.95rem; }
+    .lead, .change, #result { margin: 0; }
+    .lead { max-width: 38rem; }
+    #stage { margin-top: 16px; }
+    .pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .side {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px;
+    }
+    .figure {
+      margin: 4px 0 10px;
+      font-family: "Iowan Old Style", Palatino, Georgia, serif;
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .blocks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .block {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: var(--empty);
+    }
+    .block.filled.left { background: var(--teal); }
+    .block.filled.right { background: var(--clay); }
+    .block.added { box-shadow: inset 0 0 0 3px var(--ink); }
+    .greater { margin: 10px 0 0; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .change { margin-top: 12px; }
+    #result { margin-top: 8px; min-height: 1.4em; font-weight: 700; }
+    button {
+      appearance: none;
+      width: 100%;
+      min-height: 52px;
+      margin-top: 16px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--ink);
+      color: var(--paper);
+      font: 700 18px/1 "Avenir Next", "Segoe UI", sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+    }
+    button:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+    @media (max-width: 360px) {
+      .pair { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Which amount is more?</h1>
+    <p class="lead">Both amounts start equal. Add one more, then see which is greater.</p>
+    <section id="stage" aria-live="polite"></section>
+    <button type="button" data-quantity="more">Add one more</button>
+    <p id="result"></p>
+  </main>
+  <script>
+    var scenes = {
+      fractions: {
+        heading: "Fractions",
+        leftName: "Left",
+        rightName: "Right",
+        leftText: "3/4",
+        rightText: "2/4",
+        leftCount: 3,
+        rightCount: 2,
+        slots: 4,
+        added: "left",
+        greater: "left",
+        change: "One more piece makes the left fraction 3/4.",
+        comparison: "3/4 is more than 2/4."
+      },
+      ratios: {
+        heading: "Ratios",
+        leftName: "Left",
+        rightName: "Right",
+        leftText: "3 to 1",
+        rightText: "2 to 1",
+        leftCount: 3,
+        rightCount: 2,
+        slots: 4,
+        added: "left",
+        greater: "left",
+        change: "One more makes the left ratio 3 to 1.",
+        comparison: "3 to 1 is more than 2 to 1."
+      },
+      quantities: {
+        heading: "Quantities",
+        leftName: "Left group",
+        rightName: "Right group",
+        leftText: "5",
+        rightText: "4",
+        leftCount: 5,
+        rightCount: 4,
+        slots: 5,
+        added: "left",
+        greater: "left",
+        change: "One more makes the left group 5.",
+        comparison: "5 is more than 4."
+      },
+      beforeAfter: {
+        heading: "Before and after",
+        leftName: "Before",
+        rightName: "After",
+        leftText: "3",
+        rightText: "4",
+        leftCount: 3,
+        rightCount: 4,
+        slots: 4,
+        added: "right",
+        greater: "right",
+        change: "One more makes the after amount 4.",
+        comparison: "After is more than before."
+      }
+    };
+
+    function side(scene, which) {
+      var count = which === "left" ? scene.leftCount : scene.rightCount;
+      var article = document.createElement("article");
+      article.className = "side";
+      var name = document.createElement("h3");
+      name.textContent = which === "left" ? scene.leftName : scene.rightName;
+      var figure = document.createElement("p");
+      figure.className = "figure";
+      figure.textContent = which === "left" ? scene.leftText : scene.rightText;
+      var blocks = document.createElement("div");
+      blocks.className = "blocks";
+      for (var i = 0; i < scene.slots; i++) {
+        var cell = document.createElement("span");
+        cell.className = "block";
+        if (i < count) cell.className += " filled " + which;
+        if (which === scene.added && i === count - 1) cell.className += " added";
+        blocks.appendChild(cell);
+      }
+      article.appendChild(name);
+      article.appendChild(figure);
+      article.appendChild(blocks);
+      if (which === scene.greater) {
+        var tag = document.createElement("p");
+        tag.className = "greater";
+        tag.textContent = "Greater";
+        article.appendChild(tag);
+      }
+      return article;
+    }
+
+    function render(scene) {
+      var stage = document.getElementById("stage");
+      while (stage.firstChild) stage.removeChild(stage.firstChild);
+      var heading = document.createElement("h2");
+      heading.textContent = scene.heading;
+      var pair = document.createElement("div");
+      pair.className = "pair";
+      pair.appendChild(side(scene, "left"));
+      pair.appendChild(side(scene, "right"));
+      var change = document.createElement("p");
+      change.className = "change";
+      change.textContent = scene.change;
+      stage.appendChild(heading);
+      stage.appendChild(pair);
+      stage.appendChild(change);
+      document.getElementById("result").textContent = scene.comparison;
+    }
+
+    document.querySelector("[data-quantity=more]").addEventListener("click", function () {
+      var params = window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+      var mode = typeof params.mode === "string" ? params.mode : "fractions";
+      render(scenes[mode] || scenes.fractions);
+      window.ArtifactKit.emit("quantity_changed", { mode: mode });
+      window.ArtifactKit.emit("comparison_made", { mode: mode });
+    });
+  </script>
+</body>
+</html>
