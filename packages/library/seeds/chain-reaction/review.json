@@ -1,0 +1,28 @@
+{
+  "headings": [
+    {
+      "heading": "Scientific accuracy",
+      "finding": "left for staff"
+    },
+    {
+      "heading": "Age fit",
+      "finding": "The words stay short for ages 6 to 10. The task is one tap, then watching the row."
+    },
+    {
+      "heading": "Whether it teaches the objective",
+      "finding": "A child who finishes can say that one tap knocks down the whole row, and can predict that a longer row still starts with that same tap."
+    },
+    {
+      "heading": "Interaction quality",
+      "finding": "The tap on the first domino is the teaching gesture. The row falls from that tap, and the page says how many fell."
+    },
+    {
+      "heading": "Mobile feel",
+      "finding": "The row fits a phone width, and the first domino is a button tall enough for a finger. The label says Tap, so the starter is not color alone."
+    },
+    {
+      "heading": "Tutor-guide completeness",
+      "finding": "The guide records an intro, steps, hints, observation prompts, and misconceptions. Its success criteria cite domino_toppled and chain_completed."
+    }
+  ]
+}

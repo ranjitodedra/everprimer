@@ -1,0 +1,72 @@
+{
+  "manifestVersion": 1,
+  "id": "chain-reaction",
+  "version": 1,
+  "title": "Chain Reaction",
+  "description": "Tap the first domino and the rest of the row falls, so a child can see a chain reaction and predict that a longer row still starts with one tap.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["cause and effect"],
+  "concepts": ["cause and effect", "chain reaction"],
+  "prerequisites": [],
+  "learningObjectives": ["Predict that one tap can knock down a whole row of dominoes"],
+  "objectiveIntents": ["explain_process", "predict"],
+  "visualKinds": ["simulation", "sequence"],
+  "interactionTypes": ["select", "simulate", "predict"],
+  "ageRange": [6, 10],
+  "difficulty": 1,
+  "durationSec": [30, 90],
+  "params": [{ "key": "count", "type": "number", "default": 5, "description": "How many dominoes stand in the row." }],
+  "events": [
+    {
+      "name": "domino_toppled",
+      "data": { "count": "number" },
+      "description": "The child tapped the first domino and the row began to fall."
+    },
+    {
+      "name": "chain_completed",
+      "data": { "count": "number" },
+      "description": "The whole row finished falling after that one tap."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Tap the first domino and watch the row fall.",
+    "steps": [
+      "Count the dominoes standing in the row.",
+      "Tap the first one.",
+      "Watch each one knock into the next."
+    ],
+    "observationPrompts": [
+      "Did you need to tap every domino?",
+      "What happened to the last one?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "You have to tap every domino to knock them all down.",
+        "response": "The first tap is enough. Each falling domino knocks into the next one."
+      }
+    ],
+    "hints": [
+      "The domino that says Tap is the one you press.",
+      "One tap is enough for the whole row.",
+      "A longer row still starts with that same tap."
+    ],
+    "successCriteria": [
+      {
+        "description": "Tapped the first domino and the whole row fell",
+        "evidence": ["domino_toppled", "chain_completed"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "A row of dominoes. Tap the first one and the whole row falls.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["hand"], "createdAt": "2026-10-25T16:40:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}
