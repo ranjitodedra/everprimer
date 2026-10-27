@@ -1,0 +1,6 @@
+[
+  { "click": "[data-force=push]" },
+  { "expect": "force_applied" },
+  { "expect": "motion_predicted" },
+  { "emit": "not_a_real_event" }
+]

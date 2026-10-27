@@ -1,0 +1,81 @@
+{
+  "manifestVersion": 1,
+  "id": "cycle-explorer",
+  "version": 1,
+  "title": "Cycle Explorer",
+  "description": "A child follows the water, rock, or plant life cycle and taps where it starts again.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["earth cycles", "life cycles"],
+  "concepts": ["water cycle", "rock cycle", "plant life cycle"],
+  "prerequisites": [],
+  "learningObjectives": [
+    "Explain how a cycle moves from one stage to the next",
+    "Find where the water, rock, or plant life cycle starts again"
+  ],
+  "objectiveIntents": ["explain_process", "sequence"],
+  "visualKinds": ["simulation", "sequence"],
+  "interactionTypes": ["select", "sequence"],
+  "ageRange": [8, 12],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "cycle",
+      "type": "string",
+      "default": "water",
+      "options": ["water", "rock", "life"],
+      "description": "Which cycle the page shows."
+    }
+  ],
+  "events": [
+    {
+      "name": "stage_selected",
+      "data": { "cycle": "string", "stage": "string" },
+      "description": "The child selected a stage of the cycle."
+    },
+    {
+      "name": "cycle_completed",
+      "data": { "cycle": "string" },
+      "description": "The child returned to the first stage of the cycle."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "This cycle returns to its start. Follow the four stages, then tap the first one.",
+    "steps": ["Read the four stages in order.", "Tap stage 1, the start of the loop."],
+    "observationPrompts": [
+      "What happens after the last stage?",
+      "Where does the cycle return to the start?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "A cycle ends at the last stage and does not start again.",
+        "response": "The last stage feeds the first one. Water collects and can evaporate again, rock can melt again, and fruit holds new seeds."
+      },
+      {
+        "belief": "The water cycle uses up the water.",
+        "response": "The same water moves. It changes from liquid to vapor and back."
+      }
+    ],
+    "hints": [
+      "Start with the stage marked 1.",
+      "Tap stage 1. That is where the loop begins again.",
+      "Water begins with evaporation, rock with magma, and a plant with a seed."
+    ],
+    "successCriteria": [
+      { "description": "Selected a stage of the cycle", "evidence": ["stage_selected"] },
+      { "description": "Returned to the first stage and finished the cycle", "evidence": ["cycle_completed"] }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Four stages of a cycle. Tap a stage to hear what happens. The first stage starts the loop again.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["cursor"], "createdAt": "2026-10-25T00:00:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}

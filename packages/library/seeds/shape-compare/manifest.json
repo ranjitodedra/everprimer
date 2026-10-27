@@ -1,0 +1,85 @@
+{
+  "manifestVersion": 1,
+  "id": "shape-compare",
+  "version": 1,
+  "title": "Shape Compare",
+  "description": "Turn a square and compare its corners with a circle. A 3D setting adds a side view of the same two shapes.",
+  "format": "bundle",
+  "entry": "index.html",
+  "rendering": { "dimension": "3d", "tech": ["three@0.170.0"], "webgl": true },
+  "subjects": ["math"],
+  "topics": ["geometry", "shapes"],
+  "concepts": ["corners and sides", "front and side views"],
+  "prerequisites": [],
+  "learningObjectives": [
+    "Identify a square by its four sides and four corners",
+    "Compare a front view with a side view of the same shapes"
+  ],
+  "objectiveIntents": ["compare", "identify"],
+  "visualKinds": ["comparison", "parts"],
+  "interactionTypes": ["rotate", "compare", "select"],
+  "ageRange": [7, 11],
+  "difficulty": 1,
+  "durationSec": [40, 90],
+  "params": [
+    {
+      "key": "dimension",
+      "type": "string",
+      "default": "2d",
+      "options": ["2d", "3d"],
+      "description": "2d shows one view. 3d adds a side view of the same shapes."
+    }
+  ],
+  "events": [
+    {
+      "name": "shape_rotated",
+      "data": { "shape": "string", "dimension": "string" },
+      "description": "The child turned shape A."
+    },
+    {
+      "name": "shapes_compared",
+      "data": { "dimension": "string", "same": "boolean" },
+      "description": "The child compared the shapes on the page."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Turn the square. Then see how it compares with the circle.",
+    "steps": [
+      "Tap Turn shape A.",
+      "Count the corners on the square and on the circle.",
+      "If a side view appears, look at the same shapes from the side."
+    ],
+    "observationPrompts": [
+      "How many corners does the square have after the turn?",
+      "What does the side view look like?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "Turning a shape gives it new sides.",
+        "response": "A turn moves the shape. The square still has four sides and four corners."
+      }
+    ],
+    "hints": [
+      "The labeled square is shape A.",
+      "Count corners, not the color.",
+      "A square has four corners. A circle has none."
+    ],
+    "successCriteria": [
+      { "description": "Turned shape A", "evidence": ["shape_rotated"] },
+      { "description": "Compared the shapes", "evidence": ["shapes_compared"] }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "A square and a circle. Turn the square, then compare their corners. A 3D setting adds a side view of the same shapes.",
+    "colorSafe": true
+  },
+  "performance": { "maxBundleKB": 2048, "targetFps": 30, "mobileTested": true },
+  "provenance": { "createdWith": ["cursor"], "createdAt": "2026-10-25T16:40:00.000Z" },
+  "license": {
+    "artifact": "proprietary",
+    "thirdParty": [{ "name": "three", "version": "0.170.0", "license": "MIT" }],
+    "attributions": []
+  }
+}

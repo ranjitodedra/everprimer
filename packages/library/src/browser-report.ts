@@ -42,6 +42,12 @@ export interface BrowserCheckResult {
   report: BrowserReport;
   /** PNG bytes of the desktop iframe. Null when that viewport never becomes ready. */
   thumbnail: Uint8Array | null;
+  /** Event names the declared-event rule accepted during the check. */
+  acceptedEvents: string[];
+  /** Event names the declared-event rule rejected during the check. */
+  droppedNames: string[];
+  /** False when a probe step did not succeed. True when the check had no probe. */
+  probeOk: boolean;
 }
 
 /** The parameter defaults a lesson sends in ak-init. */

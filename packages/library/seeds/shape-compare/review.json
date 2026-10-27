@@ -1,0 +1,19 @@
+{
+  "Scientific accuracy": null,
+  "Age fit": "Sentences stay short for ages 7 to 11. The task is one tap: turn the square and compare corners.",
+  "Whether it teaches the objective": "After the tap, a child can point to four corners on the square and none on the circle, and can say a turn did not add sides.",
+  "Interaction quality": "The turn is the teaching move. The page rotates shape A and, when dimension is 3d, opens a side view of the same shapes.",
+  "Mobile feel": "The turn control is a full-width button with a tall tap target. The canvas uses the width of a phone.",
+  "Tutor-guide completeness": {
+    "observationPrompts": [
+      "How many corners does the square have after the turn?",
+      "What does the side view look like?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "Turning a shape gives it new sides.",
+        "response": "A turn moves the shape. The square still has four sides and four corners."
+      }
+    ]
+  }
+}

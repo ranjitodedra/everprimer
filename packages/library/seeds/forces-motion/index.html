@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Forces and Motion</title>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      background: #f3ecdf;
+      color: #1c2430;
+      font-family: "Iowan Old Style", Palatino, Georgia, serif;
+    }
+    header { padding: 14px 16px 0; }
+    h1 { margin: 0; font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
+    .lead { margin: 6px 0 0; font-size: 1rem; line-height: 1.35; }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+    }
+    button {
+      min-height: 48px;
+      min-width: 112px;
+      padding: 10px 22px;
+      border: 0;
+      border-radius: 999px;
+      background: #1d4e89;
+      color: #fff;
+      font: 700 1.05rem "Avenir Next", "Segoe UI", sans-serif;
+    }
+    .mass {
+      font: 700 1rem "Avenir Next", "Segoe UI", sans-serif;
+      background: #fff;
+      border: 2px solid #1c2430;
+      border-radius: 999px;
+      padding: 8px 14px;
+    }
+    #prediction { margin: 0; padding: 0 16px 10px; font-size: 1rem; line-height: 1.4; }
+    #stage { flex: 1; min-height: 180px; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Push the box</h1>
+    <p class="lead">The push stays the same. A heavier box speeds up less.</p>
+  </header>
+  <div class="controls">
+    <button type="button" data-force="push">Push</button>
+    <p class="mass">Mass <span id="mass">2</span></p>
+  </div>
+  <p id="prediction">Press Push. The speed-up is the push divided by the mass.</p>
+  <div id="stage"></div>
+  <script src="matter.min.js"></script>
+  <script>
+    (function () {
+      var Matter = window.Matter;
+      Matter.Common.logLevel = 0;
+
+      var stage = document.getElementById("stage");
+      var width = Math.max(280, stage.clientWidth || document.documentElement.clientWidth || 320);
+      var height = Math.max(180, stage.clientHeight || 220);
+      var startX = 88;
+      var startY = height - 78;
+      var pushForce = 0.03;
+
+      var engine = Matter.Engine.create();
+      var box = Matter.Bodies.rectangle(startX, startY, 72, 48, {
+        frictionAir: 0.08,
+        friction: 0.25,
+        restitution: 0,
+        render: { fillStyle: "#2f6fed" }
+      });
+      var ground = Matter.Bodies.rectangle(width / 2, height - 18, width + 80, 36, {
+        isStatic: true,
+        render: { fillStyle: "#c4a574" }
+      });
+      Matter.Body.setMass(box, 2);
+      Matter.Composite.add(engine.world, [ground, box]);
+
+      var render = Matter.Render.create({
+        element: stage,
+        engine: engine,
+        options: {
+          width: width,
+          height: height,
+          wireframes: false,
+          background: "#f3ecdf",
+          pixelRatio: 1
+        }
+      });
+      var runner = Matter.Runner.create();
+      var running = false;
+
+      function pageIsStill() {
+        return document.documentElement.getAttribute("data-reduced-motion") === "true" ||
+          !!(window.ArtifactKit && window.ArtifactKit.reducedMotion);
+      }
+
+      function drawStill() {
+        Matter.Render.world(render);
+      }
+
+      function syncMotion() {
+        if (pageIsStill()) {
+          if (running) {
+            Matter.Runner.stop(runner);
+            Matter.Render.stop(render);
+            running = false;
+          }
+          drawStill();
+          return;
+        }
+        if (!running) {
+          Matter.Render.run(render);
+          Matter.Runner.run(runner, engine);
+          running = true;
+        }
+      }
+
+      function readMass() {
+        var params = window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+        var mass = Number(params.mass);
+        if (!isFinite(mass) || mass <= 0) mass = 2;
+        return mass;
+      }
+
+      function showMass(mass) {
+        document.getElementById("mass").textContent = String(mass);
+      }
+
+      document.querySelector("[data-force=push]").addEventListener("click", function () {
+        var mass = readMass();
+        var acceleration = pushForce / mass;
+        Matter.Body.setMass(box, mass);
+        Matter.Body.setAngle(box, 0);
+        Matter.Body.setAngularVelocity(box, 0);
+        Matter.Body.setVelocity(box, { x: 0, y: 0 });
+        Matter.Body.setPosition(box, { x: startX, y: startY });
+        if (pageIsStill()) {
+          Matter.Body.setPosition(box, { x: startX + 160 * (2 / mass), y: startY });
+          drawStill();
+        } else {
+          Matter.Body.applyForce(box, box.position, { x: pushForce, y: 0 });
+        }
+        showMass(mass);
+        document.getElementById("prediction").textContent =
+          "Same push. Mass " + mass + " speeds up by " + acceleration.toFixed(3) +
+          ". A heavier box speeds up less.";
+        window.ArtifactKit.emit("force_applied", { mass: mass, force: pushForce });
+        window.ArtifactKit.emit("motion_predicted", { mass: mass, acceleration: acceleration });
+      });
+
+      new MutationObserver(function () {
+        showMass(readMass());
+        syncMotion();
+      }).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-reduced-motion"]
+      });
+      syncMotion();
+    })();
+  </script>
+</body>
+</html>

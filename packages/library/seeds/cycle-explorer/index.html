@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en" data-cycle="water">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cycle Explorer</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    @media (prefers-reduced-motion: reduce) {
+      .flow { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <h1 id="cycle-title">Water cycle</h1>
+        <p class="lead" id="cycle-lead">Water rises, forms clouds, falls, and collects.</p>
+      </div>
+    </header>
+    <div class="flow" aria-hidden="true"></div>
+    <div class="board">
+      <ol class="loop">
+        <li>
+          <button type="button" data-stage="first" data-index="0" aria-pressed="true">
+            <span class="ord">1</span>
+            <span class="name">Evaporation</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" data-index="1" aria-pressed="false">
+            <span class="ord">2</span>
+            <span class="name">Condensation</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" data-index="2" aria-pressed="false">
+            <span class="ord">3</span>
+            <span class="name">Precipitation</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" data-index="3" aria-pressed="false">
+            <span class="ord">4</span>
+            <span class="name">Collection</span>
+          </button>
+        </li>
+      </ol>
+      <section class="detail" aria-live="polite">
+        <h2 id="stage-name">Evaporation</h2>
+        <p id="stage-detail">The sun warms water in oceans, lakes, and puddles. Some of that water becomes vapor and rises into the air.</p>
+        <p class="status" id="cycle-status">Tap stage 1 when you see how the loop returns.</p>
+      </section>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var CYCLES = {
+        water: {
+          title: "Water cycle",
+          lead: "Water rises, forms clouds, falls, and collects.",
+          stages: [
+            { id: "evaporation", name: "Evaporation", detail: "The sun warms water in oceans, lakes, and puddles. Some of that water becomes vapor and rises into the air." },
+            { id: "condensation", name: "Condensation", detail: "The vapor cools high up. Tiny drops form clouds." },
+            { id: "precipitation", name: "Precipitation", detail: "The drops grow heavy and fall as rain, snow, or hail." },
+            { id: "collection", name: "Collection", detail: "Water gathers in rivers, lakes, oceans, and underground. The sun can warm it again." }
+          ]
+        },
+        rock: {
+          title: "Rock cycle",
+          lead: "Rock melts, hardens, breaks, and forms again.",
+          stages: [
+            { id: "magma", name: "Magma", detail: "Deep underground, rock can get hot enough to melt. That melted rock is magma." },
+            { id: "igneous", name: "Igneous", detail: "When magma cools, it hardens into igneous rock." },
+            { id: "sediment", name: "Sediment", detail: "Wind, water, and ice break rock into smaller pieces called sediment." },
+            { id: "new_rock", name: "New rock", detail: "Sediment can press into sedimentary rock. Heat and pressure can change rock into metamorphic rock. Either kind can melt into magma again." }
+          ]
+        },
+        life: {
+          title: "Life cycle",
+          lead: "This plant starts as a seed and makes new seeds.",
+          stages: [
+            { id: "seed", name: "Seed", detail: "A seed holds a tiny plant and stored food. Water and warmth can start it growing." },
+            { id: "sprout", name: "Sprout", detail: "The seed splits. A root grows down and a shoot grows up toward the light." },
+            { id: "flower", name: "Flower", detail: "The plant grows and opens flowers. Those flowers can be pollinated." },
+            { id: "fruit", name: "Fruit", detail: "A fruit grows where the flower was. Inside are new seeds, ready to start again." }
+          ]
+        }
+      };
+
+      var buttons = document.querySelectorAll("[data-index]");
+      var title = document.getElementById("cycle-title");
+      var lead = document.getElementById("cycle-lead");
+      var stageName = document.getElementById("stage-name");
+      var stageDetail = document.getElementById("stage-detail");
+      var status = document.getElementById("cycle-status");
+      var shown = "";
+
+      function cycleFrom(params) {
+        var cycle = params && params.cycle;
+        if (cycle === "rock" || cycle === "life" || cycle === "water") return cycle;
+        return "water";
+      }
+
+      function applyCycle(cycle) {
+        var spec = CYCLES[cycle];
+        document.documentElement.setAttribute("data-cycle", cycle);
+        title.textContent = spec.title;
+        lead.textContent = spec.lead;
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].querySelector(".name").textContent = spec.stages[i].name;
+        }
+      }
+
+      function selectStage(cycle, index) {
+        var stage = CYCLES[cycle].stages[index];
+        stageName.textContent = stage.name;
+        stageDetail.textContent = stage.detail;
+        for (var i = 0; i < buttons.length; i++) {
+          buttons[i].setAttribute("aria-pressed", i === index ? "true" : "false");
+        }
+      }
+
+      function paint() {
+        var params = window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+        var cycle = cycleFrom(params);
+        if (cycle === shown) return;
+        shown = cycle;
+        applyCycle(cycle);
+        selectStage(cycle, 0);
+        status.textContent = "Tap stage 1 when you see how the loop returns.";
+      }
+
+      document.querySelector("[data-stage=first]").addEventListener("click", function () {
+        var params = window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+        var cycle = cycleFrom(params);
+        var stage = CYCLES[cycle].stages[0];
+        shown = cycle;
+        applyCycle(cycle);
+        selectStage(cycle, 0);
+        status.textContent = "You tapped the start. This cycle comes back here.";
+        window.ArtifactKit.emit("stage_selected", { cycle: cycle, stage: stage.id });
+        window.ArtifactKit.emit("cycle_completed", { cycle: cycle });
+      });
+
+      for (var n = 0; n < buttons.length; n++) {
+        if (buttons[n].getAttribute("data-stage") === "first") continue;
+        buttons[n].addEventListener("click", function () {
+          var params = window.ArtifactKit && window.ArtifactKit.params ? window.ArtifactKit.params : {};
+          var cycle = cycleFrom(params);
+          var index = Number(this.getAttribute("data-index"));
+          var stage = CYCLES[cycle].stages[index];
+          shown = cycle;
+          applyCycle(cycle);
+          selectStage(cycle, index);
+          status.textContent = "Stage " + (index + 1) + " of 4. The loop returns to stage 1.";
+          window.ArtifactKit.emit("stage_selected", { cycle: cycle, stage: stage.id });
+        });
+      }
+
+      paint();
+      var ticks = 0;
+      var timer = setInterval(function () {
+        paint();
+        ticks += 1;
+        if (ticks >= 180) clearInterval(timer);
+      }, 16);
+    })();
+  </script>
+</body>
+</html>

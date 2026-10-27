@@ -7,13 +7,16 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./browser-check": "./src/browser-check.ts"
+    "./browser-check": "./src/browser-check.ts",
+    "./seed-check": "./src/seed-check.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "seed": "tsx src/seed-check.ts",
     "vendor:sync": "tsx scripts/vendor-sync.ts",
-    "vendor:check": "tsx scripts/vendor-sync.ts --check"
+    "vendor:check": "tsx scripts/vendor-sync.ts --check",
+    "brief:check": "tsx scripts/brief-check.ts"
   },
   "dependencies": {
     "@eco/contracts": "workspace:*",

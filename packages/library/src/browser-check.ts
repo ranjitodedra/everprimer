@@ -8,8 +8,8 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
-import { chromium, type Browser, type ConsoleMessage, type Page, type Request, type Response } from "playwright";
-import type { ArtifactManifest } from "@eco/contracts";
+import { chromium, type Browser, type ConsoleMessage, type Frame, type Page, type Request, type Response } from "playwright";
+import { checkDeclaredEvent, type ArtifactManifest } from "@eco/contracts";
 import { defaultParams, type BrowserCheckResult, type BrowserFinding, type BrowserReport, type BrowserViewportReport } from "./browser-report";
 import type { InMemoryFile } from "./import/types";
 
@@ -32,6 +32,9 @@ const BLOCKING = new Set([
   "missing_webgl",
 ]);
 
+/** A step stored beside a seed. Not a manifest field. */
+export type BrowserProbeStep = { click: string } | { expect: string } | { emit: string };
+
 export interface BrowserCheckInput {
   manifest: ArtifactManifest;
   bundleSha256: string;
@@ -46,6 +49,12 @@ export interface BrowserCheckInput {
    * one of them does not become ready, and the browser stays closeable.
    */
   holdPaths?: string[];
+  /** Clicks, expected event names, and emits. Empty when the caller has no probe. */
+  probe?: BrowserProbeStep[];
+  /** Replaces one param default in ak-init. The stored browser report keeps the manifest defaults. */
+  paramOverride?: { key: string; value: unknown };
+  /** Host tells the page that reduced motion is on. */
+  reducedMotion?: boolean;
 }
 
 interface Served {
@@ -55,30 +64,52 @@ interface Served {
 
 export async function runBrowserCheck(input: BrowserCheckInput): Promise<BrowserCheckResult> {
   const timeout = input.readyTimeoutMs ?? READY_TIMEOUT_MS;
-  const params = defaultParams(input.manifest);
+  const defaults = defaultParams(input.manifest);
+  const params = { ...defaults };
+  if (input.paramOverride) params[input.paramOverride.key] = input.paramOverride.value;
   const served = input.files ? await serve(input.files, input.holdPaths ?? []) : null;
   const entry = served ? `${served.origin}/${input.manifest.entry}` : input.url;
   if (!entry) throw new Error("runBrowserCheck needs files or a url");
   const origin = new URL(entry).origin;
 
+  const probe = input.probe ?? [];
   const browser = await chromium.launch({ headless: true });
   try {
     const viewports: BrowserViewportReport[] = [];
+    const acceptedEvents: string[] = [];
+    const droppedNames: string[] = [];
     let thumbnail: Uint8Array | null = null;
+    let probeOk = true;
+    let reducedMotionMarked = true;
     for (const viewport of VIEWPORTS) {
-      const result = await runViewport(browser, { entry, origin, viewport, params, timeout, webgl: input.manifest.rendering.webgl });
+      const result = await runViewport(browser, {
+        entry,
+        origin,
+        viewport,
+        params,
+        timeout,
+        webgl: input.manifest.rendering.webgl,
+        manifest: input.manifest,
+        probe,
+        reducedMotion: input.reducedMotion ?? false,
+      });
       viewports.push(result.report);
       if (viewport.name === "desktop" && result.thumbnail) thumbnail = result.thumbnail;
+      for (const name of result.acceptedEvents) if (!acceptedEvents.includes(name)) acceptedEvents.push(name);
+      for (const name of result.droppedNames) if (!droppedNames.includes(name)) droppedNames.push(name);
+      if (!result.probeOk) probeOk = false;
+      if (!result.reducedMotionMarked) reducedMotionMarked = false;
     }
+    const findingsOk = viewports.every((viewport) => viewport.findings.every((finding) => !BLOCKING.has(finding.code)));
     const report: BrowserReport = {
-      ok: viewports.every((viewport) => viewport.findings.every((finding) => !BLOCKING.has(finding.code))),
+      ok: findingsOk && (!(input.reducedMotion ?? false) || reducedMotionMarked),
       bundleSha256: input.bundleSha256,
       webgl: input.manifest.rendering.webgl,
-      params,
+      params: defaults,
       thumbnailPath: null,
       viewports,
     };
-    return { report, thumbnail };
+    return { report, thumbnail, acceptedEvents, droppedNames, probeOk };
   } finally {
     await browser.close();
     if (served) await served.close();
@@ -160,6 +191,10 @@ function artifactHeaders(origin: string, contentType: string, contentLength: num
 interface ViewportRun {
   report: BrowserViewportReport;
   thumbnail: Uint8Array | null;
+  acceptedEvents: string[];
+  droppedNames: string[];
+  probeOk: boolean;
+  reducedMotionMarked: boolean;
 }
 
 async function runViewport(
@@ -171,6 +206,9 @@ async function runViewport(
     params: Record<string, unknown>;
     timeout: number;
     webgl: boolean;
+    manifest: ArtifactManifest;
+    probe: BrowserProbeStep[];
+    reducedMotion: boolean;
   },
 ): Promise<ViewportRun> {
   const context = await browser.newContext({ viewport: { width: input.viewport.width, height: input.viewport.height } });
@@ -199,28 +237,51 @@ async function runViewport(
   let heapBytes: number | null = null;
   let frameCount: number | null = null;
   let thumbnail: Uint8Array | null = null;
+  let acceptedEvents: string[] = [];
+  let droppedNames: string[] = [];
+  let probeOk = true;
+  let reducedMotionMarked = true;
 
   try {
     await page.setContent("<!doctype html><html><body></body></html>", { waitUntil: "domcontentloaded" });
-    await page.evaluate(installParent, { entry: input.entry, params: input.params, nonce: nonce() });
+    await page.evaluate(installParent, {
+      entry: input.entry,
+      params: input.params,
+      nonce: nonce(),
+      reducedMotion: input.reducedMotion,
+    });
     readyMs = await waitForReady(page, input.timeout);
+    let frame: Frame | undefined;
     if (readyMs === null) {
       note({ code: "ready_timeout", message: `The page was not ready within ${input.timeout}ms.` });
     } else {
-      const frame = page.frames().find((candidate) => candidate.url().startsWith(input.origin));
+      frame = page.frames().find((candidate) => candidate.url().startsWith(input.origin));
       if (frame) {
         await frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(0))));
-        const probe = await frame.evaluate(() => {
+        const probed = await frame.evaluate(() => {
           const mark = (window as unknown as { __browserCheck?: { webgl: boolean } }).__browserCheck;
           const memory = (performance as { memory?: { usedJSHeapSize?: number } }).memory;
           return { webgl: !!mark?.webgl, heap: memory?.usedJSHeapSize ?? null };
         });
-        webglCreated = probe.webgl;
-        heapBytes = probe.heap;
+        webglCreated = probed.webgl;
+        heapBytes = probed.heap;
         if (input.webgl && !webglCreated) note({ code: "missing_webgl", message: "The page did not create a WebGL context." });
         if (input.viewport.name === "desktop") thumbnail = await page.locator("iframe").screenshot();
+        if (input.probe.length) probeOk = await runProbe(page, frame, input.probe, input.manifest);
+        if (input.reducedMotion) {
+          await page.waitForTimeout(200);
+          reducedMotionMarked = await frame.evaluate(
+            () => document.documentElement.getAttribute("data-reduced-motion") === "true",
+          );
+        }
+      } else {
+        if (input.probe.length) probeOk = false;
+        if (input.reducedMotion) reducedMotionMarked = false;
       }
     }
+    const classified = classifyEvents(input.manifest, await readEvents(page));
+    acceptedEvents = classified.accepted;
+    droppedNames = classified.dropped;
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
     const errors = await page.evaluate(
       () => (window as unknown as { __akErrors?: { fatal: boolean; message: string }[] }).__akErrors ?? [],
@@ -233,6 +294,10 @@ async function runViewport(
 
   return {
     thumbnail,
+    acceptedEvents,
+    droppedNames,
+    probeOk,
+    reducedMotionMarked,
     report: {
       name: input.viewport.name,
       width: input.viewport.width,
@@ -338,11 +403,68 @@ async function waitForReady(page: Page, timeout: number): Promise<number | null>
   return null;
 }
 
+async function readEvents(page: Page): Promise<{ name: string; data: unknown }[]> {
+  return page.evaluate(() => {
+    const list = (window as unknown as { __akEvents?: { name: string; data: unknown }[] }).__akEvents ?? [];
+    return list.map((event) => ({ name: event.name, data: event.data }));
+  });
+}
+
+function classifyEvents(
+  manifest: ArtifactManifest,
+  events: { name: string; data: unknown }[],
+): { accepted: string[]; dropped: string[] } {
+  const accepted: string[] = [];
+  const dropped: string[] = [];
+  for (const event of events) {
+    const list = checkDeclaredEvent(manifest, event.name, event.data) ? dropped : accepted;
+    if (!list.includes(event.name)) list.push(event.name);
+  }
+  return { accepted, dropped };
+}
+
+/** Runs the probe inside the artifact frame. Dropped names come from checkDeclaredEvent. */
+async function runProbe(page: Page, frame: Frame, steps: BrowserProbeStep[], manifest: ArtifactManifest): Promise<boolean> {
+  for (const step of steps) {
+    if ("click" in step) {
+      try {
+        await frame.locator(step.click).click({ timeout: 2000 });
+      } catch {
+        return false;
+      }
+      await page.waitForTimeout(100);
+      continue;
+    }
+    if ("emit" in step) {
+      try {
+        const emitted = await frame.evaluate((name) => {
+          const kit = (window as unknown as { ArtifactKit?: { emit?: (eventName: string, data: unknown) => void } }).ArtifactKit;
+          if (!kit?.emit) return false;
+          kit.emit(name, {});
+          return true;
+        }, step.emit);
+        if (!emitted) return false;
+      } catch {
+        return false;
+      }
+      await page.waitForTimeout(100);
+      const classified = classifyEvents(manifest, await readEvents(page));
+      const dropped = checkDeclaredEvent(manifest, step.emit, {}) !== null;
+      if (dropped && !classified.dropped.includes(step.emit)) return false;
+      if (!dropped && !classified.accepted.includes(step.emit)) return false;
+      continue;
+    }
+    const classified = classifyEvents(manifest, await readEvents(page));
+    if (!classified.accepted.includes(step.expect)) return false;
+  }
+  return true;
+}
+
 /**
  * Parent page. Listens for ArtifactKit messages from the iframe and sends
  * ak-init once the page is ready, matching the lesson player.
  */
-function installParent(input: { entry: string; params: Record<string, unknown>; nonce: string }): void {
+function installParent(input: { entry: string; params: Record<string, unknown>; nonce: string; reducedMotion: boolean }): void {
   const mark = window as unknown as { __akReady?: number };
   const frame = document.createElement("iframe");
   frame.setAttribute("sandbox", "allow-scripts");
@@ -352,12 +474,25 @@ function installParent(input: { entry: string; params: Record<string, unknown>; 
   frame.style.border = "0";
   window.addEventListener("message", (event) => {
     if (event.source !== frame.contentWindow) return;
-    const data = event.data as { source?: string; v?: number; kind?: string; fatal?: boolean; message?: string };
+    const data = event.data as {
+      source?: string;
+      v?: number;
+      kind?: string;
+      fatal?: boolean;
+      message?: string;
+      name?: string;
+      data?: unknown;
+    };
     if (!data || data.source !== "artifactkit" || data.v !== 1) return;
+    if (data.kind === "ak-event" && typeof data.name === "string") {
+      const list = (window as unknown as { __akEvents?: { name: string; data: unknown }[] }).__akEvents ?? [];
+      list.push({ name: data.name, data: data.data ?? {} });
+      (window as unknown as { __akEvents: typeof list }).__akEvents = list;
+    }
     if (data.kind === "ak-ready" && mark.__akReady === undefined) mark.__akReady = Date.now();
     if (data.kind === "ak-ready") {
       frame.contentWindow?.postMessage(
-        { source: "artifactkit-host", v: 1, kind: "ak-init", nonce: input.nonce, params: input.params, reducedMotion: false },
+        { source: "artifactkit-host", v: 1, kind: "ak-init", nonce: input.nonce, params: input.params, reducedMotion: input.reducedMotion },
         "*",
       );
     }

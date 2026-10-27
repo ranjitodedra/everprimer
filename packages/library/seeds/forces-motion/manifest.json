@@ -1,0 +1,94 @@
+{
+  "manifestVersion": 1,
+  "id": "forces-motion",
+  "version": 1,
+  "title": "Forces and Motion",
+  "description": "Push a box and predict how its mass changes the motion. The same push speeds up a heavier box less.",
+  "format": "bundle",
+  "entry": "index.html",
+  "rendering": {
+    "dimension": "2d",
+    "tech": ["matter-js@0.19.0"],
+    "webgl": false
+  },
+  "layout": { "aspectRatio": "4:3", "minHeightPx": 320 },
+  "subjects": ["science"],
+  "topics": ["forces", "motion"],
+  "concepts": ["force", "mass", "acceleration"],
+  "prerequisites": [],
+  "learningObjectives": ["Predict that the same push speeds up a heavier box less"],
+  "objectiveIntents": ["explain_process", "predict"],
+  "visualKinds": ["simulation"],
+  "interactionTypes": ["simulate", "predict"],
+  "ageRange": [9, 13],
+  "difficulty": 2,
+  "durationSec": [45, 90],
+  "params": [
+    {
+      "key": "mass",
+      "type": "number",
+      "default": 2,
+      "description": "Mass of the box that gets pushed."
+    }
+  ],
+  "events": [
+    {
+      "name": "force_applied",
+      "data": { "mass": "number", "force": "number" },
+      "description": "The child pushed the box with a force."
+    },
+    {
+      "name": "motion_predicted",
+      "data": { "mass": "number", "acceleration": "number" },
+      "description": "The child predicted how that mass speeds up."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "Push the box and watch how its mass changes the motion.",
+    "steps": [
+      "Read the mass on the page.",
+      "Press Push.",
+      "Compare the predicted speed-up with how the box moves."
+    ],
+    "observationPrompts": [
+      "What changed when the mass number got bigger?",
+      "Did the push get stronger, or did the box get heavier?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "A heavier box always moves farther from the same push.",
+        "response": "The push stays the same. A heavier box speeds up less, so it does not travel as far."
+      }
+    ],
+    "hints": [
+      "The push stays the same each time.",
+      "A larger mass speeds up less."
+    ],
+    "successCriteria": [
+      {
+        "description": "Applied a push to the box",
+        "evidence": ["force_applied"]
+      },
+      {
+        "description": "Predicted how the mass changes the motion",
+        "evidence": ["motion_predicted"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "A box sits on a track. Push applies a force. The readout predicts that a heavier mass speeds up less.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": false },
+  "provenance": {
+    "createdWith": ["seed"],
+    "createdAt": "2026-10-25T16:40:00.000Z"
+  },
+  "license": {
+    "artifact": "proprietary",
+    "thirdParty": [{ "name": "matter-js", "version": "0.19.0", "license": "MIT" }],
+    "attributions": []
+  }
+}

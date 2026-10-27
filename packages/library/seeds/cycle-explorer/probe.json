@@ -1,0 +1,6 @@
+[
+  { "click": "[data-stage=first]" },
+  { "expect": "stage_selected" },
+  { "expect": "cycle_completed" },
+  { "emit": "not_a_real_event" }
+]
