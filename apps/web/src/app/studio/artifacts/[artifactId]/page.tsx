@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { LibraryArtifactVersionRow, LibraryVersionStatus } from "@eco/db";
 import { PageHeader } from "@/components/ui";
-import { historyForStudio } from "@/lib/studio";
+import { artifactHostEnv } from "@/lib/env";
+import { historyForStudio, openDraftLink } from "@/lib/studio";
 import { currentStudioActor } from "@/lib/studio-session";
 import { createClient } from "@/lib/supabase/server";
+import { PreviewFrame } from "../../new/preview-frame";
 import { RetireButton } from "../../retire-button";
 
 export const metadata = { title: "Version history" };
@@ -19,6 +21,19 @@ const STATUS_LABEL: Record<LibraryVersionStatus, string> = {
 function manifestTitle(row: LibraryArtifactVersionRow) {
   const title = (row.manifest as { title?: string }).title?.trim();
   return title || row.artifact_id;
+}
+
+function draftHref(artifactId: string, row: LibraryArtifactVersionRow): string | null {
+  if (row.status !== "draft") return null;
+  const entry = (row.manifest as { entry?: string }).entry?.trim() || "index.html";
+  return openDraftLink({
+    origin: artifactHostEnv.origin,
+    secret: artifactHostEnv.draftSecret,
+    now: Math.floor(Date.now() / 1000),
+    artifactId,
+    version: row.version,
+    entry,
+  });
 }
 
 function rowHeading(row: LibraryArtifactVersionRow) {
@@ -61,7 +76,9 @@ export default async function ArtifactHistoryPage(props: { params: Promise<{ art
         }
       />
       <ol className="space-y-8">
-        {history.versions.map((row) => (
+        {history.versions.map((row) => {
+          const href = draftHref(artifactId, row);
+          return (
           <li key={row.version} className="rounded-2xl border border-ink/10 p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -72,8 +89,20 @@ export default async function ArtifactHistoryPage(props: { params: Promise<{ art
                   {row.published_at ? `Published ${row.published_at}` : "No publish time"}
                 </p>
               </div>
-              {row.status === "published" ? <RetireButton artifactId={artifactId} version={row.version} /> : null}
+              <div className="flex flex-wrap gap-2">
+                {href ? (
+                  <a className="btn-secondary btn-sm" href={href}>
+                    Open
+                  </a>
+                ) : null}
+                {row.status === "published" ? <RetireButton artifactId={artifactId} version={row.version} /> : null}
+              </div>
             </div>
+            {href ? (
+              <div className="mt-5">
+                <PreviewFrame url={href} manifest={row.manifest as { params?: []; events?: { name: string }[] }} />
+              </div>
+            ) : null}
             <h3 className="mt-5 text-sm font-semibold">Files</h3>
             {row.files.length ? (
               <ul className="mt-1 text-sm text-ink-soft">
@@ -87,7 +116,8 @@ export default async function ArtifactHistoryPage(props: { params: Promise<{ art
             <h3 className="mt-5 text-sm font-semibold">Manifest</h3>
             <pre className="mt-1 overflow-x-auto text-xs text-ink-soft">{JSON.stringify(row.manifest, null, 2)}</pre>
           </li>
-        ))}
+          );
+        })}
       </ol>
     </main>
   );
