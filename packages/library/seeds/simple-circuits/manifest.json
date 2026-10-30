@@ -1,0 +1,92 @@
+{
+  "manifestVersion": 1,
+  "id": "simple-circuits",
+  "version": 1,
+  "title": "Simple circuits",
+  "description": "Close a battery, a wire, and a bulb into one loop, then see how the bulb responds to the voltage.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["circuits", "electricity"],
+  "concepts": ["closed circuit", "voltage"],
+  "prerequisites": ["A battery has two ends"],
+  "learningObjectives": [
+    "Explain that a bulb lights when the path out of the battery and back is closed",
+    "Predict that a higher voltage makes this bulb brighter"
+  ],
+  "objectiveIntents": ["explain_process", "predict"],
+  "visualKinds": ["simulation", "parts"],
+  "interactionTypes": ["select", "simulate", "predict"],
+  "ageRange": [9, 13],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "voltage",
+      "type": "number",
+      "default": 3,
+      "min": 1,
+      "max": 12,
+      "description": "Battery voltage in volts. A higher value makes this bulb brighter."
+    }
+  ],
+  "events": [
+    {
+      "name": "component_connected",
+      "data": { "part": "string", "voltage": "number" },
+      "description": "The child connected a part and closed the loop."
+    },
+    {
+      "name": "bulb_lit",
+      "data": { "voltage": "number" },
+      "description": "The bulb lit at the battery voltage."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "This battery, wire, and bulb make a circuit only when the path is a closed loop. Connect the battery and watch the bulb respond to the voltage.",
+    "steps": [
+      "Look at the battery, the wire, and the bulb, and notice the open gap.",
+      "Predict whether the bulb will light when that gap closes.",
+      "Connect the battery lead and compare the glow with the voltage."
+    ],
+    "observationPrompts": [
+      "What changed in the path when you connected the battery?",
+      "How bright is the filament at this voltage, and what would you expect if the voltage were higher?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "The electricity is used up in the bulb, so nothing returns to the battery.",
+        "response": "Charge keeps moving around the closed loop. The bulb turns some energy into light and heat, and the path still comes back to the battery."
+      },
+      {
+        "belief": "One wire from the battery is enough to light the bulb.",
+        "response": "The path has to leave the battery and come back. An open gap means no current, so the bulb stays dark."
+      }
+    ],
+    "hints": [
+      "Find the battery. The loop is still open at its lead.",
+      "Connect the battery lead so the wire meets both ends of the path.",
+      "A closed loop lets the bulb light. The voltage is the push from the battery."
+    ],
+    "successCriteria": [
+      {
+        "description": "Connected the battery so the loop closed",
+        "evidence": ["component_connected"]
+      },
+      {
+        "description": "Saw the bulb light at the given voltage",
+        "evidence": ["bulb_lit"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "A battery, a wire, and a bulb. Connect the battery lead to close the loop. The bulb lights, and the voltage is shown.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": { "createdWith": ["staff"], "createdAt": "2026-10-25T16:36:00.000Z" },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}

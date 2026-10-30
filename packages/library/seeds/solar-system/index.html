@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solar system orbits</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f7f3ea;
+      --bg: #10182b;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      background: radial-gradient(circle at 50% 18%, #1a2744 0%, var(--bg) 58%);
+      color: var(--ink);
+      font: 17px/1.35 "Avenir Next", "Segoe UI", sans-serif;
+    }
+    header { padding: 10px 12px 0; }
+    h1 { margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+    canvas { width: 100%; height: 136px; display: block; }
+    #prompt, #note { margin: 0; padding: 8px 12px; }
+    #prompt { color: #d5deef; }
+    .planets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 0 12px;
+    }
+    button {
+      min-height: 48px;
+      border: 0;
+      border-radius: 999px;
+      font: inherit;
+      font-weight: 700;
+      color: #1a1208;
+    }
+    button[data-planet="mercury"] { background: #d5d3cf; }
+    button[data-planet="venus"] { background: #e6c27a; }
+    button[data-planet="earth"] { background: #8ec5ff; color: #102033; }
+    button[data-planet="mars"] { background: #e08a6a; color: #2a100c; }
+    button.is-on { box-shadow: inset 0 0 0 3px #fff; }
+    button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      canvas { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Planets around the Sun</h1>
+  </header>
+  <canvas id="sky" width="480" height="220" aria-hidden="true"></canvas>
+  <p id="prompt">Tap a planet. Which neighbor takes longer to go around the Sun?</p>
+  <div class="planets" role="group" aria-label="Planets">
+    <button type="button" data-planet="mercury" aria-pressed="false">Mercury</button>
+    <button type="button" data-planet="venus" aria-pressed="false">Venus</button>
+    <button type="button" data-planet="earth" aria-pressed="false">Earth</button>
+    <button type="button" data-planet="mars" aria-pressed="false">Mars</button>
+  </div>
+  <p id="note" aria-live="polite">Closer planets finish a lap sooner.</p>
+  <script type="module" src="scene.js"></script>
+</body>
+</html>

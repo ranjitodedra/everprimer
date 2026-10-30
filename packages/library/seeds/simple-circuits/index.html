@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#243044">
+  <title>Simple circuits</title>
+  <style>
+    :root {
+      --bench: #243044;
+      --ink: #1c2836;
+      --tray: #e4ece8;
+      --copper: #c4622d;
+      --cell: #2f6b4f;
+      --cap: #d9d3c7;
+      --filament: #5e564c;
+      --glow-color: #ffb020;
+      --paper: #f4f7f5;
+      --glow: 0.5;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { margin: 0; }
+
+    body {
+      min-height: 100%;
+      padding:
+        max(1rem, env(safe-area-inset-top))
+        max(1rem, env(safe-area-inset-right))
+        max(1rem, env(safe-area-inset-bottom))
+        max(1rem, env(safe-area-inset-left));
+      background: var(--bench);
+      color: var(--paper);
+      font-family: "Iowan Old Style", Palatino, "Palatino Linotype", Georgia, serif;
+      font-size: 1.125rem;
+      line-height: 1.45;
+      overscroll-behavior: none;
+    }
+
+    main {
+      max-width: 36rem;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 2rem;
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .ask {
+      margin: 0 0 1rem;
+      max-width: 38ch;
+      color: #d5ddd8;
+    }
+
+    .board {
+      padding: 0.85rem 0.75rem 0.7rem;
+      background: var(--tray);
+      color: var(--ink);
+      border: 2px solid #152033;
+    }
+
+    .loop {
+      display: flex;
+      align-items: flex-start;
+    }
+
+    .battery {
+      flex: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 3.6rem;
+      min-height: 48px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: center;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .battery:focus { outline: none; }
+
+    .battery:focus-visible {
+      outline: 3px solid var(--glow-color);
+      outline-offset: 3px;
+    }
+
+    .cap {
+      display: block;
+      width: 1.35rem;
+      height: 0.55rem;
+      background: var(--cap);
+      border: 2px solid var(--ink);
+      border-bottom: 0;
+    }
+
+    .cell {
+      display: grid;
+      place-items: center;
+      width: 3.6rem;
+      height: 4.6rem;
+      background: var(--cell);
+      color: var(--paper);
+      border: 2px solid var(--ink);
+      border-radius: 0.45rem;
+      font-size: 1.75rem;
+      line-height: 1;
+    }
+
+    .action {
+      display: block;
+      width: 4.6rem;
+      margin-top: 0.35rem;
+      margin-left: -0.5rem;
+      font-size: 1rem;
+      line-height: 1.15;
+    }
+
+    .paths {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 4.6rem;
+      margin: 0.55rem -2px 0;
+      min-width: 5.5rem;
+    }
+
+    .lead {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: 1.25rem;
+    }
+
+    .wire, .return {
+      height: 4px;
+      background: var(--copper);
+    }
+
+    .wire { flex: 1; }
+
+    .break {
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .bulb {
+      flex: none;
+      width: 4.4rem;
+      margin-top: 0.15rem;
+      text-align: center;
+    }
+
+    .lamp { display: block; width: 100%; height: 6.2rem; }
+
+    .glass { fill: #f7fbf9; stroke: var(--ink); stroke-width: 2; }
+
+    .base { fill: #8d8478; stroke: var(--ink); stroke-width: 2; }
+
+    .neck { fill: var(--cap); stroke: var(--ink); stroke-width: 2; }
+
+    .filament {
+      fill: none;
+      stroke: var(--filament);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: stroke 180ms linear, filter 180ms linear;
+    }
+
+    .bulb-state {
+      margin: 0.15rem 0 0;
+      font-size: 1rem;
+    }
+
+    .closed .break { display: none; }
+
+    .closed .lead { gap: 0; }
+
+    .closed .filament {
+      stroke: var(--glow-color);
+      filter: drop-shadow(0 0 calc(4px + 12px * var(--glow)) rgba(255, 176, 32, var(--glow)));
+    }
+
+    .status, .volts {
+      margin: 0.85rem 0 0;
+      max-width: 38ch;
+    }
+
+    .volts[hidden] { display: none; }
+
+    @media (hover: hover) and (pointer: fine) {
+      .battery:hover .cell { background: #3d8a64; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .filament { transition: none; }
+    }
+
+    html[data-reduced-motion="true"] .filament,
+    .board.still .filament {
+      transition: none;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Close the loop</h1>
+    <p class="ask">Predict what the bulb will do when the path from the battery goes out and comes back.</p>
+    <div class="board" id="board">
+      <div class="loop">
+        <button class="battery" type="button" data-lead="battery" aria-pressed="false">
+          <span class="cap" aria-hidden="true"></span>
+          <span class="cell" aria-hidden="true">+</span>
+          <span class="action">Connect the battery</span>
+        </button>
+        <div class="paths" aria-hidden="true">
+          <div class="lead"><span class="wire"></span><span class="break">open</span><span class="wire"></span></div>
+          <div class="return"></div>
+        </div>
+        <div class="bulb">
+          <svg class="lamp" viewBox="10 0 60 112" aria-hidden="true">
+            <path class="glass" d="M40 6c16 0 28 14 28 32 0 13-7 22-15 28v8H27V66C19 60 12 51 12 38 12 20 24 6 40 6z"/>
+            <path class="filament" d="M32 62c0-8 4-10 8-14 4 4 8 6 8 14"/>
+            <rect class="neck" x="28" y="74" width="24" height="8"/>
+            <rect class="base" x="30" y="82" width="20" height="18" rx="2"/>
+          </svg>
+          <p class="bulb-state" id="bulb-state">dark</p>
+        </div>
+      </div>
+    </div>
+    <p class="status" id="status" aria-live="polite">The loop is open. The bulb is dark.</p>
+    <p class="volts" id="voltage" hidden></p>
+  </main>
+  <script>
+    (function () {
+      var button = document.querySelector("[data-lead=battery]");
+      var board = document.getElementById("board");
+      var status = document.getElementById("status");
+      var voltageEl = document.getElementById("voltage");
+      var bulbState = document.getElementById("bulb-state");
+      if (!button || !board || !status || !voltageEl || !bulbState) return;
+
+      button.addEventListener("click", function () {
+        var kit = window.ArtifactKit;
+        var params = kit && kit.params ? kit.params : {};
+        var voltage = typeof params.voltage === "number" ? params.voltage : 3;
+        var still = !!((kit && kit.reducedMotion) || document.documentElement.getAttribute("data-reduced-motion") === "true");
+        var glow = voltage <= 0 ? 0 : Math.max(0.35, Math.min(1, voltage / 6));
+        document.documentElement.style.setProperty("--glow", String(glow));
+        if (still) board.classList.add("still");
+        board.classList.add("closed");
+        button.setAttribute("aria-pressed", "true");
+        var label = button.querySelector(".action");
+        if (label) label.textContent = "Battery connected";
+        bulbState.textContent = "lit";
+        status.textContent = "The loop is closed. The bulb is lit.";
+        voltageEl.hidden = false;
+        voltageEl.textContent = voltage + " V. A higher voltage makes this filament brighter.";
+        if (kit && typeof kit.emit === "function") {
+          kit.emit("component_connected", { part: "battery", voltage: voltage });
+          kit.emit("bulb_lit", { voltage: voltage });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
