@@ -1,0 +1,6 @@
+[
+  { "click": "[data-machine=lever]" },
+  { "expect": "machine_selected" },
+  { "expect": "advantage_compared" },
+  { "emit": "not_a_real_event" }
+]

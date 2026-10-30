@@ -1,0 +1,6 @@
+[
+  { "click": "[data-lead=battery]" },
+  { "expect": "component_connected" },
+  { "expect": "bulb_lit" },
+  { "emit": "not_a_real_event" }
+]

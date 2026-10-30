@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BrowserReport } from "./browser-report";
 import { getArtifact } from "./catalog";
 import { fakeDb } from "./catalog-double";
-import { runSeedCheck, runSeedLoad } from "./seed-check";
+import { runSeedCheck, runSeedLoad, seedLoadCredentials } from "./seed-check";
 
 const PAGE = "<!doctype html><html><head></head><body><p>Hello</p></body></html>";
 
@@ -122,6 +122,21 @@ async function printed(run: () => Promise<number>): Promise<{ code: number; line
     spy.mockRestore();
   }
 }
+
+describe("seed load credentials", () => {
+  it("names each missing catalog value and does not build a client", () => {
+    expect(seedLoadCredentials({})).toEqual({ missing: "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" });
+    expect(seedLoadCredentials({ NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co" })).toEqual({
+      missing: "SUPABASE_SERVICE_ROLE_KEY",
+    });
+    expect(
+      seedLoadCredentials({
+        NEXT_PUBLIC_SUPABASE_URL: " https://example.supabase.co ",
+        SUPABASE_SERVICE_ROLE_KEY: " service-role ",
+      }),
+    ).toEqual({ url: "https://example.supabase.co", key: "service-role" });
+  });
+});
 
 describe("seed check", () => {
   const dirs: string[] = [];

@@ -15,6 +15,7 @@ import {
   listForStudio,
   grantStaff,
   historyForStudio,
+  openDraftLink,
   listStaff,
   previewNewArtifact,
   removeStaff,
@@ -242,6 +243,32 @@ describe("new artifact preview", () => {
       topics: ["astronomy", "forces"],
       concepts: ["fulcrum", "orbit"],
     });
+  });
+
+  it("opens a draft on the artifact host and stays closed when the host is unset", () => {
+    const url = openDraftLink({
+      origin: "http://artifacts.test",
+      secret: "draft-secret",
+      now: 1_700_000_000,
+      artifactId: "solar-system",
+      version: 1,
+      entry: "index.html",
+    });
+    expect(url).toContain("http://artifacts.test/a/solar-system/1/index.html?t=");
+    expect(url).toContain("&e=");
+    expect(
+      openDraftLink({ origin: null, secret: "draft-secret", now: 1, artifactId: "solar-system", version: 1, entry: "index.html" }),
+    ).toBeNull();
+    expect(
+      openDraftLink({
+        origin: "http://artifacts.test",
+        secret: "",
+        now: 1,
+        artifactId: "solar-system",
+        version: 1,
+        entry: "index.html",
+      }),
+    ).toBeNull();
   });
 
   it("signs a draft preview url for the artifact host", () => {

@@ -1,0 +1,93 @@
+{
+  "manifestVersion": 1,
+  "id": "solar-system",
+  "version": 1,
+  "title": "Solar System Orbits",
+  "description": "Watch Mercury, Venus, Earth, and Mars orbit the Sun, then compare which lap takes more days.",
+  "format": "bundle",
+  "entry": "index.html",
+  "rendering": {
+    "dimension": "3d",
+    "tech": ["three@0.170.0"],
+    "webgl": true
+  },
+  "subjects": ["science"],
+  "topics": ["solar system", "orbits"],
+  "concepts": ["planetary orbit", "orbital period"],
+  "prerequisites": [],
+  "learningObjectives": ["Explain why a planet farther from the Sun takes longer to complete a lap"],
+  "objectiveIntents": ["explain_process", "compare", "predict"],
+  "visualKinds": ["orbit", "simulation"],
+  "interactionTypes": ["select", "simulate", "compare", "predict"],
+  "ageRange": [8, 12],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "planets",
+      "type": "string[]",
+      "default": ["mercury", "venus", "earth", "mars"],
+      "description": "Which planets to include when a child compares orbits."
+    }
+  ],
+  "events": [
+    {
+      "name": "planet_selected",
+      "data": { "planet": "string" },
+      "description": "The child chose a planet to look at."
+    },
+    {
+      "name": "orbit_comparison_completed",
+      "data": { "inner": "string", "outer": "string", "days": "number" },
+      "description": "The child compared a closer planet with a farther one."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "The planets are moving around the Sun. Closer ones finish a lap sooner.",
+    "steps": [
+      "Tap Earth.",
+      "Read which planet is farther and how many days its lap takes.",
+      "Tap another planet and compare the two laps."
+    ],
+    "observationPrompts": [
+      "Which planet is closer to the Sun, Earth or Mars?",
+      "Which lap takes more days?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "Every planet takes one year to go around the Sun.",
+        "response": "A year is Earth's lap. A farther planet has a longer path, so its lap takes more days."
+      }
+    ],
+    "hints": [
+      "Tap a planet button.",
+      "The sentence names the closer planet and the farther one.",
+      "Farther from the Sun means a longer lap."
+    ],
+    "successCriteria": [
+      {
+        "description": "Compared a closer planet with a farther one",
+        "evidence": ["orbit_comparison_completed"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Four planets orbit the Sun. Tap a planet to compare its lap with a neighbor. Closer planets finish sooner.",
+    "colorSafe": true
+  },
+  "performance": {
+    "targetFps": 30,
+    "mobileTested": true
+  },
+  "provenance": {
+    "createdWith": ["cursor"],
+    "createdAt": "2026-10-25T16:45:00.000Z"
+  },
+  "license": {
+    "artifact": "proprietary",
+    "thirdParty": [{ "name": "three", "version": "0.170.0", "license": "MIT" }],
+    "attributions": []
+  }
+}

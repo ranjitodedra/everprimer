@@ -7,10 +7,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { complianceLevel, parseManifest, type ArtifactManifest } from "@eco/contracts";
 import type { BrowserReport } from "./browser-report";
 import { runBrowserCheck, type BrowserProbeStep } from "./browser-check";
-import { recordBrowserReport, registerDraft } from "./catalog";
+import { deleteDraft, recordBrowserReport, registerDraft } from "./catalog";
 import { importArtifact } from "./import";
 import { mimeFromExtension } from "./import/mime";
 import type { InMemoryFile } from "./import/types";
+import { bundleObjectPath } from "./paths";
 
 const BESIDE = new Set(["manifest.json", "probe.json"]);
 
@@ -104,9 +105,21 @@ interface SeedOutcome {
   draft?: {
     manifest: ArtifactManifest;
     files: LibraryFileEntry[];
+    contents: InMemoryFile[];
     bundleSha256: string;
     report: BrowserReport;
   };
+}
+
+/** The hosted catalog credentials seed load writes with. A missing name is not a client. */
+export function seedLoadCredentials(
+  env: Record<string, string | undefined>,
+): { url: string; key: string } | { missing: string } {
+  const url = env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+  const key = env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? "";
+  const missing = [url ? "" : "NEXT_PUBLIC_SUPABASE_URL", key ? "" : "SUPABASE_SERVICE_ROLE_KEY"].filter(Boolean);
+  if (missing.length) return { missing: missing.join(" and ") };
+  return { url, key };
 }
 
 /**
@@ -120,19 +133,45 @@ export async function runSeedCheck(dir: string, options: SeedCheckOptions = {}):
 }
 
 /** Runs the same check, stores its browser report on a draft, and does not publish a version. */
-export async function runSeedLoad(dir: string, db: SupabaseClient, options: SeedCheckOptions = {}): Promise<number> {
+export async function runSeedLoad(
+  dir: string,
+  db: SupabaseClient,
+  options: SeedCheckOptions = {},
+  upload?: (objectPath: string, bytes: Uint8Array, mime: string) => Promise<string | null>,
+): Promise<number> {
   const outcome = await inspectSeed(dir, options);
   console.log(outcome.line);
-  if (outcome.code === 0 && outcome.draft) {
-    const registered = await registerDraft(db, {
-      manifest: outcome.draft.manifest,
-      files: outcome.draft.files,
-      bundleSha256: outcome.draft.bundleSha256,
-      actor: null,
-    });
-    if (registered.ok) await recordBrowserReport(db, registered.artifactId, registered.version, outcome.draft.report);
+  if (outcome.code !== 0 || !outcome.draft) return outcome.code;
+  const registered = await registerDraft(db, {
+    manifest: outcome.draft.manifest,
+    files: outcome.draft.files,
+    bundleSha256: outcome.draft.bundleSha256,
+    actor: null,
+  });
+  if (!registered.ok) {
+    console.log(registered.problems.join(" "));
+    return 1;
   }
-  return outcome.code;
+  if (upload) {
+    const stored: string[] = [];
+    for (const file of outcome.draft.contents) {
+      const objectPath = bundleObjectPath(registered.artifactId, registered.version, file.path);
+      const message = await upload(objectPath, file.bytes, file.mime);
+      if (message) {
+        console.log(message);
+        if (stored.length) await db.storage.from("library").remove(stored);
+        await deleteDraft(db, registered.artifactId, registered.version);
+        return 1;
+      }
+      stored.push(objectPath);
+    }
+  }
+  const recorded = await recordBrowserReport(db, registered.artifactId, registered.version, outcome.draft.report);
+  if (!recorded.ok) {
+    console.log(recorded.problems.join(" "));
+    return 1;
+  }
+  return 0;
 }
 
 async function inspectSeed(dir: string, options: SeedCheckOptions): Promise<SeedOutcome> {
@@ -203,6 +242,7 @@ async function inspectSeed(dir: string, options: SeedCheckOptions): Promise<Seed
     draft: {
       manifest: imported.normalized.manifest,
       files: imported.normalized.files,
+      contents: imported.normalized.contents,
       bundleSha256: imported.normalized.bundleSha256,
       report: checked.report,
     },
@@ -219,11 +259,30 @@ function optionFlags(argv: string[]): SeedCheckOptions {
   return options;
 }
 
+async function runCommand(command: string | undefined, dir: string | undefined, rest: string[]): Promise<number> {
+  if (!dir || (command !== "check" && command !== "load")) return 1;
+  const options = optionFlags(rest);
+  if (command === "check") return runSeedCheck(dir, options);
+  const creds = seedLoadCredentials(process.env);
+  if ("missing" in creds) {
+    console.log(`missing ${creds.missing}`);
+    return 1;
+  }
+  const { createClient } = await import("@supabase/supabase-js");
+  const db = createClient(creds.url, creds.key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return runSeedLoad(dir, db, options, async (objectPath, bytes, mime) => {
+    const { error } = await db.storage.from("library").upload(objectPath, Buffer.from(bytes), {
+      contentType: mime,
+      upsert: false,
+    });
+    return error?.message ?? null;
+  });
+}
+
 const entry = process.argv[1];
 if (entry && import.meta.url === pathToFileURL(realpathSync(entry)).href) {
   const [command, dir, ...rest] = process.argv.slice(2);
-  const run = command === "check" && dir ? runSeedCheck(dir, optionFlags(rest)) : Promise.resolve(1);
-  run.then((code) => {
+  runCommand(command, dir, rest).then((code) => {
     process.exit(code);
   });
 }

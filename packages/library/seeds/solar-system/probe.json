@@ -1,0 +1,6 @@
+[
+  { "click": "[data-planet=earth]" },
+  { "expect": "planet_selected" },
+  { "expect": "orbit_comparison_completed" },
+  { "emit": "not_a_real_event" }
+]

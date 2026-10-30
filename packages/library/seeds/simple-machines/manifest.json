@@ -1,0 +1,90 @@
+{
+  "manifestVersion": 1,
+  "id": "simple-machines",
+  "version": 1,
+  "title": "Simple Machines",
+  "description": "Try a lever, a pulley, and a ramp, and see how each one trades a longer move for a smaller effort.",
+  "format": "html",
+  "entry": "index.html",
+  "rendering": { "dimension": "2d", "tech": [], "webgl": false },
+  "subjects": ["science"],
+  "topics": ["simple machines", "forces"],
+  "concepts": ["lever", "pulley", "ramp", "mechanical advantage"],
+  "prerequisites": ["A push can lift a crate"],
+  "learningObjectives": [
+    "Explain how a lever, a pulley, or a ramp trades a longer distance for a smaller effort.",
+    "Choose a machine that lifts a heavy crate with a smaller push."
+  ],
+  "objectiveIntents": ["explain_process", "apply"],
+  "visualKinds": ["simulation", "parts"],
+  "interactionTypes": ["select", "simulate", "compare"],
+  "ageRange": [8, 12],
+  "difficulty": 2,
+  "durationSec": [45, 120],
+  "params": [
+    {
+      "key": "machine",
+      "type": "string",
+      "default": "lever",
+      "options": ["lever", "pulley", "ramp"],
+      "description": "Which simple machine the lesson asks the child to try first."
+    }
+  ],
+  "events": [
+    {
+      "name": "machine_selected",
+      "data": { "machine": "string" },
+      "description": "The child chose a lever, a pulley, or a ramp."
+    },
+    {
+      "name": "advantage_compared",
+      "data": { "machine": "string", "advantage": "number" },
+      "description": "The child compared the machine's push with lifting the crate straight up."
+    }
+  ],
+  "tutorGuide": {
+    "intro": "A simple machine spreads one lift over a longer path, so the push gets smaller. Try a lever, a pulley, and a ramp on the same crate.",
+    "steps": [
+      "Tap Lever, Pulley, or Ramp.",
+      "Find the fulcrum, the rope, or the slope.",
+      "Read the push and the advantage."
+    ],
+    "observationPrompts": [
+      "Which part moves farther, your hand or the crate?",
+      "What happens to the push when the path gets longer?"
+    ],
+    "misconceptions": [
+      {
+        "belief": "The machine removes the work.",
+        "response": "The crate still rises. You push less hard because you push farther."
+      },
+      {
+        "belief": "A ramp is not a machine.",
+        "response": "A ramp is an inclined plane. A longer slope means a smaller push."
+      }
+    ],
+    "hints": [
+      "Tap one of the three machines.",
+      "Look at the number called advantage.",
+      "A bigger advantage means a smaller push and a longer path."
+    ],
+    "successCriteria": [
+      {
+        "description": "Chose a machine and compared its advantage with a straight lift.",
+        "evidence": ["machine_selected", "advantage_compared"]
+      }
+    ]
+  },
+  "accessibility": {
+    "reducedMotion": true,
+    "keyboard": true,
+    "screenReaderSummary": "Three machines lift one crate. A lever, a pulley, and a ramp each make the push smaller and the distance longer.",
+    "colorSafe": true
+  },
+  "performance": { "mobileTested": true },
+  "provenance": {
+    "createdWith": ["hand"],
+    "createdAt": "2026-10-25T16:40:00.000Z"
+  },
+  "license": { "artifact": "proprietary", "thirdParty": [], "attributions": [] }
+}

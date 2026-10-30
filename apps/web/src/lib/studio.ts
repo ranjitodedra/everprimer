@@ -299,6 +299,20 @@ export function draftPreviewUrl(origin: string, artifactId: string, version: num
   return `${origin.replace(/\/$/, "")}/a/${encodeURIComponent(artifactId)}/${version}/${path}?t=${token.signature}&e=${token.expiry}`;
 }
 
+/** A signed artifact-origin URL for one draft. Missing host config returns null and writes nothing. */
+export function openDraftLink(input: {
+  origin: string | null;
+  secret: string;
+  now: number;
+  artifactId: string;
+  version: number;
+  entry: string;
+}): string | null {
+  if (!input.origin || !input.secret) return null;
+  const token = signDraftToken(input.artifactId, input.version, input.now + PREVIEW_TTL_SEC, input.secret);
+  return draftPreviewUrl(input.origin, input.artifactId, input.version, input.entry, token);
+}
+
 export type NewArtifactInput = {
   html?: string;
   zip?: Uint8Array;
